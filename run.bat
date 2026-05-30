@@ -11,6 +11,16 @@ if not exist ".venv" (
     exit /b 1
 )
 
+REM ── Guard: check FFmpeg is present ───────────────
+if not exist "bin\ffmpeg.exe" (
+    echo WARNING: FFmpeg not found in bin\ffmpeg.exe
+    echo          Please run setup.bat first to download FFmpeg automatically.
+    echo          Or manually place ffmpeg.exe and ffprobe.exe inside the 'bin' folder.
+    echo.
+    pause
+    exit /b 1
+)
+
 echo Activating virtual environment...
 call .venv\Scripts\activate.bat
 
