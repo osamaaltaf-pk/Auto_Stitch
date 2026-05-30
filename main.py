@@ -709,7 +709,11 @@ async def upload_custom_video(project_name: str, index: int, file: UploadFile = 
         raise HTTPException(status_code=400, detail="Invalid slot index")
         
     for idx, b in enumerate(manifest.video_blocks):
-        if idx != index and b.filename and b.filename.lower() == file.filename.lower():
+        if (idx != index and 
+            b.filename and 
+            b.filename.lower() == file.filename.lower() and 
+            b.filename.lower() != "blank_clip.mp4" and 
+            not b.filename.lower().startswith("clip_")):
             raise HTTPException(status_code=400, detail=f"The file '{file.filename}' is already used in slot {idx}. Duplications are not allowed.")
         
     custom_video_dir = p_dir / "videos"

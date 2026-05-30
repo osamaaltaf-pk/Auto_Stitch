@@ -772,12 +772,25 @@ function App() {
   // API Call: Upload custom video file to specific slot
   const handleCustomVideoUpload = async (index, file) => {
     if (!file) return;
-    const isDuplicate = project.video_blocks.some((b, idx) => idx !== index && b.filename && b.filename.toLowerCase() === file.name.toLowerCase());
+    
+    // Check duplication across the selected video layer track, ignoring default blank placeholders
+    const activeLayer = timelineLayers.find(l => l.id === (selectedBlock?.layerId || 'video-1'));
+    const blocksToSearch = activeLayer ? activeLayer.blocks : project.video_blocks;
+    
+    const isDuplicate = blocksToSearch.some((b, idx) => 
+      idx !== index && 
+      b.filename && 
+      b.filename.toLowerCase() === file.name.toLowerCase() && 
+      b.filename.toLowerCase() !== 'blank_clip.mp4' && 
+      !b.filename.toLowerCase().startsWith('clip_')
+    );
+    
     if (isDuplicate) {
-      addLog(`Upload blocked: The file "${file.name}" is already used in another video slot. Duplications are not allowed.`, "error");
-      alert(`The file "${file.name}" is already used in another video slot. Duplications are not allowed.`);
+      addLog(`Upload blocked: The file "${file.name}" is already used in another slot in this layer. Duplications are not allowed.`, "error");
+      alert(`The file "${file.name}" is already used in another slot in this layer. Duplications are not allowed.`);
       return;
     }
+    
     addLog(`Uploading custom video clip '${file.name}' for slot ${index}...`, "info");
     const formData = new FormData();
     formData.append("file", file);
@@ -788,11 +801,33 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
+        
+        // Update the block directly in timelineLayers so it lands immediately
+        setTimelineLayers(prev => prev.map(layer => {
+          if (layer.id === (selectedBlock?.layerId || 'video-1')) {
+            const newBlocks = [...layer.blocks];
+            newBlocks[index] = {
+              ...newBlocks[index],
+              file_path: data.block.file_path,
+              filename: data.block.filename,
+              duration_s: data.block.duration_s,
+              thumbnail_path: data.block.thumbnail_path,
+              status: 'provided'
+            };
+            return { ...layer, blocks: newBlocks };
+          }
+          return layer;
+        }));
+        
+        // Update root project manifest
         setProject(data.manifest);
-        setSelectedBlock({ lane: 'video', index });
+        setSelectedBlock({ lane: 'video', index, layerId: selectedBlock?.layerId || 'video-1' });
         addLog(`Custom video clip uploaded successfully for slot ${index}!`, "success");
       } else {
-        addLog("Failed uploading custom video clip.", "error");
+        const errData = await resp.json().catch(() => ({}));
+        const errMsg = errData.detail || "Failed uploading custom video clip.";
+        addLog(`Upload failed: ${errMsg}`, "error");
+        alert(`Upload failed: ${errMsg}`);
       }
     } catch (e) {
       addLog(`Upload error: ${e}`, "error");
@@ -2385,7 +2420,7 @@ function App() {
                       onSaveProject={() => saveProject()}
                       onGenerate={(prompt, params) => generateSfx(selectedBlock.index, prompt, params)}
                       addLog={addLog}
-                      onCustomSfxUpload={(file) => handleCustomSfxUpload(selectedBlock.index, file)}
+                      onImportTextFile={(file) => importTextFile('sfx', file)}
                       onClearSfx={() => clearBlockMedia('sfx', selectedBlock.index)}
                     />
                   )}
@@ -2401,7 +2436,7 @@ function App() {
                         const updated = [...project.voice_blocks];
                         if (updated[selectedBlock.index]) {
                           updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice: voice };
-                         }
+                        }
                         const newManifest = { ...project, voice_blocks: updated };
                         setProject(newManifest);
                         saveProject(newManifest);
@@ -2410,7 +2445,7 @@ function App() {
                       onGenerate={(text, voice) => generateTts(selectedBlock.index, text, voice)}
                       addLog={addLog}
                       availableVoices={availableVoices}
-                      onCustomVoiceUpload={(file) => handleCustomVoiceUpload(selectedBlock.index, file)}
+                      onImportTextFile={(file) => importTextFile('voice', file)}
                       onClearVoice={() => clearBlockMedia('voice', selectedBlock.index)}
                     />
                   )}
@@ -2534,7 +2569,7 @@ function App() {
 }
 
 // Subcomponent: SFX Controller Panel
-function SfxController({ index, block, project, onPromptChange, onSaveProject, onGenerate, addLog, onCustomSfxUpload, onClearSfx }) {
+function SfxController({ index, block, project, onPromptChange, onSaveProject, onGenerate, addLog, onImportTextFile, onClearSfx }) {
   const [promptInput, setPromptInput] = useState(block.prompt || "");
   const [model, setModel] = useState("small-sfx");
   const [duration, setDuration] = useState(block.duration_s || 5.0);
@@ -2653,21 +2688,22 @@ function SfxController({ index, block, project, onPromptChange, onSaveProject, o
         </div>
       )}
 
-      {/* SFX Manual Upload and Clear actions */}
+      {/* SFX Prompt TXT Import */}
       <div className="flex flex-col gap-2 border-t border-carbon-border/40 pt-4 mt-2">
-        <span className="text-[10px] font-bold font-mono text-gray-500">MANUAL COMPOSITION</span>
+        <span className="text-[10px] font-bold font-mono text-gray-500">IMPORT PROMPTS</span>
         <input 
           type="file" 
-          accept="audio/*" 
-          onChange={(e) => onCustomSfxUpload(e.target.files[0])} 
+          accept=".txt" 
+          onChange={(e) => onImportTextFile(e.target.files[0])} 
           className="hidden" 
-          id="custom-sfx-upload-btn" 
+          id="custom-sfx-prompt-import" 
         />
         <label 
-          htmlFor="custom-sfx-upload-btn"
+          htmlFor="custom-sfx-prompt-import"
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-secondary/20 to-pink-600/20 border border-accent-secondary/50 hover:border-accent-secondary text-xs text-white hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
         >
-          <span>UPLOAD SFX AUDIO 📤</span>
+          <Icon name="file-text" className="w-3.5 h-3.5 text-accent-secondary" />
+          <span>UPLOAD PROMPT TXT 📤</span>
         </label>
 
         {block.file_path && (
@@ -2684,7 +2720,7 @@ function SfxController({ index, block, project, onPromptChange, onSaveProject, o
 }
 
 // Subcomponent: Voice / TTS Controller Panel
-function VoiceController({ index, block, project, onPromptChange, onVoiceChange, onSaveProject, onGenerate, addLog, availableVoices = [], onCustomVoiceUpload, onClearVoice }) {
+function VoiceController({ index, block, project, onPromptChange, onVoiceChange, onSaveProject, onGenerate, addLog, availableVoices = [], onImportTextFile, onClearVoice }) {
   const [promptInput, setPromptInput] = useState(block.prompt || "");
   const [voice, setVoice] = useState(block.voice || "alba");
 
@@ -2765,21 +2801,22 @@ function VoiceController({ index, block, project, onPromptChange, onVoiceChange,
         </div>
       )}
 
-      {/* Voice Manual Upload and Clear actions */}
+      {/* Voice Prompt TXT Import */}
       <div className="flex flex-col gap-2 border-t border-carbon-border/40 pt-4 mt-2">
-        <span className="text-[10px] font-bold font-mono text-gray-500">MANUAL COMPOSITION</span>
+        <span className="text-[10px] font-bold font-mono text-gray-500">IMPORT SCRIPT</span>
         <input 
           type="file" 
-          accept="audio/*" 
-          onChange={(e) => onCustomVoiceUpload(e.target.files[0])} 
+          accept=".txt" 
+          onChange={(e) => onImportTextFile(e.target.files[0])} 
           className="hidden" 
-          id="custom-voice-upload-btn" 
+          id="custom-voice-prompt-import" 
         />
         <label 
-          htmlFor="custom-voice-upload-btn"
+          htmlFor="custom-voice-prompt-import"
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-tertiary/20 to-teal-600/20 border border-accent-tertiary/50 hover:border-accent-tertiary text-xs text-white hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
         >
-          <span>UPLOAD SPEECH AUDIO 📤</span>
+          <Icon name="file-text" className="w-3.5 h-3.5 text-accent-tertiary" />
+          <span>UPLOAD SCRIPT TXT 📤</span>
         </label>
 
         {block.file_path && (
