@@ -580,6 +580,12 @@ function App() {
   // API Call: Upload custom video file to specific slot
   const handleCustomVideoUpload = async (index, file) => {
     if (!file) return;
+    const isDuplicate = project.video_blocks.some((b, idx) => idx !== index && b.filename && b.filename.toLowerCase() === file.name.toLowerCase());
+    if (isDuplicate) {
+      addLog(`Upload blocked: The file "${file.name}" is already used in another video slot. Duplications are not allowed.`, "error");
+      alert(`The file "${file.name}" is already used in another video slot. Duplications are not allowed.`);
+      return;
+    }
     addLog(`Uploading custom video clip '${file.name}' for slot ${index}...`, "info");
     const formData = new FormData();
     formData.append("file", file);
@@ -604,6 +610,12 @@ function App() {
   // API Call: Upload custom speech audio file to specific slot
   const handleCustomVoiceUpload = async (index, file) => {
     if (!file) return;
+    const isDuplicate = project.voice_blocks.some((b, idx) => idx !== index && b.file_path && b.file_path.toLowerCase().endsWith(file.name.toLowerCase()));
+    if (isDuplicate) {
+      addLog(`Upload blocked: The file "${file.name}" is already used in another voice slot. Duplications are not allowed.`, "error");
+      alert(`The file "${file.name}" is already used in another voice slot. Duplications are not allowed.`);
+      return;
+    }
     addLog(`Uploading custom speech audio '${file.name}' for slot ${index}...`, "info");
     const formData = new FormData();
     formData.append("file", file);
@@ -628,6 +640,12 @@ function App() {
   // API Call: Upload custom sound effect to specific slot
   const handleCustomSfxUpload = async (index, file) => {
     if (!file) return;
+    const isDuplicate = project.sfx_blocks.some((b, idx) => idx !== index && b.file_path && b.file_path.toLowerCase().endsWith(file.name.toLowerCase()));
+    if (isDuplicate) {
+      addLog(`Upload blocked: The file "${file.name}" is already used in another SFX slot. Duplications are not allowed.`, "error");
+      alert(`The file "${file.name}" is already used in another SFX slot. Duplications are not allowed.`);
+      return;
+    }
     addLog(`Uploading custom sound effect '${file.name}' for slot ${index}...`, "info");
     const formData = new FormData();
     formData.append("file", file);
@@ -775,7 +793,7 @@ function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target.result;
-      const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const lines = [...new Set(text.split("\n").map(l => l.trim()).filter(l => l.length > 0))];
       if (lines.length === 0) {
         addLog("Import failed: Select file has no text lines.", "error");
         return;
@@ -842,6 +860,12 @@ function App() {
       addLog("Please write a speech script first.", "error");
       return;
     }
+    const isDuplicate = project.voice_blocks.some((b, idx) => idx !== index && b.prompt && b.prompt.trim().toLowerCase() === text.trim().toLowerCase());
+    if (isDuplicate) {
+      addLog(`Failed to generate TTS: The prompt "${text}" is already used in another slot. Duplications are not allowed.`, "error");
+      alert(`The prompt "${text}" is already used in another slot. Duplications are not allowed.`);
+      return;
+    }
     const block = project.voice_blocks[index];
     addLog(`Synthesizing voiceover block ${block.id}...`, "info");
     
@@ -878,6 +902,12 @@ function App() {
   const generateSfx = async (index, prompt, params) => {
     if (!prompt.trim()) {
       addLog("Please describe your sound effect first.", "error");
+      return;
+    }
+    const isDuplicate = project.sfx_blocks.some((b, idx) => idx !== index && b.prompt && b.prompt.trim().toLowerCase() === prompt.trim().toLowerCase());
+    if (isDuplicate) {
+      addLog(`Failed to generate SFX: The prompt "${prompt}" is already used in another slot. Duplications are not allowed.`, "error");
+      alert(`The prompt "${prompt}" is already used in another slot. Duplications are not allowed.`);
       return;
     }
     const block = project.sfx_blocks[index];

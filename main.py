@@ -708,6 +708,10 @@ async def upload_custom_video(project_name: str, index: int, file: UploadFile = 
     if index < 0 or index >= len(manifest.video_blocks):
         raise HTTPException(status_code=400, detail="Invalid slot index")
         
+    for idx, b in enumerate(manifest.video_blocks):
+        if idx != index and b.filename and b.filename.lower() == file.filename.lower():
+            raise HTTPException(status_code=400, detail=f"The file '{file.filename}' is already used in slot {idx}. Duplications are not allowed.")
+        
     custom_video_dir = p_dir / "videos"
     custom_video_dir.mkdir(exist_ok=True)
     
@@ -748,6 +752,10 @@ async def upload_custom_voice(project_name: str, index: int, file: UploadFile = 
     if index < 0 or index >= len(manifest.voice_blocks):
         raise HTTPException(status_code=400, detail="Invalid slot index")
         
+    for idx, b in enumerate(manifest.voice_blocks):
+        if idx != index and b.file_path and Path(b.file_path).name.lower() == file.filename.lower():
+            raise HTTPException(status_code=400, detail=f"The file '{file.filename}' is already used in slot {idx}. Duplications are not allowed.")
+        
     voice_dir = p_dir / "voice"
     voice_dir.mkdir(exist_ok=True)
     
@@ -781,6 +789,10 @@ async def upload_custom_sfx(project_name: str, index: int, file: UploadFile = Fi
         
     if index < 0 or index >= len(manifest.sfx_blocks):
         raise HTTPException(status_code=400, detail="Invalid slot index")
+        
+    for idx, b in enumerate(manifest.sfx_blocks):
+        if idx != index and b.file_path and Path(b.file_path).name.lower() == file.filename.lower():
+            raise HTTPException(status_code=400, detail=f"The file '{file.filename}' is already used in slot {idx}. Duplications are not allowed.")
         
     sfx_dir = p_dir / "sfx"
     sfx_dir.mkdir(exist_ok=True)
