@@ -1518,7 +1518,17 @@ function App() {
                         onClick={() => setSelectedBlock({ lane: 'video', index: i })}
                         className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-all ${selectedBlock?.lane === 'video' && selectedBlock?.index === i ? 'bg-accent-primary/10 border-accent-primary text-white' : 'bg-carbon-card/20 border-carbon-border/50 hover:border-carbon-border hover:bg-carbon-card/40'}`}
                       >
-                        <img src={v.thumbnail_path} className="w-10 h-7 rounded object-cover" />
+                        {v.file_path ? (
+                          <video 
+                            src={`/api/video/serve?path=${encodeURIComponent(v.file_path)}#t=0.1`} 
+                            preload="metadata" 
+                            muted 
+                            playsInline 
+                            className="w-10 h-7 rounded object-cover pointer-events-none bg-black/40" 
+                          />
+                        ) : (
+                          <img src={v.thumbnail_path} className="w-10 h-7 rounded object-cover" />
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold truncate text-gray-300">{v.filename}</p>
                           <span className="text-[10px] text-gray-500 font-mono">{v.duration_s.toFixed(1)}s</span>
@@ -2007,9 +2017,9 @@ function App() {
                         
                         {/* Quick Insert button inside ruler tick */}
                         <button
-                          onClick={(e) => { e.stopPropagation(); insertBlankSlotAt(i); }}
-                          className="text-gray-600 hover:text-white text-xs font-extrabold ml-auto mr-2 focus:outline-none"
-                          title="Insert blank slot before this column"
+                          onClick={(e) => { e.stopPropagation(); insertBlankSlotAt(i + 1); }}
+                          className="flex items-center justify-center w-5 h-5 rounded-full border border-carbon-border/50 bg-carbon hover:bg-accent-primary hover:border-accent-primary text-gray-400 hover:text-white text-[11px] font-extrabold ml-auto mr-1.5 focus:outline-none transition-all shadow-sm cursor-pointer"
+                          title="Insert blank slot to the right of this column"
                         >
                           +
                         </button>
@@ -2024,31 +2034,6 @@ function App() {
 
               {/* TIMELINE LANES */}
               <div className="flex-1 flex flex-col min-h-0 overflow-y-auto relative">
-                
-                {/* Rendering Vertical Hover-Insertion Dividers */}
-                {project.video_blocks.map((v, i) => (
-                  <div
-                    key={`divider-${i}`}
-                    style={{ left: `${(i * 146) + 143}px` }}
-                    className="timeline-insert-divider"
-                    onClick={() => insertBlankSlotAt(i + 1)}
-                    title={`Insert slot between position ${i} and ${i + 1}`}
-                  >
-                    <div className="timeline-insert-button">+</div>
-                  </div>
-                ))}
-                
-                {/* Divider at the very beginning (position 0) */}
-                {project.video_blocks.length > 0 && (
-                  <div
-                    style={{ left: `-3px` }}
-                    className="timeline-insert-divider"
-                    onClick={() => insertBlankSlotAt(0)}
-                    title="Insert slot at the very beginning (position 0)"
-                  >
-                    <div className="timeline-insert-button">+</div>
-                  </div>
-                )}
 
                 {/* DYNAMIC TIMELINE LAYERS */}
                 {timelineLayers.map((layer, layerIdx) => {
@@ -2116,7 +2101,17 @@ function App() {
                                         : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-primary/40 hover:bg-carbon-card/35')
                                 }`}
                               >
-                                <img src={block.thumbnail_path} className="w-full h-11 rounded object-cover" />
+                                {block.file_path ? (
+                                  <video 
+                                    src={`/api/video/serve?path=${encodeURIComponent(block.file_path)}#t=0.1`} 
+                                    preload="metadata" 
+                                    muted 
+                                    playsInline 
+                                    className="w-full h-11 rounded object-cover pointer-events-none bg-black/40" 
+                                  />
+                                ) : (
+                                  <img src={block.thumbnail_path} className="w-full h-11 rounded object-cover" />
+                                )}
                                 <div className="flex items-center justify-between text-[10px]">
                                   <span className="truncate font-semibold text-gray-300 max-w-[80px]">{block.filename}</span>
                                   <span className="font-mono text-gray-500">{block.duration_s.toFixed(1)}s</span>
@@ -2365,7 +2360,17 @@ function App() {
                   {/* Video Block Detail View */}
                   {selectedBlock.lane === 'video' && blockData && (
                     <div className="flex flex-col gap-4">
-                      <img src={blockData.thumbnail_path} className="w-full h-32 rounded-lg object-cover border border-carbon-border" />
+                      {blockData.file_path ? (
+                        <video 
+                          src={`/api/video/serve?path=${encodeURIComponent(blockData.file_path)}#t=0.1`} 
+                          preload="metadata" 
+                          muted 
+                          playsInline 
+                          className="w-full h-32 rounded-lg object-cover border border-carbon-border pointer-events-none bg-black/40" 
+                        />
+                      ) : (
+                        <img src={blockData.thumbnail_path} className="w-full h-32 rounded-lg object-cover border border-carbon-border" />
+                      )}
                       <div className="bg-carbon/50 p-3 rounded-lg border border-carbon-border/50 font-mono text-xs flex flex-col gap-2">
                         <div>
                           <span className="text-gray-500">File Name:</span>
