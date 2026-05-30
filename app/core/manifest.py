@@ -24,6 +24,9 @@ class VideoBlock:
     thumbnail_path: Optional[str] = None
     order: int = 0             # position in lane (0-indexed)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> VideoBlock:
         return cls(
@@ -44,6 +47,9 @@ class SfxBlock:
     file_path: Optional[str] = None   # path to generated .wav
     duration_s: Optional[float] = None # target duration (default: match video slot)
     error_msg: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> SfxBlock:
@@ -68,6 +74,9 @@ class VoiceBlock:
     file_path: Optional[str] = None   # path to generated or copied .wav/.mp3
     duration_s: Optional[float] = None
     error_msg: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> VoiceBlock:
