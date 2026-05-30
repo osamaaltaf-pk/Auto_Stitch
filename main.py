@@ -193,7 +193,7 @@ async def update_settings(model: SettingsModel):
 
 @app.get("/api/voices")
 async def list_available_voices():
-    """Fetch the dynamic list of voices from the PocketTTS server."""
+    """Fetch the dynamic list of voices from the PocketTTS server, supporting both flat list and dictionary response styles."""
     settings = load_settings()
     tts_url = settings["tts_server_url"]
     default_voices = ["alba", "marius", "fantine", "cosette", "jean", "eponine"]
@@ -205,12 +205,38 @@ async def list_available_voices():
                 timeout=5.0
             )
             if resp.status_code == 200:
-                server_voices = resp.json().get("voices", [])
-                # Combine and remove duplicates
+                raw_voices = resp.json().get("voices", [])
+                server_voices = []
+                for v in raw_voices:
+                    if isinstance(v, dict) and "name" in v:
+                        server_voices.append(v["name"])
+                    elif isinstance(v, str):
+                        server_voices.append(v)
+                # Combine and remove duplicates cleanly
                 return {"voices": sorted(list(set(default_voices + server_voices)))}
     except Exception as e:
         logger.warning(f"Failed contacting PocketTTS voices API: {e}")
     return {"voices": default_voices}
+
+@app.delete("/api/voices/delete/{voice_name}")
+async def proxy_delete_voice(voice_name: str):
+    """Delete a dynamic cloned voice from the PocketTTS server."""
+    settings = load_settings()
+    tts_url = settings["tts_server_url"]
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{tts_url}/api/voices/delete?voice_name={voice_name}",
+                headers={"bypass-tunnel-reminder": "true"},
+                timeout=10.0
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except Exception as e:
+        logger.error(f"Failed deleting voice '{voice_name}': {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/voices/clone")
 async def proxy_clone_voice(file: UploadFile = File(...)):

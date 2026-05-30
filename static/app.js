@@ -353,6 +353,36 @@ function App() {
     }
   };
 
+  // API Call: Delete custom cloned voice
+  const deleteVoice = async (voiceName) => {
+    if (["alba", "marius", "fantine", "cosette", "jean", "eponine"].includes(voiceName)) {
+      addLog("Cannot delete standard premade voice.", "error");
+      return;
+    }
+    const confirm = window.confirm(`Are you sure you want to permanently delete the custom cloned voice '${voiceName}'?`);
+    if (!confirm) return;
+
+    addLog(`Deleting cloned voice '${voiceName}'...`, "info");
+    try {
+      const resp = await fetch(`/api/voices/delete/${encodeURIComponent(voiceName)}`, {
+        method: "DELETE"
+      });
+      if (resp.ok) {
+        addLog(`Voice '${voiceName}' deleted successfully!`, "success");
+        await fetchVoices();
+        if (globalDefaultVoice === voiceName) {
+          setGlobalDefaultVoice("alba");
+        }
+      } else {
+        const err = await resp.text();
+        addLog(`Failed to delete voice: ${err}`, "error");
+      }
+    } catch (e) {
+      addLog(`Error contacting server: ${e}`, "error");
+    }
+  };
+
+
   // API Call: Voice cloning upload proxy
   const handleCloneVoiceUpload = async (e) => {
     const file = e.target.files[0];
@@ -1137,72 +1167,42 @@ function App() {
                 <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2.5">
                   <h3 className="text-xs font-bold font-mono text-gray-400">SCAN LOCAL FOLDER</h3>
                   
-                  {/* Browse and Downloads Fast Shortcut Buttons */}
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={async () => {
-                        addLog("Opening native directory picker...", "info");
-                        try {
-                          const resp = await fetch("/api/videos/select-folder", { method: "POST" });
-                          if (resp.ok) {
-                            const data = await resp.json();
-                            if (data.status === 'ok' && data.folder) {
-                              setVideoFolderInput(data.folder);
-                              addLog(`Selected videos directory: "${data.folder}"`, "success");
-                            } else {
-                              addLog("Folder selection cancelled.", "info");
-                            }
+                  {/* Browse Button */}
+                  <button 
+                    onClick={async () => {
+                      addLog("Opening native directory picker...", "info");
+                      try {
+                        const resp = await fetch("/api/videos/select-folder", { method: "POST" });
+                        if (resp.ok) {
+                          const data = await resp.json();
+                          if (data.status === 'ok' && data.folder) {
+                            setVideoFolderInput(data.folder);
+                            addLog(`Selected videos directory: "${data.folder}"`, "success");
+                          } else {
+                            addLog("Folder selection cancelled.", "info");
                           }
-                        } catch (e) {
-                          addLog("Failed loading native directory picker.", "error");
                         }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1 bg-carbon border border-carbon-border hover:border-accent-primary text-[10px] text-gray-300 py-2 rounded-lg transition-all font-semibold font-mono"
-                      title="Open Windows directory selection dialog"
-                    >
-                      <Icon name="folder-search" className="w-3.5 h-3.5 text-accent-primary" />
-                      <span>BROWSE 📂</span>
-                    </button>
+                      } catch (e) {
+                        addLog("Failed loading native directory picker.", "error");
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-primary text-xs text-gray-300 py-2.5 rounded-lg transition-all font-semibold font-mono"
+                    title="Open Windows directory selection dialog"
+                  >
+                    <Icon name="folder-search" className="w-4 h-4 text-accent-primary" />
+                    <span>BROWSE FOLDER 📂</span>
+                  </button>
 
-                    <button 
-                      onClick={async () => {
-                        addLog("Locating Downloads folder path...", "info");
-                        try {
-                          const resp = await fetch("/api/videos/downloads-folder");
-                          if (resp.ok) {
-                            const data = await resp.json();
-                            if (data.status === 'ok' && data.folder) {
-                              setVideoFolderInput(data.folder);
-                              addLog(`Selected Downloads folder: "${data.folder}"`, "success");
-                            } else {
-                              addLog("Could not locate Downloads folder.", "error");
-                            }
-                          }
-                        } catch (e) {
-                          addLog("Failed contacting server.", "error");
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1 bg-carbon border border-carbon-border hover:border-accent-tertiary text-[10px] text-gray-300 py-2 rounded-lg transition-all font-semibold font-mono"
-                      title="Select your user Downloads directory instantly"
-                    >
-                      <span>DOWNLOADS 📥</span>
-                    </button>
-                  </div>
-
-                  {/* Clean, thin editable path input so they can type/paste standard Windows paths if picker is hidden! */}
-                  <div className="flex flex-col gap-1 text-[10px] font-mono text-gray-500 mt-1">
-                    <label className="text-gray-400">SCAN DIRECTORY:</label>
-                    <input 
-                      value={videoFolderInput}
-                      onChange={(e) => setVideoFolderInput(e.target.value)}
-                      placeholder="e.g. C:\Users\Microsoft\Downloads"
-                      className="w-full bg-carbon text-[10px] text-gray-200 outline-none border border-carbon-border/50 focus:border-accent-primary px-2.5 py-1.5 rounded font-mono transition-all"
-                    />
-                  </div>
+                  {/* Subtle path display */}
+                  {videoFolderInput && (
+                    <div className="text-[10px] font-mono text-gray-500 truncate text-center my-0.5 select-text" title={videoFolderInput}>
+                      Selected: <span className="text-gray-300">{videoFolderInput}</span>
+                    </div>
+                  )}
 
                   <button 
                     onClick={scanVideos}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary/20 to-purple-600/20 border border-accent-primary/40 hover:border-accent-primary text-xs text-white hover:text-white py-2 rounded-lg transition-all font-bold font-mono mt-1"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary/20 to-purple-600/20 border border-accent-primary/40 hover:border-accent-primary text-xs text-white hover:text-white py-2.5 rounded-lg transition-all font-bold font-mono"
                   >
                     <Icon name="sparkles" className="w-3.5 h-3.5" />
                     <span>SCAN VIDEOS ⚡</span>
@@ -1358,14 +1358,26 @@ function App() {
                                addLog(`Set global default voice to '${voice}'`, "success");
                              }
                            }}
-                           className={`flex items-center gap-1.5 p-2 rounded-lg cursor-pointer transition-all border-2 ${
+                           className={`flex items-center gap-1.5 p-2 rounded-lg cursor-pointer transition-all border-2 relative group ${
                              isVoiceSelected 
                                ? 'bg-accent-tertiary/10 border-accent-tertiary text-white shadow-[0_0_8px_rgba(108,255,204,0.2)]' 
                                : 'bg-carbon-card/30 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/50 hover:bg-carbon-card/50'
                            }`}
                          >
-                           <span className={`w-1.5 h-1.5 rounded-full ${isVoiceSelected ? 'bg-accent-tertiary shadow-[0_0_6px_#6cffcc]' : 'bg-gray-600'}`}></span>
-                           <span className="text-xs font-mono font-semibold truncate" title={voice}>{voice}</span>
+                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isVoiceSelected ? 'bg-accent-tertiary shadow-[0_0_6px_#6cffcc]' : 'bg-gray-600'}`}></span>
+                           <span className="text-xs font-mono font-semibold truncate flex-1" title={voice}>{voice}</span>
+                           {!["alba", "marius", "fantine", "cosette", "jean", "eponine"].includes(voice) && (
+                             <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 deleteVoice(voice);
+                               }}
+                               className="text-gray-500 hover:text-red-500 hover:scale-110 p-0.5 rounded transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 font-bold leading-none shrink-0"
+                               title={`Delete custom voice ${voice}`}
+                             >
+                               ✕
+                             </button>
+                           )}
                          </div>
                        );
                     })}
