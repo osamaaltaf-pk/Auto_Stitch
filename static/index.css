@@ -1,0 +1,242 @@
+/* --- Custom Global Styles & Aesthetic Animations --- */
+
+body {
+  background-color: #07070a;
+}
+
+/* Elegant custom scrollbar designed for timeline */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(7, 7, 10, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 108, 255, 0.2);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 108, 255, 0.5);
+}
+
+/* Glassmorphism styling helpers */
+.glass-panel {
+  background: rgba(13, 14, 20, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.glass-card {
+  background: rgba(20, 22, 34, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(124, 108, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.1);
+}
+
+/* Glow highlights for selected elements */
+.glow-active {
+  box-shadow: 0 0 15px rgba(124, 108, 255, 0.25);
+  border-color: rgba(124, 108, 255, 0.6) !important;
+}
+
+/* Status indicator glows & animation pulses */
+@keyframes generating-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 2px rgba(251, 191, 36, 0.2);
+  }
+}
+
+.status-generating {
+  animation: generating-pulse 1.5s infinite ease-in-out;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  background: rgba(251, 191, 36, 0.04) !important;
+}
+
+.status-done {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background: rgba(16, 185, 129, 0.03) !important;
+}
+
+.status-provided {
+  border-color: rgba(6, 182, 212, 0.4) !important;
+  background: rgba(6, 182, 212, 0.03) !important;
+}
+
+@keyframes error-blink {
+  0%, 100% {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.03);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 0.8);
+    background: rgba(239, 68, 68, 0.1);
+  }
+}
+
+.status-error {
+  animation: error-blink 2s infinite ease-in-out;
+}
+
+/* Grid & Timeline timeline lane track overlays */
+.timeline-lane-track {
+  background-size: 146px 100%;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  position: relative;
+}
+
+/* Ruler tick indicator styling */
+.timeline-ruler {
+  background-size: 146px 100%;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+/* Horizontal scrolling alignment */
+.sync-scroll-container {
+  scrollbar-width: none; /* Firefox */
+}
+
+.sync-scroll-container::-webkit-scrollbar {
+  display: none; /* Safari & Chrome */
+}
+
+/* Interactive custom slider style */
+input[type="range"].custom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #1f2235;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"].custom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #7c6cff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(124, 108, 255, 0.5);
+  transition: transform 0.1s ease;
+}
+
+input[type="range"].custom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Draggable Timeline columns style */
+.draggable-ruler-tick {
+  cursor: grab;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.draggable-ruler-tick:active {
+  cursor: grabbing;
+}
+
+.drag-over-column {
+  border-left: 2px dashed #7c6cff !important;
+  background: rgba(124, 108, 255, 0.08) !important;
+}
+
+/* Glowing Vertical Insertion Divider */
+.timeline-insert-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: pointer;
+  z-index: 30;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.timeline-insert-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #7c6cff, #ff6c9d);
+  box-shadow: 0 0 8px #7c6cff;
+}
+
+.timeline-insert-divider:hover {
+  opacity: 1;
+}
+
+.timeline-insert-button {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(to right, #7c6cff, #ff6c9d);
+  border: 1.5px solid #07070a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(124, 108, 255, 0.8);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.timeline-insert-button:hover {
+  transform: scale(1.25);
+}
+
+/* Mixer Faders aesthetic */
+.mixer-fader {
+  background: #141622;
+  border: 1px solid #1f2235;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.mixer-fader:hover {
+  border-color: #7c6cff/30;
+  background: rgba(20, 22, 34, 0.9);
+}
+
+/* Animated wave pulse for beautiful synced audio previewer card */
+@keyframes wave-pulse {
+  0% {
+    transform: scaleY(0.2);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scaleY(1.0);
+    opacity: 1;
+  }
+}
+
+

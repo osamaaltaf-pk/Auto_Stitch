@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoStitch Studio · AI Video Composition</title>
+  <!-- Curated Font families -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  
+  <!-- Local Offline Cached JS Libraries -->
+  <script src="/static/lib/react.production.min.js"></script>
+  <script src="/static/lib/react-dom.production.min.js"></script>
+  <script src="/static/lib/babel.min.js"></script>
+  <script src="/static/lib/tailwind.js"></script>
+  <script src="/static/lib/Sortable.min.js"></script>
+  <script src="/static/lib/wavesurfer.min.js"></script>
+  <script src="/static/lib/lucide.min.js"></script>
+  
+  <!-- Premium Custom Styling Sheet -->
+  <link rel="stylesheet" href="/static/index.css">
+  
+  <script>
+    // Configure Tailwind CSS config locally
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['Space Mono', 'monospace'],
+          },
+          colors: {
+            carbon: {
+              DEFAULT: '#07070a',
+              panel: '#0d0e14',
+              card: '#141622',
+              border: '#1f2235',
+            },
+            accent: {
+              primary: '#7c6cff',
+              secondary: '#ff6c9d',
+              tertiary: '#6cffcc',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-carbon text-gray-200 font-sans h-screen overflow-hidden">
+  
+  <div id="root" class="h-full w-full"></div>
+  
+  <!-- Load unified React logic. In-browser Babel compiles our ES6/JSX code instantly -->
+  <script type="text/babel" src="/static/app.js"></script>
+</body>
+</html>
