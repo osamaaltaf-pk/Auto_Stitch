@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and Project Local Data
+projects/
+output/
+scratch/
+.gemini/
+.vscode/
+.idea/
+settings.json
+.env
+
+# Thumbnails and generated files in static
+static/thumbnails/*
+!static/thumbnails/placeholder.jpg
+
+# OS files
+.DS_Store
+Thumbs.db

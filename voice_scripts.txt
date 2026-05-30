@@ -1,0 +1,5 @@
+Welcome to AutoStitch Studio, the ultimate AI video composition engine.
+In this segment, we are demonstrating our high-quality local text-to-speech generation.
+Stitching audio tracks, voiceovers, and videos has never been so seamless and fast.
+Each block in our timeline represents a single clip with aligned visual and audio cues.
+We are now rendering the complete master video with ducked volume and custom audio transitions.
