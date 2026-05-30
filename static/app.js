@@ -165,6 +165,8 @@ function App() {
   const [renderState, setRenderState] = useState({ status: 'idle', progress: 0.0, error: null });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
+  // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
+  const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
 
   // Advanced Preview and Mixer States
   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
@@ -407,6 +409,8 @@ function App() {
           if (data.status === 'done') {
             addLog("Render task completed! Combined master video is ready.", "success");
             clearInterval(timer);
+            // Stamp a new stable timestamp ONCE — this is the only place the video src will update
+            setMasterVideoTs(Date.now());
             loadProject(project.project_name);
           } else if (data.status === 'error') {
             addLog(`Render failed: ${data.error}`, "error");
@@ -1839,9 +1843,13 @@ function App() {
               ) : (
                 project.render_complete ? (
                   <div className="relative w-full h-full">
-                    <video 
-                      src={`/output/master.mp4?t=${Date.now()}`}
+                    {/* key={masterVideoTs} ensures React only remounts this element when a NEW render completes, not on every state change */}
+                    <video
+                      key={masterVideoTs}
+                      src={`/output/master.mp4?t=${masterVideoTs}`}
                       controls
+                      playsInline
+                      preload="auto"
                       className="w-full h-full object-contain"
                     />
                   </div>

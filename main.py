@@ -6,7 +6,7 @@ import asyncio
 import httpx
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -867,7 +867,36 @@ async def clear_block_media(project_name: str, lane: str, index: int):
 # Expose thumbnails as a static route so browser React can render them
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/projects", StaticFiles(directory=str(PROJECTS_DIR)), name="projects")
-app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
+
+@app.get("/output/master.mp4")
+async def serve_master_video(request: Request, t: str = ""):
+    """
+    Dedicated master.mp4 streaming endpoint with proper video headers.
+    The ?t= cache-buster is accepted but ignored server-side; the ETag handles caching.
+    ConnectionResetError in logs when seeking is normal browser behaviour, not a bug.
+    """
+    master_path = OUTPUT_DIR / "master.mp4"
+    if not master_path.exists():
+        raise HTTPException(status_code=404, detail="Master video not yet rendered")
+    
+    stat = master_path.stat()
+    etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+    
+    # Return 304 if client already has this exact file
+    if_none_match = request.headers.get("if-none-match", "")
+    if if_none_match == etag:
+        from fastapi.responses import Response
+        return Response(status_code=304, headers={"ETag": etag})
+    
+    return FileResponse(
+        path=str(master_path),
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "ETag": etag,
+            "Cache-Control": "no-cache",   # revalidate but allow range requests
+        }
+    )
 
 @app.get("/api/video/serve")
 async def serve_video(path: str):
