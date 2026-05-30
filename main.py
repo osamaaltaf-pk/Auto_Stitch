@@ -241,16 +241,16 @@ async def proxy_clone_voice(file: UploadFile = File(...)):
 
 @app.post("/api/videos/select-folder")
 async def select_local_folder():
-    """Opens a native local directory selection dialog forced to topmost front."""
+    """Opens a native local directory selection dialog forced to topmost front with modern file-open style."""
     import subprocess
     
     def ask_folder():
-        # Force the dialog to the front by using a dummy TopMost Form as its parent owner
+        # Open modern Windows Explorer dialogue style (OpenFileDialog configured to select folders)
         cmd = [
             "powershell",
             "-NoProfile",
             "-Command",
-            "Add-Type -AssemblyName System.Windows.Forms; $w = New-Object System.Windows.Forms.Form; $w.TopMost = $true; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select Videos Directory to Scan'; if ($f.ShowDialog($w) -eq 'OK') { $f.SelectedPath }"
+            "Add-Type -AssemblyName System.Windows.Forms; $w = New-Object System.Windows.Forms.Form; $w.TopMost = $true; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = 'Select Videos Directory to Scan'; $d.Filter = 'Folders|`n'; $d.CheckFileExists = $false; $d.DereferenceLinks = $false; $d.FileName = 'Select Folder Here'; if ($d.ShowDialog($w) -eq 'OK') { [System.IO.Path]::GetDirectoryName($d.FileName) }"
         ]
         result = subprocess.run(
             cmd, 
