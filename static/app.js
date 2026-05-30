@@ -2560,8 +2560,12 @@ function App() {
                 <input 
                   value={settings.sfx_server_url}
                   onChange={(e) => setSettings(prev => ({ ...prev, sfx_server_url: e.target.value }))}
+                  placeholder="https://your-tunnel.loca.lt"
                   className="bg-carbon border border-carbon-border/50 focus:border-accent-primary outline-none px-3 py-2 rounded-lg text-white font-mono"
                 />
+                <p className="text-[10px] text-gray-600 font-mono leading-relaxed">
+                  💡 Paste your Colab loca.lt / ngrok tunnel URL here — trailing slashes are stripped automatically.
+                </p>
               </div>
 
               <div className="flex flex-col gap-1.5">
