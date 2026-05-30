@@ -182,6 +182,128 @@ function App() {
   const [availableVoices, setAvailableVoices] = useState(["alba", "marius", "fantine", "cosette", "jean", "eponine"]);
   const [isCloning, setIsCloning] = useState(false);
 
+  // Dynamic Timeline Layers State
+  const [timelineLayers, setTimelineLayers] = useState([]);
+
+  // Merge dynamic timeline layers into standard lanes for backend serialization
+  const getMergedManifest = (layersList = timelineLayers) => {
+    if (!project || !project.video_blocks || layersList.length === 0) return project;
+    const targetLen = project.video_blocks.length;
+
+    // 1. Merge Video
+    const videoLayers = layersList.filter(l => l.type === 'video');
+    const mergedVideoBlocks = [];
+    for (let i = 0; i < targetLen; i++) {
+      let chosenBlock = null;
+      for (let j = videoLayers.length - 1; j >= 0; j--) {
+        const b = videoLayers[j].blocks[i];
+        if (b && b.file_path) {
+          chosenBlock = b;
+          break;
+        }
+      }
+      if (!chosenBlock) {
+        chosenBlock = videoLayers[0]?.blocks[i] || project.video_blocks[i];
+      }
+      mergedVideoBlocks.push({ ...chosenBlock, order: i });
+    }
+
+    // 2. Merge SFX
+    const sfxLayers = layersList.filter(l => l.type === 'sfx');
+    const mergedSfxBlocks = [];
+    for (let i = 0; i < targetLen; i++) {
+      const prompts = [];
+      let combinedStatus = 'idle';
+      let combinedFilePath = null;
+      sfxLayers.forEach(l => {
+        const b = l.blocks[i];
+        if (b && b.prompt && b.prompt.trim()) {
+          prompts.push(b.prompt.trim());
+          if (b.status === 'generating') combinedStatus = 'generating';
+          if (b.file_path) combinedFilePath = b.file_path;
+        }
+      });
+      const primarySfxBlock = sfxLayers[0]?.blocks[i] || project.sfx_blocks[i] || { id: `sfx_${String(i).padStart(2, '0')}`, order: i };
+      mergedSfxBlocks.push({
+        ...primarySfxBlock,
+        prompt: prompts.join(", "),
+        status: combinedStatus === 'generating' ? 'generating' : (combinedFilePath ? 'done' : 'idle'),
+        file_path: combinedFilePath,
+        order: i
+      });
+    }
+
+    // 3. Merge Voice
+    const voiceLayers = layersList.filter(l => l.type === 'voice');
+    const mergedVoiceBlocks = [];
+    for (let i = 0; i < targetLen; i++) {
+      const prompts = [];
+      let combinedStatus = 'idle';
+      let combinedFilePath = null;
+      let chosenVoice = globalDefaultVoice || "alba";
+      voiceLayers.forEach(l => {
+        const b = l.blocks[i];
+        if (b && b.prompt && b.prompt.trim()) {
+          prompts.push(b.prompt.trim());
+          if (b.status === 'generating') combinedStatus = 'generating';
+          if (b.file_path) combinedFilePath = b.file_path;
+          if (b.voice) chosenVoice = b.voice;
+        }
+      });
+      const primaryVoiceBlock = voiceLayers[0]?.blocks[i] || project.voice_blocks[i] || { id: `vo_${String(i).padStart(2, '0')}`, order: i };
+      mergedVoiceBlocks.push({
+        ...primaryVoiceBlock,
+        prompt: prompts.join(". "),
+        status: combinedStatus === 'generating' ? 'generating' : (combinedFilePath ? 'provided' : 'idle'),
+        file_path: combinedFilePath,
+        voice: chosenVoice,
+        order: i
+      });
+    }
+
+    return {
+      ...project,
+      video_blocks: mergedVideoBlocks,
+      sfx_blocks: mergedSfxBlocks,
+      voice_blocks: mergedVoiceBlocks
+    };
+  };
+
+  // Sync effect to initialize layers and keep slot counts updated dynamically
+  useEffect(() => {
+    if (!project || !project.video_blocks) return;
+    if (timelineLayers.length === 0) {
+      setTimelineLayers([
+        { id: 'video-1', type: 'video', name: 'VIDEO 1', blocks: project.video_blocks },
+        { id: 'sfx-1', type: 'sfx', name: 'SFX 1', blocks: project.sfx_blocks },
+        { id: 'voice-1', type: 'voice', name: 'VOICE 1', blocks: project.voice_blocks }
+      ]);
+    } else {
+      setTimelineLayers(prev => prev.map(layer => {
+        if (layer.id === 'video-1') return { ...layer, blocks: project.video_blocks };
+        if (layer.id === 'sfx-1') return { ...layer, blocks: project.sfx_blocks };
+        if (layer.id === 'voice-1') return { ...layer, blocks: project.voice_blocks };
+        
+        let blocks = [...layer.blocks];
+        const targetLen = project.video_blocks.length;
+        while (blocks.length < targetLen) {
+          const newIdx = blocks.length;
+          if (layer.type === 'sfx') {
+            blocks.push({ id: `sfx_${layer.id}_${newIdx}`, prompt: "", order: newIdx, status: "idle", file_path: null });
+          } else if (layer.type === 'voice') {
+            blocks.push({ id: `vo_${layer.id}_${newIdx}`, order: newIdx, status: "idle", prompt: "", file_path: null, voice: "alba" });
+          } else if (layer.type === 'video') {
+            blocks.push({ id: `v_${layer.id}_${newIdx}`, file_path: "", filename: "Blank_Clip.mp4", duration_s: 5.0, thumbnail_path: "/static/thumbnails/placeholder.jpg", order: newIdx });
+          }
+        }
+        if (blocks.length > targetLen) {
+          blocks = blocks.slice(0, targetLen);
+        }
+        return { ...layer, blocks };
+      }));
+    }
+  }, [project]);
+
   // Synchronize volumes
   useEffect(() => {
     if (videoRef.current) videoRef.current.volume = videoVolume;
@@ -437,12 +559,13 @@ function App() {
   };
 
   // API Call: Save manifest
-  const saveProject = async (newManifest = project) => {
+  const saveProject = async (newManifest = null) => {
+    const manifestToSave = newManifest || getMergedManifest();
     try {
       const resp = await fetch("/api/project/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newManifest)
+        body: JSON.stringify(manifestToSave)
       });
       if (resp.ok) {
         addLog("Project workspace saved.", "success");
@@ -452,6 +575,70 @@ function App() {
     } catch (e) {
       addLog("Connection failed when saving project.", "error");
     }
+  };
+
+  // Layer Management Methods
+  const addTimelineLayer = (type) => {
+    if (!type) return;
+    const typeCount = timelineLayers.filter(l => l.type === type).length + 1;
+    const typeLabel = type === 'video' ? 'VIDEO' : (type === 'sfx' ? 'SFX' : 'VOICE');
+    const newLayerId = `${type}-${Date.now()}`;
+    const targetLen = project.video_blocks.length;
+    const blocks = [];
+    for (let i = 0; i < targetLen; i++) {
+      if (type === 'video') {
+        blocks.push({
+          id: `v_${newLayerId}_${i}`,
+          file_path: "",
+          filename: `Blank_Clip.mp4`,
+          duration_s: 5.0,
+          thumbnail_path: "/static/thumbnails/placeholder.jpg",
+          order: i
+        });
+      } else if (type === 'sfx') {
+        blocks.push({
+          id: `sfx_${newLayerId}_${i}`,
+          prompt: "",
+          order: i,
+          status: "idle",
+          file_path: null
+        });
+      } else if (type === 'voice') {
+        blocks.push({
+          id: `vo_${newLayerId}_${i}`,
+          order: i,
+          status: "idle",
+          prompt: "",
+          file_path: null,
+          voice: "alba"
+        });
+      }
+    }
+    const newLayer = {
+      id: newLayerId,
+      type,
+      name: `${typeLabel} ${typeCount}`,
+      blocks
+    };
+    const updatedLayers = [...timelineLayers, newLayer];
+    setTimelineLayers(updatedLayers);
+    saveProject(getMergedManifest(updatedLayers));
+    addLog(`Added a new dynamic timeline layer: "${newLayer.name}"`, "success");
+  };
+
+  const removeTimelineLayer = (layerId) => {
+    if (['video-1', 'sfx-1', 'voice-1'].includes(layerId)) {
+      addLog("Cannot delete default primary system layer.", "error");
+      return;
+    }
+    const layer = timelineLayers.find(l => l.id === layerId);
+    if (!layer) return;
+    const confirm = window.confirm(`Are you sure you want to delete the dynamic layer "${layer.name}"? All custom blocks in this layer will be removed.`);
+    if (!confirm) return;
+    const updatedLayers = timelineLayers.filter(l => l.id !== layerId);
+    setTimelineLayers(updatedLayers);
+    saveProject(getMergedManifest(updatedLayers));
+    addLog(`Deleted dynamic timeline layer: "${layer.name}"`, "success");
   };
 
   // API Call: Scan Video directory
@@ -539,6 +726,11 @@ function App() {
     if (index < 0) return;
     addLog(`Deleting timeline slot ${index}...`, "info");
     
+    setTimelineLayers(prev => prev.map(layer => {
+      const blocks = layer.blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
+      return { ...layer, blocks };
+    }));
+
     const video_blocks = project.video_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
     const sfx_blocks = project.sfx_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
     const voice_blocks = project.voice_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
@@ -689,6 +881,11 @@ function App() {
     if (selectedIndices.length === 0) return;
     addLog(`Deleting selected slots: ${selectedIndices.join(", ")}...`, "info");
     
+    setTimelineLayers(prev => prev.map(layer => {
+      const blocks = layer.blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
+      return { ...layer, blocks };
+    }));
+
     const video_blocks = project.video_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
     const sfx_blocks = project.sfx_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
     const voice_blocks = project.voice_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
@@ -707,7 +904,6 @@ function App() {
     addLog(`Successfully removed ${selectedIndices.length} slots from timeline.`, "success");
   };
 
-  // Advanced Draggable Timeline sequence swap handler
   const handleMoveSlot = (from, to) => {
     if (from === to || from < 0 || to < 0 || from >= project.video_blocks.length || to >= project.video_blocks.length) return;
     addLog(`Re-aligning sequence: Moving slot ${from} to slot ${to}...`, "info");
@@ -718,6 +914,10 @@ function App() {
       copy.splice(to, 0, removed);
       return copy.map((item, idx) => ({ ...item, order: idx }));
     };
+
+    setTimelineLayers(prev => prev.map(layer => {
+      return { ...layer, blocks: reorder(layer.blocks) };
+    }));
 
     const newManifest = {
       ...project,
@@ -733,7 +933,6 @@ function App() {
     addLog(`Timeline sequence aligned successfully.`, "success");
   };
 
-  // Arbitrary position insert handler
   const insertBlankSlotAt = (index) => {
     if (index < 0 || index > project.video_blocks.length) return;
     addLog(`Inserting a blank composition slot at index ${index}...`, "info");
@@ -743,6 +942,40 @@ function App() {
       copy.splice(index, 0, newItem);
       return copy.map((item, idx) => ({ ...item, order: idx }));
     };
+
+    setTimelineLayers(prev => prev.map(layer => {
+      const copy = [...layer.blocks];
+      let newBlock;
+      if (layer.type === 'video') {
+        newBlock = {
+          id: `v_ins_${layer.id}_${Date.now()}`,
+          file_path: "",
+          filename: `Blank_Clip.mp4`,
+          duration_s: 5.0,
+          thumbnail_path: "/static/thumbnails/placeholder.jpg",
+          order: index
+        };
+      } else if (layer.type === 'sfx') {
+        newBlock = {
+          id: `sfx_ins_${layer.id}_${Date.now()}`,
+          prompt: "",
+          order: index,
+          status: "idle",
+          file_path: null
+        };
+      } else if (layer.type === 'voice') {
+        newBlock = {
+          id: `vo_ins_${layer.id}_${Date.now()}`,
+          order: index,
+          status: "idle",
+          prompt: "",
+          file_path: null,
+          voice: "alba"
+        };
+      }
+      copy.splice(index, 0, newBlock);
+      return { ...layer, blocks: copy.map((item, idx) => ({ ...item, order: idx })) };
+    }));
 
     const v_id = `v_ins_${Date.now()}`;
     const sfx_id = `sfx_ins_${Date.now()}`;
@@ -1422,10 +1655,10 @@ function App() {
         <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden">
           
           {/* ── UPPER PART: MASTER MEDIA PREVIEWER & AUDIO COMPOSER MIXER ── */}
-          <div className="h-[370px] shrink-0 border-b border-carbon-border bg-carbon-panel/20 p-5 flex gap-5 overflow-hidden select-text">
+          <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/20 p-5 flex flex-col items-center justify-center gap-4 select-text">
             
-            {/* Video Screen Section */}
-            <div className="w-[500px] h-full rounded-xl bg-black overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
+            {/* Centered Video Screen Section */}
+            <div className="w-[600px] h-[280px] rounded-xl bg-black overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
               {previewMode === 'composer' ? (
                 selectedBlock !== null && project.video_blocks[selectedBlock.index] ? (
                   project.video_blocks[selectedBlock.index].file_path ? (
@@ -1564,154 +1797,109 @@ function App() {
               </div>
             </div>
 
-            {/* Right Side Mixer Controls */}
-            <div className="flex-1 h-full bg-carbon-card/40 border border-carbon-border/50 rounded-xl p-4 flex flex-col justify-between overflow-hidden shadow-lg select-none">
+            {/* Selection Buttons & Mixer Strip */}
+            <div className="w-[600px] flex flex-col gap-3">
               
-              {/* Mode Tabs */}
-              <div className="flex items-center justify-between border-b border-carbon-border/50 pb-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPreviewMode("composer")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${previewMode === 'composer' ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30 shadow-[0_0_10px_rgba(124,108,255,0.1)]' : 'text-gray-500 hover:text-gray-300'}`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-primary"></span>
-                    ⚡ COMPOSER PREVIEW
-                  </button>
-                  <button
-                    onClick={() => setPreviewMode("master")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${previewMode === 'master' ? 'bg-accent-secondary/20 text-accent-secondary border border-accent-secondary/30 shadow-[0_0_10px_rgba(255,108,157,0.1)]' : 'text-gray-500 hover:text-gray-300'}`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary"></span>
-                    🎬 MASTER VIDEO
-                  </button>
-                </div>
-                
-                {/* Save indicator badge */}
-                <span className="text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">
-                  AUTO-SAVE ACTIVE
-                </span>
+              {/* Preview Selection toggles below player screen */}
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => setPreviewMode("composer")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${previewMode === 'composer' ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30 shadow-[0_0_10px_rgba(124,108,255,0.1)]' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-primary"></span>
+                  ⚡ COMPOSER PREVIEW
+                </button>
+                <button
+                  onClick={() => setPreviewMode("master")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${previewMode === 'master' ? 'bg-accent-secondary/20 text-accent-secondary border border-accent-secondary/30 shadow-[0_0_10px_rgba(255,108,157,0.1)]' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary"></span>
+                  🎬 MASTER VIDEO
+                </button>
               </div>
 
-              {/* Tab Content 1: Pre-render Interactive mixer controls */}
+              {/* Slider Controls directly below buttons (Composer Mode) */}
               {previewMode === 'composer' && (
-                <div className="flex-1 flex gap-4 mt-4 overflow-hidden">
+                <div className="flex gap-4 items-center bg-carbon-card/25 border border-carbon-border/30 rounded-xl p-3 shadow-lg select-none">
                   
-                  {/* Faders */}
-                  <div className="flex-1 grid grid-cols-3 gap-3">
-                    
-                    {/* Video Volume */}
-                    <div className="mixer-fader">
-                      <div className="flex justify-between items-center text-[9px] font-bold text-accent-primary font-mono">
-                        <span>VIDEO</span>
-                        <span>{Math.round(videoVolume * 100)}%</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={videoVolume}
-                        onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
-                        className="custom-slider my-2"
-                      />
-                      <span className="text-[8px] text-gray-500 font-mono text-center block">FADER A</span>
-                    </div>
-
-                    {/* Voice Volume */}
-                    <div className="mixer-fader">
-                      <div className="flex justify-between items-center text-[9px] font-bold text-accent-tertiary font-mono">
-                        <span>VOICE</span>
-                        <span>{Math.round(voiceVolume * 100)}%</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={voiceVolume}
-                        onChange={(e) => setVoiceVolume(parseFloat(e.target.value))}
-                        className="custom-slider my-2"
-                      />
-                      <span className="text-[8px] text-gray-500 font-mono text-center block">FADER B</span>
-                    </div>
-
-                    {/* SFX Volume */}
-                    <div className="mixer-fader">
-                      <div className="flex justify-between items-center text-[9px] font-bold text-accent-secondary font-mono">
-                        <span>SFX</span>
-                        <span>{Math.round(sfxVolume * 100)}%</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={sfxVolume}
-                        onChange={(e) => setSfxVolume(parseFloat(e.target.value))}
-                        className="custom-slider my-2"
-                      />
-                      <span className="text-[8px] text-gray-500 font-mono text-center block">FADER C</span>
-                    </div>
-
+                  {/* Video Volume */}
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-accent-primary font-mono w-10 shrink-0">VIDEO</span>
+                    <input 
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={videoVolume}
+                      onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
+                      className="custom-slider flex-1"
+                    />
+                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(videoVolume * 100)}%</span>
                   </div>
 
-                  {/* Pre-render mixer detail pane */}
-                  <div className="w-[180px] bg-carbon/50 border border-carbon-border/40 rounded-lg p-3 flex flex-col justify-between font-mono text-[10px] text-gray-400">
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[9px] text-gray-500 font-bold">ACTIVE MIX DETAILS</span>
-                      {selectedBlock !== null ? (
-                        <div className="flex flex-col gap-1.5 text-gray-300">
-                          <div className="truncate"><span className="text-gray-500">Clip:</span> {project.video_blocks[selectedBlock.index]?.filename || "Blank"}</div>
-                          <div className="truncate"><span className="text-gray-500">VO:</span> {project.voice_blocks[selectedBlock.index]?.prompt ? `"${project.voice_blocks[selectedBlock.index].prompt.substring(0, 15)}..."` : "Empty"}</div>
-                          <div className="truncate"><span className="text-gray-500">SFX:</span> {project.sfx_blocks[selectedBlock.index]?.prompt ? `"${project.sfx_blocks[selectedBlock.index].prompt.substring(0, 15)}..."` : "Empty"}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-600 italic">Select timeline slot to inspect mix audios.</span>
-                      )}
-                    </div>
-                    
-                    {selectedBlock !== null && (
-                      <button
-                        onClick={togglePlayAll}
-                        className="w-full flex items-center justify-center gap-1.5 bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/40 hover:border-accent-primary text-white text-[10px] font-bold py-1.5 rounded transition-all"
-                      >
-                        {isPlaying ? "❚❚ PAUSE" : "▶ PLAY SLOTS"}
-                      </button>
-                    )}
+                  {/* Voice Volume */}
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-accent-tertiary font-mono w-10 shrink-0">VOICE</span>
+                    <input 
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={voiceVolume}
+                      onChange={(e) => setVoiceVolume(parseFloat(e.target.value))}
+                      className="custom-slider flex-1"
+                    />
+                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(voiceVolume * 100)}%</span>
                   </div>
+
+                  {/* SFX Volume */}
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-accent-secondary font-mono w-8 shrink-0">SFX</span>
+                    <input 
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={sfxVolume}
+                      onChange={(e) => setSfxVolume(parseFloat(e.target.value))}
+                      className="custom-slider flex-1"
+                    />
+                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(sfxVolume * 100)}%</span>
+                  </div>
+
+                  {/* Play Trigger */}
+                  {selectedBlock !== null && (
+                    <button
+                      onClick={togglePlayAll}
+                      className="flex items-center justify-center gap-1 bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/40 hover:border-accent-primary text-white text-[10px] font-bold px-3 py-1.5 rounded transition-all shrink-0 font-mono"
+                    >
+                      {isPlaying ? "❚❚ PAUSE" : "▶ PLAY"}
+                    </button>
+                  )}
 
                 </div>
               )}
 
-              {/* Tab Content 2: Post-render Master previewer */}
+              {/* Master Video Download bar (Master Mode) */}
               {previewMode === 'master' && (
-                <div className="flex-1 flex flex-col justify-between mt-4 font-mono">
-                  <div className="bg-carbon/30 border border-carbon-border/50 rounded-lg p-4 text-xs leading-relaxed text-gray-400 flex flex-col gap-2">
-                    <span className="text-xs font-extrabold text-white">🎬 PRODUCTION EXPORT PIPELINE</span>
-                    <p className="text-[11px]">
-                      When rendering completes, FFmpeg concatenates all video clips, ducks the SFX background audio around the voice narration, and normalize final sound.
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5 font-mono text-[10px] text-gray-400">
-                      <div><span className="text-gray-600">Project:</span> {project.project_name}</div>
-                      <div><span className="text-gray-600">Total Clips:</span> {project.video_blocks.length}</div>
-                    </div>
+                <div className="flex gap-4 items-center bg-carbon-card/25 border border-carbon-border/30 rounded-xl p-3 shadow-lg select-none">
+                  <div className="flex-1 text-[10px] font-mono text-gray-400">
+                    <span className="text-white font-bold">🎬 master.mp4: </span>
+                    {project.render_complete ? "Your master render is compiled! Click to download final composition." : "Master video compilation has not been run yet."}
                   </div>
-                  
-                  <div className="flex gap-3">
-                    <a 
-                      href={`/output/master.mp4`} 
-                      download={`${project.project_name}_master.mp4`}
-                      onClick={(e) => {
-                        if (!project.render_complete) {
-                          e.preventDefault();
-                          addLog("Cannot download! Master video has not been rendered yet.", "error");
-                        }
-                      }}
-                      className={`flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-accent-secondary to-pink-600 text-white font-bold py-2.5 rounded-lg shadow-lg transition-all text-xs ${!project.render_complete ? 'opacity-40 cursor-not-allowed' : 'hover:from-accent-secondary hover:to-pink-500 hover:shadow-accent-secondary/20'}`}
-                    >
-                      <span>DOWNLOAD MASTER COMPOSITION 📥</span>
-                    </a>
-                  </div>
+                  <a 
+                    href={`/output/master.mp4`} 
+                    download={`${project.project_name}_master.mp4`}
+                    onClick={(e) => {
+                      if (!project.render_complete) {
+                        e.preventDefault();
+                        addLog("Cannot download! Master video has not been rendered yet.", "error");
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-2 bg-gradient-to-r from-accent-secondary to-pink-600 hover:from-accent-secondary hover:to-pink-500 text-white font-bold px-4 py-2 rounded-lg transition-all text-xs font-mono shrink-0 shadow-md ${!project.render_complete ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    <span>DOWNLOAD MASTER 📥</span>
+                  </a>
                 </div>
               )}
 
@@ -1827,172 +2015,244 @@ function App() {
                   </div>
                 )}
 
-                {/* LANE 1: VIDEOS */}
-                <div className="flex h-24 border-b border-carbon-border bg-carbon-panel/10 hover:bg-carbon-panel/20 transition-all">
-                  <div className="w-20 border-r border-carbon-border flex flex-col items-center justify-center text-xs text-accent-primary font-bold select-none">
-                    <Icon name="video" className="w-4 h-4 mb-1" />
-                    <span>VIDEO</span>
-                  </div>
-                  <div 
-                    ref={laneVideoRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track gap-1.5"
-                  >
-                    {project.video_blocks.map((v, i) => (
-                      <div 
-                        key={v.id}
-                        onClick={(e) => {
-                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                            e.stopPropagation();
-                            handleToggleSelectIndex(i);
-                          } else {
-                            setSelectedBlock({ lane: 'video', index: i });
-                          }
-                        }}
-                        style={{ width: '140px', minWidth: '140px' }}
-                        className={getVideoCardClass(v, i, selectedBlock, selectedIndices, dragOverIndex, draggedIndex)}
-                      >
-                        <img src={v.thumbnail_path} className="w-full h-11 rounded object-cover" />
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="truncate font-semibold text-gray-300 max-w-[80px]">{v.filename}</span>
-                          <span className="font-mono text-gray-500">{v.duration_s.toFixed(1)}s</span>
-                        </div>
-                        {/* Shifters */}
-                        <div className="absolute -top-1 right-1 flex gap-0.5 opacity-0 hover:opacity-100 transition-all bg-carbon-panel/90 rounded px-1">
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('video', i, -1)}} className="text-gray-400 hover:text-white text-[8px]">◀</button>
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('video', i, 1)}} className="text-gray-400 hover:text-white text-[8px]">▶</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* DYNAMIC TIMELINE LAYERS */}
+                {timelineLayers.map((layer, layerIdx) => {
+                  let accentColor = 'text-accent-primary';
+                  let iconName = 'video';
+                  if (layer.type === 'sfx') {
+                    accentColor = 'text-accent-secondary';
+                    iconName = 'music';
+                  } else if (layer.type === 'voice') {
+                    accentColor = 'text-accent-tertiary';
+                    iconName = 'mic';
+                  }
 
-                {/* LANE 2: SFX */}
-                <div className="flex h-24 border-b border-carbon-border bg-carbon-panel/10 hover:bg-carbon-panel/20 transition-all">
-                  <div className="w-20 border-r border-carbon-border flex flex-col items-center justify-center text-xs text-accent-secondary font-bold select-none">
-                    <Icon name="music" className="w-4 h-4 mb-1" />
-                    <span>SFX</span>
-                  </div>
-                  <div 
-                    ref={laneSfxRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track gap-1.5"
-                  >
-                    {project.sfx_blocks.map((s, i) => (
-                      <div 
-                        key={s.id}
-                        onClick={(e) => {
-                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                            e.stopPropagation();
-                            handleToggleSelectIndex(i);
-                          } else {
-                            setSelectedBlock({ lane: 'sfx', index: i });
-                          }
-                        }}
-                        style={{ width: '140px', minWidth: '140px' }}
-                        className={getSfxCardClass(s, i, selectedBlock, selectedIndices, dragOverIndex, draggedIndex)}
-                      >
-                        <div className="flex-1 flex flex-col gap-1 w-full h-full">
-                          <textarea
-                            value={s.prompt}
-                            onChange={(e) => handlePromptChange('sfx', i, e.target.value)}
-                            onBlur={() => saveProject()}
-                            placeholder="Type sfx prompt..."
-                            className="w-full flex-1 bg-transparent text-[10px] text-gray-300 outline-none resize-none leading-tight font-mono border-0 focus:ring-0 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              generateSfx(i, s.prompt, { model: 'small-sfx', duration: 5.0, steps: 8, seed: -1 });
-                            }}
-                            disabled={s.status === 'generating'}
-                            className="bg-accent-secondary/20 hover:bg-accent-secondary/40 text-accent-secondary px-1.5 py-0.5 rounded font-bold transition-all text-[8px]"
-                          >
-                            {s.status === 'generating' ? '...' : '⚡ GEN'}
-                          </button>
-                          <span className={getStatusBadgeClass(s.status)}>
-                            {s.status.toUpperCase()}
-                          </span>
-                        </div>
-                        {/* Shifters */}
-                        <div className="absolute -top-1 right-1 flex gap-0.5 opacity-0 hover:opacity-100 transition-all bg-carbon-panel/90 rounded px-1">
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('sfx', i, -1)}} className="text-gray-400 hover:text-white text-[8px]">◀</button>
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('sfx', i, 1)}} className="text-gray-400 hover:text-white text-[8px]">▶</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  const isDefaultLayer = ['video-1', 'sfx-1', 'voice-1'].includes(layer.id);
 
-                {/* LANE 3: VOICE */}
-                <div className="flex h-24 border-b border-carbon-border bg-carbon-panel/10 hover:bg-carbon-panel/20 transition-all">
-                  <div className="w-20 border-r border-carbon-border flex flex-col items-center justify-center text-xs text-accent-tertiary font-bold select-none">
-                    <Icon name="mic" className="w-4 h-4 mb-1" />
-                    <span>VOICE</span>
-                  </div>
-                  <div 
-                    ref={laneVoiceRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track gap-1.5"
-                  >
-                    {project.voice_blocks.map((vo, i) => (
-                      <div 
-                        key={vo.id}
-                        onClick={(e) => {
-                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                            e.stopPropagation();
-                            handleToggleSelectIndex(i);
-                          } else {
-                            setSelectedBlock({ lane: 'voice', index: i });
-                          }
-                        }}
-                        style={{ width: '140px', minWidth: '140px' }}
-                        className={getVoiceCardClass(vo, i, selectedBlock, selectedIndices, dragOverIndex, draggedIndex)}
-                      >
-                        <div className="flex-1 flex flex-col gap-1 w-full h-full">
-                          <textarea
-                            value={vo.prompt || ""}
-                            onChange={(e) => handlePromptChange('voice', i, e.target.value)}
-                            onBlur={() => saveProject()}
-                            placeholder="Type script..."
-                            className="w-full flex-1 bg-transparent text-[10px] text-gray-300 outline-none resize-none leading-tight font-mono border-0 focus:ring-0 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20 gap-1">
+                  return (
+                    <div key={layer.id} className="flex h-24 border-b border-carbon-border bg-carbon-panel/10 hover:bg-carbon-panel/20 transition-all relative group/row">
+                      
+                      {/* Left Track Header */}
+                      <div className="w-20 border-r border-carbon-border flex flex-col items-center justify-center text-[10px] font-bold select-none p-1 text-center relative shrink-0">
+                        <Icon name={iconName} className={`w-3.5 h-3.5 mb-1 ${accentColor}`} />
+                        <span className="truncate max-w-full text-gray-300" title={layer.name}>{layer.name}</span>
+                        
+                        {/* Layer removal button for custom layers */}
+                        {!isDefaultLayer && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              generateTts(i, vo.prompt || "", vo.voice || globalDefaultVoice || "alba");
-                            }}
-                            disabled={vo.status === 'generating'}
-                            className="bg-accent-tertiary/20 hover:bg-accent-tertiary/40 text-accent-tertiary px-1.5 py-0.5 rounded font-bold transition-all text-[8px] shrink-0"
+                            onClick={() => removeTimelineLayer(layer.id)}
+                            className="absolute top-1 right-1 text-gray-500 hover:text-red-500 font-extrabold text-[9px] focus:outline-none opacity-0 group-hover/row:opacity-100 transition-opacity"
+                            title={`Remove layer: ${layer.name}`}
                           >
-                            {vo.status === 'generating' ? '...' : '⚡ GEN'}
+                            ✕
                           </button>
+                        )}
+                      </div>
+
+                      {/* Timeline Lane Track */}
+                      <div 
+                        ref={layer.type === 'video' ? laneVideoRef : (layer.type === 'sfx' ? laneSfxRef : laneVoiceRef)}
+                        onScroll={handleScroll}
+                        className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track gap-1.5"
+                      >
+                        {layer.blocks.map((block, i) => {
+                          const isBlockSelected = selectedBlock?.layerId === layer.id && selectedBlock?.index === i;
+                          const isColSelected = selectedIndices.includes(i);
                           
-                          {/* Visually stunning small voice indicator */}
-                          <span 
-                            className="text-[8px] text-accent-tertiary/80 font-mono truncate max-w-[42px]" 
-                            title={`Voice: ${vo.voice || globalDefaultVoice || "alba"}`}
-                          >
-                            🗣️ {vo.voice || globalDefaultVoice || "alba"}
-                          </span>
+                          // Render Video block
+                          if (layer.type === 'video') {
+                            return (
+                              <div 
+                                key={block.id}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                    e.stopPropagation();
+                                    handleToggleSelectIndex(i);
+                                  } else {
+                                    setSelectedBlock({ lane: 'video', index: i, layerId: layer.id });
+                                  }
+                                }}
+                                style={{ width: '140px', minWidth: '140px' }}
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
+                                  isBlockSelected
+                                    ? 'bg-accent-primary/10 border-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)] text-white'
+                                    : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-primary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-primary/40 hover:bg-carbon-card/35')
+                                }`}
+                              >
+                                <img src={block.thumbnail_path} className="w-full h-11 rounded object-cover" />
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="truncate font-semibold text-gray-300 max-w-[80px]">{block.filename}</span>
+                                  <span className="font-mono text-gray-500">{block.duration_s.toFixed(1)}s</span>
+                                </div>
+                              </div>
+                            );
+                          }
 
-                          <span className={getStatusBadgeClass(vo.status)}>
-                            {vo.status.toUpperCase()}
-                          </span>
-                        </div>
-                        {/* Shifters */}
-                        <div className="absolute -top-1 right-1 flex gap-0.5 opacity-0 hover:opacity-100 transition-all bg-carbon-panel/90 rounded px-1">
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('voice', i, -1)}} className="text-gray-400 hover:text-white text-[8px]">◀</button>
-                          <button onClick={(e) => {e.stopPropagation(); handleMoveBlock('voice', i, 1)}} className="text-gray-400 hover:text-white text-[8px]">▶</button>
-                        </div>
+                          // Render SFX block
+                          if (layer.type === 'sfx') {
+                            return (
+                              <div 
+                                key={block.id}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                    e.stopPropagation();
+                                    handleToggleSelectIndex(i);
+                                  } else {
+                                    setSelectedBlock({ lane: 'sfx', index: i, layerId: layer.id });
+                                  }
+                                }}
+                                style={{ width: '140px', minWidth: '140px' }}
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
+                                  isBlockSelected
+                                    ? 'bg-accent-secondary/15 border-accent-secondary shadow-[0_0_8px_rgba(255,108,157,0.25)] text-white'
+                                    : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-secondary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-secondary/40 hover:bg-carbon-card/35')
+                                }`}
+                              >
+                                <div className="flex-1 flex flex-col gap-1 w-full h-full">
+                                  <textarea
+                                    value={block.prompt}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setTimelineLayers(prev => prev.map(l => {
+                                        if (l.id === layer.id) {
+                                          const newBlocks = [...l.blocks];
+                                          newBlocks[i] = { ...newBlocks[i], prompt: text, status: 'idle' };
+                                          return { ...l, blocks: newBlocks };
+                                        }
+                                        return l;
+                                      }));
+                                    }}
+                                    onBlur={() => saveProject()}
+                                    placeholder="Type sfx prompt..."
+                                    className="w-full flex-1 bg-transparent text-[10px] text-gray-300 outline-none resize-none leading-tight font-mono border-0 focus:ring-0 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      generateSfx(i, block.prompt, { model: 'small-sfx', duration: 5.0, steps: 8, seed: -1 });
+                                    }}
+                                    disabled={block.status === 'generating'}
+                                    className="bg-accent-secondary/20 hover:bg-accent-secondary/40 text-accent-secondary px-1.5 py-0.5 rounded font-bold transition-all text-[8px]"
+                                  >
+                                    {block.status === 'generating' ? '...' : '⚡ GEN'}
+                                  </button>
+                                  <span className={getStatusBadgeClass(block.status)}>
+                                    {block.status.toUpperCase()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Render Voice block
+                          if (layer.type === 'voice') {
+                            return (
+                              <div 
+                                key={block.id}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                    e.stopPropagation();
+                                    handleToggleSelectIndex(i);
+                                  } else {
+                                    setSelectedBlock({ lane: 'voice', index: i, layerId: layer.id });
+                                  }
+                                }}
+                                style={{ width: '140px', minWidth: '140px' }}
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
+                                  isBlockSelected
+                                    ? 'bg-accent-tertiary/15 border-accent-tertiary shadow-[0_0_8px_rgba(108,255,204,0.25)] text-white'
+                                    : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-tertiary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/40 hover:bg-carbon-card/35')
+                                }`}
+                              >
+                                <div className="flex-1 flex flex-col gap-1 w-full h-full">
+                                  <textarea
+                                    value={block.prompt || ""}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setTimelineLayers(prev => prev.map(l => {
+                                        if (l.id === layer.id) {
+                                          const newBlocks = [...l.blocks];
+                                          newBlocks[i] = { ...newBlocks[i], prompt: text, status: 'idle' };
+                                          return { ...l, blocks: newBlocks };
+                                        }
+                                        return l;
+                                      }));
+                                    }}
+                                    onBlur={() => saveProject()}
+                                    placeholder="Type script..."
+                                    className="w-full flex-1 bg-transparent text-[10px] text-gray-300 outline-none resize-none leading-tight font-mono border-0 focus:ring-0 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20 gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      generateTts(i, block.prompt || "", block.voice || globalDefaultVoice || "alba");
+                                    }}
+                                    disabled={block.status === 'generating'}
+                                    className="bg-accent-tertiary/20 hover:bg-accent-tertiary/40 text-accent-tertiary px-1.5 py-0.5 rounded font-bold transition-all text-[8px] shrink-0"
+                                  >
+                                    {block.status === 'generating' ? '...' : '⚡ GEN'}
+                                  </button>
+                                  
+                                  <span 
+                                    className="text-[8px] text-accent-tertiary/80 font-mono truncate max-w-[42px]" 
+                                    title={`Voice: ${block.voice || globalDefaultVoice || "alba"}`}
+                                  >
+                                    🗣️ {block.voice || globalDefaultVoice || "alba"}
+                                  </span>
+
+                                  <span className={getStatusBadgeClass(block.status)}>
+                                    {block.status.toUpperCase()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        })}
                       </div>
-                    ))}
+
+                    </div>
+                  );
+                })}
+
+                {/* + ADD LAYER MENU ROW */}
+                <div className="flex h-10 border-b border-carbon-border bg-carbon-card/5 select-none items-center justify-start px-4 gap-2">
+                  <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">Lanes Area</span>
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => addTimelineLayer('video')}
+                      className="flex items-center gap-1.5 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/30 hover:border-accent-primary text-accent-primary hover:text-white px-2.5 py-1 rounded text-[9px] font-bold font-mono transition-all"
+                      title="Add a new dynamic Video layer"
+                    >
+                      ➕ VIDEO LAYER 🎬
+                    </button>
+                    <button
+                      onClick={() => addTimelineLayer('sfx')}
+                      className="flex items-center gap-1.5 bg-accent-secondary/10 hover:bg-accent-secondary/20 border border-accent-secondary/30 hover:border-accent-secondary text-accent-secondary hover:text-white px-2.5 py-1 rounded text-[9px] font-bold font-mono transition-all"
+                      title="Add a new dynamic SFX layer"
+                    >
+                      ➕ SFX LAYER 🎵
+                    </button>
+                    <button
+                      onClick={() => addTimelineLayer('voice')}
+                      className="flex items-center gap-1.5 bg-accent-tertiary/10 hover:bg-accent-tertiary/20 border border-accent-tertiary/30 hover:border-accent-tertiary text-accent-tertiary hover:text-white px-2.5 py-1 rounded text-[9px] font-bold font-mono transition-all"
+                      title="Add a new dynamic Voice layer"
+                    >
+                      ➕ VOICE LAYER 🎙️
+                    </button>
                   </div>
                 </div>
 
