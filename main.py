@@ -188,6 +188,9 @@ async def get_settings():
 @app.post("/api/settings")
 async def update_settings(model: SettingsModel):
     settings = model.dict()
+    # Normalize: strip trailing slashes from server URLs so /api/... paths always work correctly
+    settings["tts_server_url"] = settings.get("tts_server_url", "").rstrip("/")
+    settings["sfx_server_url"] = settings.get("sfx_server_url", "").rstrip("/")
     save_settings(settings)
     return {"status": "ok", "settings": settings}
 
@@ -536,8 +539,8 @@ async def generate_sfx(req: SfxGenerateRequest):
                     "seed": req.seed
                 }
                 
-                # Check for dynamic Colab or local API URL
-                sfx_url = settings["sfx_server_url"]
+                # Check for dynamic Colab or local API URL — strip trailing slash to avoid double-slash paths
+                sfx_url = settings["sfx_server_url"].rstrip("/")
                 logger.info(f"Calling Stable Audio at {sfx_url}/api/generate with: {payload}")
                 
                 # Trigger async generation job
@@ -545,7 +548,7 @@ async def generate_sfx(req: SfxGenerateRequest):
                     f"{sfx_url}/api/generate",
                     json=payload,
                     headers={"bypass-tunnel-reminder": "true"},
-                    timeout=60.0
+                    timeout=90.0
                 )
                 if resp.status_code != 200:
                     try:
@@ -573,7 +576,7 @@ async def generate_sfx(req: SfxGenerateRequest):
                     status_resp = await client.get(
                         f"{sfx_url}/api/status/{job_id}",
                         headers={"bypass-tunnel-reminder": "true"},
-                        timeout=10.0
+                        timeout=15.0
                     )
                     if status_resp.status_code == 200:
                         status_data = status_resp.json()

@@ -149,7 +149,9 @@ function App() {
     output_dir: "output",
     projects_dir: "projects"
   });
-  const [globalDefaultVoice, setGlobalDefaultVoice] = useState("alba");
+  const [globalDefaultVoice, setGlobalDefaultVoice] = useState(() => {
+    try { return localStorage.getItem('as_default_voice') || 'alba'; } catch { return 'alba'; }
+  });
   const [health, setHealth] = useState({
     tts_server: { online: false, model_loaded: false, url: "" },
     sfx_server: { online: false, device: "unknown", url: "" },
@@ -240,14 +242,15 @@ function App() {
       const prompts = [];
       let combinedStatus = 'idle';
       let combinedFilePath = null;
+      // Pick voice: first look for explicit per-block voice assignment, then default
       let chosenVoice = globalDefaultVoice || "alba";
       voiceLayers.forEach(l => {
         const b = l.blocks[i];
-        if (b && b.prompt && b.prompt.trim()) {
-          prompts.push(b.prompt.trim());
+        if (b) {
+          if (b.voice) chosenVoice = b.voice; // always read voice regardless of prompt
+          if (b.prompt && b.prompt.trim()) prompts.push(b.prompt.trim());
           if (b.status === 'generating') combinedStatus = 'generating';
           if (b.file_path) combinedFilePath = b.file_path;
-          if (b.voice) chosenVoice = b.voice;
         }
       });
       const primaryVoiceBlock = voiceLayers[0]?.blocks[i] || project.voice_blocks[i] || { id: `vo_${String(i).padStart(2, '0')}`, order: i };
@@ -494,6 +497,7 @@ function App() {
         await fetchVoices();
         if (globalDefaultVoice === voiceName) {
           setGlobalDefaultVoice("alba");
+          try { localStorage.setItem('as_default_voice', 'alba'); } catch {}
         }
       } else {
         const err = await resp.text();
@@ -1167,25 +1171,32 @@ function App() {
   };
 
   // API Call: Run SFX generation
-  const generateSfx = async (index, prompt, params) => {
-    if (!prompt.trim()) {
+  const generateSfx = async (index, prompt, params, overrideBlockId = null) => {
+    if (!prompt || !prompt.trim()) {
       addLog("Please describe your sound effect first.", "error");
       return;
     }
-    const isDuplicate = project.sfx_blocks.some((b, idx) => idx !== index && b.prompt && b.prompt.trim().toLowerCase() === prompt.trim().toLowerCase());
+    // Use the merged manifest so we always get the canonical block ID saved to disk
+    const merged = getMergedManifest();
+    const isDuplicate = merged.sfx_blocks.some((b, idx) => idx !== index && b.prompt && b.prompt.trim().toLowerCase() === prompt.trim().toLowerCase());
     if (isDuplicate) {
       addLog(`Failed to generate SFX: The prompt "${prompt}" is already used in another slot. Duplications are not allowed.`, "error");
       alert(`The prompt "${prompt}" is already used in another slot. Duplications are not allowed.`);
       return;
     }
-    const block = project.sfx_blocks[index];
-    addLog(`Generating sound effect block ${block.id}...`, "info");
+    // Use overrideBlockId (from timeline layer block) or fall back to merged manifest block
+    const mergedBlock = merged.sfx_blocks[index];
+    const blockId = overrideBlockId || (mergedBlock ? mergedBlock.id : `sfx_${String(index).padStart(2,'0')}`);
+    addLog(`Generating sound effect block ${blockId} (slot ${index})...`, "info");
 
-    // Optimistic status update in UI
-    const updatedSfx = [...project.sfx_blocks];
-    updatedSfx[index].status = 'generating';
-    updatedSfx[index].prompt = prompt;
-    setProject(prev => ({ ...prev, sfx_blocks: updatedSfx }));
+    // Save latest prompt to manifest before firing request
+    if (mergedBlock) {
+      mergedBlock.prompt = prompt;
+      mergedBlock.status = 'generating';
+    }
+    const updatedMerged = { ...merged, sfx_blocks: merged.sfx_blocks.map((b, idx) => idx === index ? { ...b, prompt, status: 'generating' } : b) };
+    setProject(updatedMerged);
+    await saveProject(updatedMerged);
 
     try {
       const resp = await fetch("/api/generate/sfx", {
@@ -1193,7 +1204,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_name: project.project_name,
-          block_id: block.id,
+          block_id: blockId,
           prompt: prompt,
           model: params.model || "small-sfx",
           duration: params.duration || 5.0,
@@ -1205,7 +1216,8 @@ function App() {
         addLog(`Stable Audio task launched for slot ${index}.`, "info");
         pollProjectManifest();
       } else {
-        addLog("Failed initiating SFX task.", "error");
+        const errData = await resp.json().catch(() => ({}));
+        addLog(`Failed initiating SFX task: ${errData.detail || resp.status}`, "error");
       }
     } catch (e) {
       addLog("Failed contacting server.", "error");
@@ -1653,16 +1665,29 @@ function App() {
                            key={voice}
                            onClick={() => {
                              if (selectedBlock && selectedBlock.lane === 'voice') {
+                               // Update project.voice_blocks
                                const updated = [...project.voice_blocks];
                                if (updated[selectedBlock.index]) {
-                                 updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice: voice };
+                                 updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice };
                                }
                                const newManifest = { ...project, voice_blocks: updated };
                                setProject(newManifest);
+                               // Also sync into timelineLayers so getMergedManifest picks it up
+                               setTimelineLayers(prev => prev.map(l => {
+                                 if (l.type === 'voice') {
+                                   const newBlocks = [...l.blocks];
+                                   if (newBlocks[selectedBlock.index]) {
+                                     newBlocks[selectedBlock.index] = { ...newBlocks[selectedBlock.index], voice };
+                                   }
+                                   return { ...l, blocks: newBlocks };
+                                 }
+                                 return l;
+                               }));
                                saveProject(newManifest);
                                addLog(`Applied voice '${voice}' to voice slot ${selectedBlock.index}`, "success");
                              } else {
                                setGlobalDefaultVoice(voice);
+                               try { localStorage.setItem('as_default_voice', voice); } catch {}
                                addLog(`Set global default voice to '${voice}'`, "success");
                              }
                            }}
@@ -2166,7 +2191,8 @@ function App() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      generateSfx(i, block.prompt, { model: 'small-sfx', duration: 5.0, steps: 8, seed: -1 });
+                                      // Pass the timeline layer block.id as override so backend finds it in manifest
+                                      generateSfx(i, block.prompt, { model: 'small-sfx', duration: 5.0, steps: 8, seed: -1 }, block.id);
                                     }}
                                     disabled={block.status === 'generating'}
                                     className="bg-accent-secondary/20 hover:bg-accent-secondary/40 text-accent-secondary px-1.5 py-0.5 rounded font-bold transition-all text-[8px]"
@@ -2438,12 +2464,24 @@ function App() {
                       project={project}
                       onPromptChange={(text) => handlePromptChange('voice', selectedBlock.index, text)}
                       onVoiceChange={(voice) => {
+                        // Update project.voice_blocks
                         const updated = [...project.voice_blocks];
                         if (updated[selectedBlock.index]) {
-                          updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice: voice };
+                          updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice };
                         }
                         const newManifest = { ...project, voice_blocks: updated };
                         setProject(newManifest);
+                        // Also sync into timelineLayers so getMergedManifest uses it
+                        setTimelineLayers(prev => prev.map(l => {
+                          if (l.type === 'voice') {
+                            const newBlocks = [...l.blocks];
+                            if (newBlocks[selectedBlock.index]) {
+                              newBlocks[selectedBlock.index] = { ...newBlocks[selectedBlock.index], voice };
+                            }
+                            return { ...l, blocks: newBlocks };
+                          }
+                          return l;
+                        }));
                         saveProject(newManifest);
                       }}
                       onSaveProject={() => saveProject()}
