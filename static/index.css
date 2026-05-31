@@ -51,6 +51,29 @@ body {
 .light-theme .text-red-400       { color: #b91c1c !important; }
 .light-theme .text-cyan-400      { color: #0e7490 !important; }
 .light-theme .text-purple-400    { color: #7c3aed !important; }
+/* Brand name and key headings must be dark in light mode */
+.light-theme h1,
+.light-theme h2,
+.light-theme h3 { color: #1a1814 !important; -webkit-text-fill-color: #1a1814 !important; }
+/* Gradient text (bg-clip-text text-transparent) — override fill color */
+.light-theme [style*="WebkitTextFillColor"] { -webkit-text-fill-color: #1a1814 !important; }
+/* Nav brand gradient specifically */
+.light-theme nav h1 span[style] {
+  background: linear-gradient(to right, #1a1814, #504840) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+/* Input fields in light mode */
+.light-theme input,
+.light-theme textarea,
+.light-theme select {
+  color: #3a342c !important;
+}
+.light-theme input::placeholder,
+.light-theme textarea::placeholder { color: #9a9082 !important; }
+/* bg-transparent inputs specifically */
+.light-theme input.bg-transparent { color: #1a1814 !important; font-weight: 700; }
 
 /* ── LIGHT THEME BACKGROUND OVERRIDES ── */
 .light-theme .bg-black\/40       { background-color: rgba(70, 62, 54, 0.04) !important; }

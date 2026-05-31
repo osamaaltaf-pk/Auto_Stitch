@@ -1976,8 +1976,9 @@ function App() {
             A
           </div>
           <div>
-            <h1 className="font-extrabold text-md tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              AutoStitch <span className="text-xs font-semibold text-accent-primary bg-accent-primary/10 px-2 py-0.5 rounded-full ml-1 font-mono">v1 STUDIO</span>
+            <h1 className="font-extrabold text-md tracking-tight" style={{color: 'var(--text-bright)'}}>
+              <span style={{background: 'linear-gradient(to right, var(--text-bright), var(--text-muted))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>AutoStitch</span>
+              {' '}<span className="text-xs font-semibold text-accent-primary bg-accent-primary/10 px-2 py-0.5 rounded-full ml-1 font-mono">v1 STUDIO</span>
             </h1>
           </div>
         </div>
@@ -1985,12 +1986,13 @@ function App() {
         {/* Project Selector & Server Status Badges */}
         <div className="flex items-center gap-6">
           <div className="flex items-center bg-carbon-card/50 border border-carbon-border/50 px-3 py-1 rounded-lg">
-            <span className="text-xs text-gray-500 font-mono mr-2">PROJECT:</span>
+            <span className="text-xs font-mono mr-2" style={{color: 'var(--text-muted)'}}>PROJECT:</span>
             <input 
               value={project.project_name}
               onChange={(e) => setProject(prev => ({ ...prev, project_name: e.target.value }))}
               onBlur={() => saveProject()}
-              className="bg-transparent outline-none font-bold text-white max-w-[120px]"
+              className="bg-transparent outline-none font-bold max-w-[120px]"
+              style={{color: 'var(--text-bright)'}}
             />
           </div>
 
@@ -1998,24 +2000,24 @@ function App() {
             {/* TTS Status */}
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${health.tts_server.online ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-gray-600'}`}></span>
-              <span className="text-gray-400">TTS:</span>
-              <span className={health.tts_server.online ? 'text-gray-200' : 'text-gray-500'}>
+              <span style={{color:'var(--text-muted)'}}>TTS:</span>
+              <span style={{color: health.tts_server.online ? 'var(--text-main)' : 'var(--text-muted)'}}>
                 {health.tts_server.online ? (health.tts_server.model_loaded ? 'LOADED' : 'READY') : 'OFFLINE'}
               </span>
             </div>
             {/* SFX Status */}
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${health.sfx_server.online ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-gray-600'}`}></span>
-              <span className="text-gray-400">SFX:</span>
-              <span className={health.sfx_server.online ? 'text-gray-200' : 'text-gray-500'}>
+              <span style={{color:'var(--text-muted)'}}>SFX:</span>
+              <span style={{color: health.sfx_server.online ? 'var(--text-main)' : 'var(--text-muted)'}}>
                 {health.sfx_server.online ? `GPU (${health.sfx_server.device})` : 'OFFLINE'}
               </span>
             </div>
             {/* FFmpeg Status */}
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${health.ffmpeg.ok ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-gray-600'}`}></span>
-              <span className="text-gray-400">FFMPEG:</span>
-              <span className={health.ffmpeg.ok ? 'text-gray-200' : 'text-gray-500'}>
+              <span style={{color:'var(--text-muted)'}}>FFMPEG:</span>
+              <span style={{color: health.ffmpeg.ok ? 'var(--text-main)' : 'var(--text-muted)'}}>
                 {health.ffmpeg.ok ? 'OK' : 'MISSING'}
               </span>
             </div>
