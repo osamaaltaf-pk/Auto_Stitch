@@ -1688,7 +1688,12 @@ function App() {
             </div>
 
           </div>
-     if (currentView === "start") {
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === "start") {
     return (
       <div className="h-full w-full bg-carbon flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
         <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
