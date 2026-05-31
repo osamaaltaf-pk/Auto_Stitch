@@ -32,3 +32,11 @@ Pocket_tts/
 
 # FFmpeg binaries (auto-downloaded by setup.bat, do not commit)
 bin/
+
+# Sensitive and Local database files
+license.json
+*.db
+*.db-journal
+*.log
+outputs/
+Stable audio LOcal CPU/outputs/

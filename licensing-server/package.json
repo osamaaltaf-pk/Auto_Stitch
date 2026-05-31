@@ -1,0 +1,9 @@
+{
+  "name": "omni-automator-licensing",
+  "version": "1.0.0",
+  "description": "Vercel + Supabase serverless licensing backend for AutoStitch",
+  "main": "index.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.8"
+  }
+}

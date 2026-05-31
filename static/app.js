@@ -167,6 +167,8 @@ function App() {
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
   const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
+  const [licenseStatus, setLicenseStatus] = useState({ valid: true, message: "", gmail: "", expiry_date: "", license_key: "" });
+  const [isActivatingLicense, setIsActivatingLicense] = useState(false);
 
   // Advanced Preview and Mixer States
   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
@@ -188,6 +190,10 @@ function App() {
 
   // Dynamic Timeline Layers State
   const [timelineLayers, setTimelineLayers] = useState([]);
+
+  // SQLite local database history states
+  const [dbHistory, setDbHistory] = useState([]);
+  const [dbRenders, setDbRenders] = useState([]);
 
   // Merge dynamic timeline layers into standard lanes for backend serialization
   const getMergedManifest = (layersList = timelineLayers) => {
@@ -384,9 +390,45 @@ function App() {
     }
   }, [logs]);
 
+  const checkLicenseStatus = async () => {
+    try {
+      const resp = await fetch("/api/license/status");
+      const data = await resp.json();
+      setLicenseStatus(data);
+      if (!data.valid) {
+        addLog(`License Validation: ${data.message}`, "error");
+      }
+    } catch (e) {
+      console.error("Failed to check license:", e);
+    }
+  };
+
+  const fetchDbHistory = async () => {
+    try {
+      const [hResp, rResp] = await Promise.all([
+        fetch("/api/db/history"),
+        fetch("/api/db/renders")
+      ]);
+      const hData = await hResp.json();
+      const rData = await rResp.json();
+      setDbHistory(hData.history || []);
+      setDbRenders(rData.renders || []);
+    } catch (e) {
+      console.error("Failed to fetch database history:", e);
+    }
+  };
+
+  // Sync database history on tab activation
+  useEffect(() => {
+    if (activeTab === "history") {
+      fetchDbHistory();
+    }
+  }, [activeTab]);
+
   // Load project & health on launch
   useEffect(() => {
     addLog("Initializing AutoStitch Studio UI...", "info");
+    checkLicenseStatus();
     fetchSettings();
     checkHealth();
     fetchVoices();
@@ -1333,6 +1375,102 @@ function App() {
   // Selected Detail Element Data
   const blockData = getSelectedBlockData();
 
+  if (!licenseStatus.valid) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-carbon text-gray-200 font-sans overflow-hidden relative">
+        {/* Background decorative orbs */}
+        <div className="absolute w-[450px] h-[450px] bg-accent-primary/5 rounded-full blur-[100px] top-[-10%] right-[-10%] -z-10 animate-pulse"></div>
+        <div className="absolute w-[350px] h-[350px] bg-accent-secondary/5 rounded-full blur-[80px] bottom-[-5%] left-[-5%] -z-10 animate-pulse" style={{ animationDelay: '2s' }}></div>
+
+        <div className="relative w-full max-w-[480px] p-8 rounded-3xl bg-[#0c0d15]/80 border border-white/5 shadow-2xl flex flex-col items-center gap-6 z-10 backdrop-blur-2xl">
+          {/* Glowing logo lock icon */}
+          <div className="w-14 h-14 bg-gradient-to-tr from-red-500 to-accent-secondary rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 border border-white/10 glow-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-7 h-7 text-white">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-3xl font-extrabold text-white tracking-tight text-center">AutoStitch Studio</h1>
+            <p className="text-[10px] text-red-400 font-extrabold uppercase tracking-wider text-center bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-full mt-1 max-w-[400px]">
+              🔒 {licenseStatus.message}
+            </p>
+          </div>
+
+          {/* Locked screen Credentials activation Form */}
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const key = e.target.license_key.value.trim();
+              const gmail = e.target.gmail.value.trim();
+              const password = e.target.password.value.trim();
+
+              if (!key || !gmail || !password) {
+                alert("Please fill in all activation fields!");
+                return;
+              }
+
+              setIsActivatingLicense(true);
+              try {
+                const resp = await fetch("/api/license/activate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ license_key: key, gmail, password })
+                });
+
+                const data = await resp.json();
+
+                if (resp.ok && data.status === 'success') {
+                  alert("Product successfully unlocked! Welcome to AutoStitch Studio.");
+                  // Refresh status to unlock UI immediately!
+                  await checkLicenseStatus();
+                } else {
+                  alert(`Activation Failed: ${data.message || data.detail || "Invalid credentials or device slot limit reached."}`);
+                }
+              } catch (err) {
+                console.error(err);
+                alert("Network error. Verify Vercel licensing server configuration is active.");
+              } finally {
+                setIsActivatingLicense(false);
+              }
+            }}
+            className="w-full flex flex-col gap-4 mt-1"
+          >
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">GMAIL ADDRESS</label>
+              <input type="email" name="gmail" placeholder="Enter Gmail Address" required
+                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">PASSWORD</label>
+              <input type="password" name="password" placeholder="Enter Password" required
+                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">MONTHLY LICENSE KEY</label>
+              <input type="text" name="license_key" placeholder="OMNI-AS-XXXX-YYYY-ZZZZ-WWWW" required
+                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs font-mono outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={isActivatingLicense}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-95 text-white font-bold text-xs tracking-wide shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] mt-2 disabled:opacity-50"
+            >
+              {isActivatingLicense ? "⚡ Activating Product..." : "⚡ Activate Product"}
+            </button>
+          </form>
+
+          <p className="text-[9px] text-gray-500 text-center font-mono leading-relaxed max-w-[280px] mt-2 uppercase tracking-wide">
+            Licenses are bound to Motherboard UUID. Need a new key or slot reset? Contact Administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col select-text text-sm">
       
@@ -1455,21 +1593,27 @@ function App() {
           <div className="flex border-b border-carbon-border">
             <button 
               onClick={() => setActiveTab("video")}
-              className={`flex-1 py-3 text-center text-xs font-semibold ${activeTab === 'video' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'video' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               VIDEOS
             </button>
             <button 
               onClick={() => setActiveTab("sfx")}
-              className={`flex-1 py-3 text-center text-xs font-semibold ${activeTab === 'sfx' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'sfx' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               SFX
             </button>
             <button 
               onClick={() => setActiveTab("voice")}
-              className={`flex-1 py-3 text-center text-xs font-semibold ${activeTab === 'voice' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'voice' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
-              VOICE / TTS
+              VOICE
+            </button>
+            <button 
+              onClick={() => setActiveTab("history")}
+              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'history' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              HISTORY
             </button>
           </div>
 
@@ -1719,6 +1863,104 @@ function App() {
                        );
                     })}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: SQLite Audits & History logs */}
+            {activeTab === 'history' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-carbon-border pb-2.5">
+                  <h3 className="text-xs font-bold font-mono text-gray-400">🕒 USAGE HISTORY LOGS</h3>
+                  <button 
+                    onClick={fetchDbHistory}
+                    className="p-1.5 rounded hover:bg-carbon bg-carbon-card/50 text-[10px] text-accent-primary border border-carbon-border hover:border-accent-primary font-mono font-bold leading-none"
+                    title="Refresh logs from local SQLite DB"
+                  >
+                    SYNC
+                  </button>
+                </div>
+
+                {/* 1. Generations logs */}
+                <div className="flex flex-col gap-2">
+                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider font-mono">Recent Generations ({dbHistory.length})</div>
+                  {dbHistory.length === 0 ? (
+                    <span className="text-[11px] text-gray-600 italic">No generations audit trail found.</span>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                      {dbHistory.map(row => (
+                        <div 
+                          key={row.id}
+                          className="p-2 border border-carbon-border/50 bg-[#090a0f]/60 rounded-lg flex flex-col gap-1.5 hover:border-carbon-border transition-all"
+                        >
+                          <div className="flex items-center justify-between text-[8px] font-mono text-gray-500">
+                            <span>{new Date(row.created_at).toLocaleTimeString()}</span>
+                            <span className={`px-1.5 py-0.2 rounded-full border ${row.block_type === 'sfx' ? 'text-accent-secondary border-accent-secondary/20 bg-accent-secondary/5' : 'text-accent-tertiary border-accent-tertiary/20 bg-accent-tertiary/5'}`}>
+                              {row.block_type === 'sfx' ? '🎵 SFX' : '🎤 VOICE'}
+                            </span>
+                          </div>
+                          
+                          <p className="text-[11px] font-mono text-gray-300 line-clamp-2 select-text" title={row.prompt}>
+                            {row.prompt}
+                          </p>
+
+                          <div className="flex items-center justify-between mt-0.5">
+                            <span className={`text-[8px] font-bold uppercase tracking-wider ${row.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              ● {row.status}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(row.prompt);
+                                addLog(`Copied past prompt to clipboard: "${row.prompt}"`, "success");
+                                if (selectedBlock) {
+                                  handlePromptChange(selectedBlock.lane, selectedBlock.index, row.prompt);
+                                  addLog(`Auto-pasted prompt into selected timeline block!`, "success");
+                                }
+                              }}
+                              className="text-[9px] font-bold text-accent-primary hover:text-white bg-accent-primary/10 hover:bg-accent-primary px-2 py-0.5 border border-accent-primary/20 rounded transition-all"
+                              title="Click to copy and auto-paste into active block"
+                            >
+                              REUSE
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Renders logs */}
+                <div className="flex flex-col gap-2 mt-2">
+                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider font-mono">Recent Render Exports ({dbRenders.length})</div>
+                  {dbRenders.length === 0 ? (
+                    <span className="text-[11px] text-gray-600 italic">No video rendering audits logged yet.</span>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
+                      {dbRenders.map(row => (
+                        <div 
+                          key={row.id}
+                          className="p-2 border border-carbon-border/50 bg-[#090a0f]/60 rounded-lg flex flex-col gap-1 hover:border-carbon-border transition-all"
+                        >
+                          <div className="flex items-center justify-between text-[8px] font-mono text-gray-500">
+                            <span>{new Date(row.created_at).toLocaleDateString()} {new Date(row.created_at).toLocaleTimeString()}</span>
+                            <span className={`text-[8px] font-bold uppercase tracking-wider ${row.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              ● {row.status}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] font-semibold text-gray-300 truncate">
+                            Project: {row.project_name}
+                          </div>
+
+                          {row.output_path && (
+                            <div className="text-[9px] font-mono text-gray-500 truncate" title={row.output_path}>
+                              Path: {row.output_path.split('\\').pop().split('/').pop()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

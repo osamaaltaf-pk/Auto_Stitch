@@ -4,6 +4,8 @@ import json
 import logging
 import asyncio
 import httpx
+import datetime
+import hashlib
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Request
@@ -22,12 +24,117 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from app.core.manifest import Manifest, BlockStatus, VideoBlock, SfxBlock, VoiceBlock
 from app.utils import ffprobe
 from app.core import stitcher
+from app.core import db
 
 app = FastAPI(
     title="AutoStitch Unified Backend",
     description="Orchestrates projects, proxy requests, and runs FFmpeg rendering.",
     version="1.0.0"
 )
+
+# Keep track of background server subprocesses
+background_subprocesses = []
+
+def get_system_ram_gb() -> float:
+    import ctypes
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [
+            ("dwLength", ctypes.c_ulong),
+            ("dwMemoryLoad", ctypes.c_ulong),
+            ("ullTotalPhys", ctypes.c_ulonglong),
+            ("ullAvailPhys", ctypes.c_ulonglong),
+            ("ullTotalPageFile", ctypes.c_ulonglong),
+            ("ullAvailPageFile", ctypes.c_ulonglong),
+            ("ullTotalVirtual", ctypes.c_ulonglong),
+            ("ullAvailVirtual", ctypes.c_ulonglong),
+            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+        ]
+    try:
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(stat)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+            return stat.ullTotalPhys / (1024**3)
+    except Exception as e:
+        logger.warning(f"Could not read RAM via GlobalMemoryStatusEx: {e}")
+    return 16.0  # fallback
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Initializing local SQLite production database...")
+    db.init_db()
+    
+    # Auto-launch background servers if configured to run locally
+    settings = load_settings()
+    tts_url = settings.get("tts_server_url", "http://127.0.0.1:8000")
+    sfx_url = settings.get("sfx_server_url", "http://127.0.0.1:5000")
+    
+    import subprocess
+    
+    # 1. PocketTTS Server
+    is_tts_local = "127.0.0.1" in tts_url or "localhost" in tts_url
+    if is_tts_local:
+        tts_python = BASE_DIR / "Pocket_tts" / "venv" / "Scripts" / "python.exe"
+        tts_script = BASE_DIR / "Pocket_tts" / "server.py"
+        if tts_python.exists() and tts_script.exists():
+            logger.info("Starting local PocketTTS server in background...")
+            try:
+                proc = subprocess.Popen(
+                    [str(tts_python), str(tts_script)],
+                    cwd=str(BASE_DIR / "Pocket_tts"),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+                background_subprocesses.append(proc)
+                logger.info(f"PocketTTS server subprocess started (PID: {proc.pid})")
+            except Exception as e:
+                logger.error(f"Failed to start local PocketTTS server: {e}")
+        else:
+            logger.warning(f"PocketTTS local files not found at {tts_python} or {tts_script}")
+            
+    # 2. Stable Audio CPU Server
+    is_sfx_local = "127.0.0.1" in sfx_url or "localhost" in sfx_url
+    if is_sfx_local:
+        ram_gb = get_system_ram_gb()
+        logger.info(f"Detected {ram_gb:.1f} GB of system RAM.")
+        if ram_gb >= 16.0:
+            sfx_python = BASE_DIR / "Stable audio LOcal CPU" / "venv" / "Scripts" / "python.exe"
+            sfx_script = BASE_DIR / "Stable audio LOcal CPU" / "server.py"
+            if sfx_python.exists() and sfx_script.exists():
+                logger.info("System has >= 16GB RAM. Starting local Stable Audio CPU server in background...")
+                try:
+                    proc = subprocess.Popen(
+                        [str(sfx_python), str(sfx_script)],
+                        cwd=str(BASE_DIR / "Stable audio LOcal CPU"),
+                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                    )
+                    background_subprocesses.append(proc)
+                    logger.info(f"Stable Audio CPU server subprocess started (PID: {proc.pid})")
+                except Exception as e:
+                    logger.error(f"Failed to start local Stable Audio CPU server: {e}")
+            else:
+                logger.warning(f"Stable Audio local files not found at {sfx_python} or {sfx_script}")
+        else:
+            logger.warning(
+                f"Local Stable Audio is configured, but system RAM is only {ram_gb:.1f} GB (required: >= 16 GB). "
+                "Skipping local Stable Audio launch to prevent system instability. "
+                "Please run on a system with more RAM, or set 'sfx_server_url' to a remote Colab tunnel URL in settings."
+            )
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Gracefully shutting down background AI servers...")
+    import subprocess
+    for proc in background_subprocesses:
+        try:
+            logger.info(f"Terminating subprocess PID {proc.pid}...")
+            proc.terminate()
+            try:
+                proc.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Process PID {proc.pid} did not exit gracefully, killing...")
+                proc.kill()
+        except Exception as e:
+            logger.error(f"Error terminating background subprocess: {e}")
+    logger.info("Background servers shutdown sequence completed.")
 
 # Enable CORS for local cross-origin request compatibility
 app.add_middleware(
@@ -55,10 +162,177 @@ THUMBS_DIR.mkdir(exist_ok=True)
 SETTINGS_FILE = BASE_DIR / "settings.json"
 DEFAULT_SETTINGS = {
     "tts_server_url": "http://127.0.0.1:8000",
-    "sfx_server_url": "http://127.0.0.1:5001",  # Defaults to 5001 (GPU Colab)
+    "sfx_server_url": "http://127.0.0.1:5000",  # Defaults to 5000 (Local CPU or Colab Tunnel)
+    "license_server_url": "https://omni-automator.vercel.app",  # Default Vercel server URL
     "output_dir": str(OUTPUT_DIR),
     "projects_dir": str(PROJECTS_DIR),
 }
+
+SECURE_SALT = "OMNI_STITCH_SECURE_SALT_2026"
+DEVELOPER_BYPASS_KEY = "Osama@1232£-80£viu%*ajoy/(592@!(/@0862hkhakowpnbtaownyekn69vhwilwn"
+
+def generate_local_signature(key: str, gmail: str, machine_id: str, expiry: str) -> str:
+    """Generates a secure cryptographic signature to prevent tampering of license.json."""
+    raw = f"{key}||{gmail}||{machine_id}||{expiry}||{SECURE_SALT}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+async def check_license_validity() -> tuple[bool, str]:
+    """Offline and online license checker with 12-hour grace period enforcement."""
+    license_path = BASE_DIR / "license.json"
+    if not license_path.exists():
+        return False, "Activation credentials missing! Run setup_all.bat to activate."
+
+    try:
+        with open(license_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return False, "Corrupted license configuration."
+
+    key = data.get("license_key", "")
+    gmail = data.get("gmail", "")
+    machine_id = data.get("machine_id", "")
+    expiry = data.get("expiry_date", "")
+    last_check_str = data.get("last_online_check", "")
+    sig = data.get("signature", "")
+
+    # 1. Developer Bypass Key
+    if key == DEVELOPER_BYPASS_KEY:
+        return True, "Lifetime Developer Bypass Unlocked"
+
+    # 2. Check local signature integrity
+    computed_sig = generate_local_signature(key, gmail, machine_id, expiry)
+    if computed_sig != sig:
+        return False, "Tampered license key detected!"
+
+    # 3. Check expiration date locally
+    try:
+        # Strip trailing Z if exists for fromisoformat compatibility in older python
+        expiry_clean = expiry.rstrip("Z")
+        expiry_dt = datetime.datetime.fromisoformat(expiry_clean)
+    except Exception as e:
+        return False, f"Invalid expiry timestamp format: {e}"
+
+    now = datetime.datetime.now()
+    if now > expiry_dt:
+        return False, f"Your license expired on {expiry_dt.date().isoformat()}."
+
+    # 4. Attempt online real-time verification with Vercel server
+    settings = load_settings()
+    server_url = settings.get("license_server_url", "https://omni-automator.vercel.app").rstrip("/")
+    url = f"{server_url}/api/verify"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                url,
+                json={"license_key": key, "machine_id": machine_id},
+                headers={"Content-Type": "application/json"},
+                timeout=3.0
+            )
+            if resp.status_code == 200:
+                res_data = resp.json()
+                if res_data.get("status") == "success":
+                    # Update last online check timestamp and write back
+                    data["last_online_check"] = datetime.datetime.now().isoformat() + "Z"
+                    data["signature"] = generate_local_signature(key, gmail, machine_id, expiry)
+                    with open(license_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2)
+                    return True, "License validated successfully online."
+                else:
+                    return False, res_data.get("message", "License validation rejected by Vercel server.")
+            elif resp.status_code in (401, 403, 404):
+                return False, resp.json().get("message", "License has expired or is invalid.")
+    except Exception as e:
+        logger.warning(f"Online license verification failed (operating in offline mode): {e}")
+
+    # 5. Offline fallback: Enforce 12-hour grace period
+    if not last_check_str:
+        return False, "First-time verification requires an active internet connection."
+
+    try:
+        last_check_clean = last_check_str.rstrip("Z")
+        last_check_dt = datetime.datetime.fromisoformat(last_check_clean)
+    except Exception:
+        return False, "Invalid offline timestamp configuration."
+
+    elapsed = now - last_check_dt
+    elapsed_hours = elapsed.total_seconds() / 3600.0
+
+    if elapsed_hours <= 12.0:
+        left = 12.0 - elapsed_hours
+        return True, f"Offline Mode (12-hour grace period active. Time left: {left:.1f} hours)"
+    else:
+        return False, "12-Hour Offline Limit Reached. Please connect to the internet to verify your license."
+
+# FastAPI Middleware to intercept and block API calls when locked
+@app.middleware("http")
+async def license_middleware(request: Request, call_next):
+    path = request.url.path
+    # Intercept all core operations endpoints (exclude static pages and license checkers)
+    if path.startswith("/api/"):
+        excluded_endpoints = [
+            "/api/license/status", 
+            "/api/license/activate", 
+            "/api/settings"
+        ]
+        if path not in excluded_endpoints:
+            ok, msg = await check_license_validity()
+            if not ok:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": f"License Blocked: {msg}"}
+                )
+    response = await call_next(request)
+    return response
+
+# API Endpoint models & routes
+class LicenseActivateRequest(BaseModel):
+    license_key: str
+    gmail: str
+    password: str
+
+@app.get("/api/license/status")
+async def get_license_status():
+    """Retrieve detailed activation state and expiry parameters."""
+    ok, msg = await check_license_validity()
+    
+    gmail = ""
+    expiry = ""
+    key = ""
+    license_path = BASE_DIR / "license.json"
+    if license_path.exists():
+        try:
+            with open(license_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                gmail = data.get("gmail", "")
+                expiry = data.get("expiry_date", "")
+                key = data.get("license_key", "")
+        except Exception:
+            pass
+            
+    return {
+        "valid": ok,
+        "message": msg,
+        "gmail": gmail,
+        "expiry_date": expiry,
+        "license_key": key
+    }
+
+@app.post("/api/license/activate")
+async def activate_license_endpoint(req: LicenseActivateRequest):
+    """Enables users to activate their product directly from the React UI."""
+    import activate
+    settings = load_settings()
+    server_url = settings.get("license_server_url", "https://omni-automator.vercel.app")
+    
+    success = activate.activate_license(req.license_key, req.gmail, req.password, server_url)
+    if success:
+        return {"status": "success", "message": "License activated successfully!"}
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Activation failed! Check credentials, Vercel endpoints, or device limits."
+        )
 
 def load_settings() -> Dict[str, Any]:
     settings = DEFAULT_SETTINGS.copy()
@@ -320,24 +594,36 @@ async def load_project(req: ProjectLoadRequest):
     p_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = p_dir / "manifest.json"
     
+    # 1. Try loading from local SQLite database first
+    db_manifest = db.get_project(project_name)
+    if db_manifest:
+        logger.info(f"Loaded project manifest '{project_name}' from local SQLite database.")
+        db_manifest["project_dir"] = str(p_dir)
+        return db_manifest
+        
+    # 2. Fallback to manifest.json on disk
     if manifest_path.exists():
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 content = f.read()
             manifest = Manifest.from_json(content)
             manifest.project_dir = str(p_dir)
+            # Sync to SQLite
+            db.save_project(project_name, manifest.to_dict())
             return manifest.to_dict()
         except Exception as e:
             logger.error(f"Error parsing manifest.json: {e}")
             raise HTTPException(status_code=500, detail=f"Failed loading manifest: {str(e)}")
             
-    # Return fresh blank project
+    # 3. Return fresh blank project
     manifest = Manifest(
         project_name=project_name,
         project_dir=str(p_dir),
         output_dir=str(OUTPUT_DIR)
     )
     manifest.save()
+    # Sync to SQLite
+    db.save_project(project_name, manifest.to_dict())
     return manifest.to_dict()
 
 @app.post("/api/project/save")
@@ -348,11 +634,29 @@ async def save_project_api(data: Dict[str, Any]):
         p_dir = PROJECTS_DIR / manifest.project_name
         p_dir.mkdir(parents=True, exist_ok=True)
         manifest.project_dir = str(p_dir)
+        # 1. Save to manifest.json on disk
         manifest.save()
+        # 2. Save to SQLite local database
+        db.save_project(manifest.project_name, data)
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Error saving project manifest: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/db/history")
+async def get_synthesis_history(limit: int = 100):
+    """Retrieve local SQLite history logs of all AI generations (prompts/scripts)."""
+    return {"history": db.get_generation_history(limit)}
+
+@app.get("/api/db/renders")
+async def get_video_renders_history(limit: int = 50):
+    """Retrieve local SQLite history logs of all video stitches."""
+    return {"renders": db.get_render_history(limit)}
+
+@app.get("/api/db/projects")
+async def get_local_projects_list():
+    """Retrieve lists of all saved projects in local SQLite."""
+    return {"projects": db.list_projects()}
 
 @app.post("/api/videos/load")
 async def scan_video_folder(req: VideoScanRequest):
@@ -484,6 +788,8 @@ async def generate_tts(req: TtsGenerateRequest):
                     block.duration_s = meta["duration_s"]
                     block.error_msg = None
                     logger.info(f"TTS Synthesized successfully → {out_wav}")
+                    # Log successful TTS generation to SQLite DB
+                    db.log_generation(req.project_name, block.id, "voice", req.text, str(out_wav), "success")
                 else:
                     try:
                         detail = resp.json().get("detail", f"HTTP {resp.status_code}")
@@ -492,12 +798,18 @@ async def generate_tts(req: TtsGenerateRequest):
                     block.status = BlockStatus.ERROR
                     block.error_msg = detail
                     logger.error(f"TTS Server failed: {detail}")
+                    # Log failed TTS generation to SQLite DB
+                    db.log_generation(req.project_name, block.id, "voice", req.text, None, "failed")
         except Exception as e:
             block.status = BlockStatus.ERROR
             block.error_msg = str(e)
             logger.error(f"Connection failed to PocketTTS server: {e}")
+            # Log failed TTS generation exception to SQLite DB
+            db.log_generation(req.project_name, block.id, "voice", req.text, None, "failed")
         finally:
             manifest.save()
+            # Also sync project state back to SQLite on changes
+            db.save_project(req.project_name, manifest.to_dict())
             
     # Trigger generation task in background so we respond immediately with "generating" status
     asyncio.create_task(run_tts())
@@ -558,6 +870,7 @@ async def generate_sfx(req: SfxGenerateRequest):
                     block.status = BlockStatus.ERROR
                     block.error_msg = err
                     manifest.save()
+                    db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
                 job_data = resp.json()
@@ -590,6 +903,7 @@ async def generate_sfx(req: SfxGenerateRequest):
                             block.status = BlockStatus.ERROR
                             block.error_msg = status_data.get("error", "Unknown model error")
                             manifest.save()
+                            db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                             return
                     else:
                         logger.warning(f"Failed pulling job {job_id} status.")
@@ -598,6 +912,7 @@ async def generate_sfx(req: SfxGenerateRequest):
                     block.status = BlockStatus.ERROR
                     block.error_msg = "Model generation timed out"
                     manifest.save()
+                    db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
                 # Download WAV
@@ -615,15 +930,20 @@ async def generate_sfx(req: SfxGenerateRequest):
                     block.duration_s = meta["duration_s"]
                     block.error_msg = None
                     logger.info(f"SFX file downloaded successfully → {out_wav}")
+                    # Log successful generation
+                    db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, str(out_wav), "success")
                 else:
                     block.status = BlockStatus.ERROR
                     block.error_msg = "Failed downloading generated audio"
+                    db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
         except Exception as e:
             block.status = BlockStatus.ERROR
             block.error_msg = str(e)
             logger.error(f"Error generating SFX: {e}")
+            db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
         finally:
             manifest.save()
+            db.save_project(req.project_name, manifest.to_dict())
             
     asyncio.create_task(run_sfx())
     return {"status": "generating", "manifest": manifest.to_dict()}
@@ -670,11 +990,17 @@ async def trigger_render(req: RenderRequest, background_tasks: BackgroundTasks):
             # Save render completion status
             manifest.render_complete = True
             manifest.save()
+            # Sync to SQLite project manifest
+            db.save_project(project_name, manifest.to_dict())
             logger.info(f"Render completed successfully for {project_name}! Output: {output_path}")
+            # Log successful render to SQLite
+            db.log_render(project_name, req.concat, str(output_path), "success")
         except Exception as e:
             active_renders[project_name]["status"] = "error"
             active_renders[project_name]["error"] = str(e)
             logger.error(f"Render task failed: {e}")
+            # Log failed render to SQLite
+            db.log_render(project_name, req.concat, "", "failed")
             
     background_tasks.add_task(render_task)
     return {"status": "rendering", "message": "Render task scheduled"}
@@ -915,6 +1241,12 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    # Start the server on port 8080
+    # Start the server on localhost port 8080
     logger.info("Starting AutoStitch Studio backend server...")
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=False)
+    
+    print("\n" + "="*60)
+    print("  🎬 AUTOSTITCH STUDIO — SUCCESSFUL LAUNCH")
+    print("  👉 Click to open: http://localhost:8080")
+    print("="*60 + "\n")
+    
+    uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=False)

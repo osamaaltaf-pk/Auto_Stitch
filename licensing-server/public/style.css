@@ -1,0 +1,201 @@
+/* --- Omni Automator Premium Styling and Responsive Aesthetics --- */
+
+:root {
+  --color-bg: #050609;
+  --color-panel: #0d0e15;
+  --color-card: #12131e;
+  --color-border: rgba(255, 255, 255, 0.05);
+  
+  --accent-primary: #7c6cff;
+  --accent-secondary: #ff6c9d;
+  --accent-tertiary: #6cffcc;
+  
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Space Mono', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: #dfdfef;
+  font-family: var(--font-sans);
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Elegant Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(5, 6, 9, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 108, 255, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 108, 255, 0.5);
+}
+
+/* Glassmorphism Classes */
+.glass-card {
+  background: rgba(13, 14, 21, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 
+              0 0 80px rgba(124, 108, 255, 0.02);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Logo animation and glow */
+.glow-logo {
+  box-shadow: 0 0 20px rgba(124, 108, 255, 0.35);
+  animation: logo-glow 3s infinite ease-in-out;
+}
+
+@keyframes logo-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(124, 108, 255, 0.35);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(255, 108, 157, 0.45);
+    transform: translateY(-2px);
+  }
+}
+
+/* Input Fields & Selection Styling */
+input[type="password"],
+input[type="number"],
+select {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus {
+  border-color: rgba(124, 108, 255, 0.4) !important;
+  box-shadow: 0 0 15px rgba(124, 108, 255, 0.1);
+  background: #08090d !important;
+}
+
+/* Button Animations */
+#btn-generate {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.25);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#btn-generate:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 12px 30px rgba(124, 108, 255, 0.45);
+}
+
+#btn-generate:active {
+  transform: scale(0.985);
+}
+
+/* Tab buttons active effect */
+#tab-generator {
+  box-shadow: 0 4px 15px rgba(124, 108, 255, 0.2);
+}
+
+/* Custom Tailwind replacement helpers */
+.bg-carbon { background-color: var(--color-bg); }
+.text-accent-primary { color: var(--accent-primary); }
+.bg-accent-primary\/10 { background-color: rgba(124, 108, 255, 0.1); }
+.bg-accent-primary { background-color: var(--accent-primary); }
+.hover\:bg-accent-primary:hover { background-color: var(--accent-primary); }
+.border-accent-primary\/20 { border-color: rgba(124, 108, 255, 0.2); }
+.grid { display: grid; }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gap-4 { gap: 1rem; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-5 { gap: 1.25rem; }
+.gap-6 { gap: 1.5rem; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.max-w-\[620px\] { max-width: 620px; }
+.p-8 { padding: 2rem; }
+.rounded-3xl { border-radius: 1.5rem; }
+.rounded-2xl { border-radius: 1.25rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.text-white { color: #ffffff; }
+.text-gray-200 { color: #e2e8f0; }
+.text-gray-400 { color: #94a3b8; }
+.text-gray-500 { color: #64748b; }
+.text-emerald-400 { color: #34d399; }
+.bg-emerald-500\/5 { background-color: rgba(52, 211, 153, 0.05); }
+.border-emerald-500\/10 { border-color: rgba(52, 211, 153, 0.1); }
+.font-sans { font-family: var(--font-sans); }
+.font-mono { font-family: var(--font-mono); }
+.text-4xl { font-size: 2.25rem; }
+.font-extrabold { font-weight: 800; }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+.tracking-tight { letter-spacing: -0.025em; }
+.tracking-wide { letter-spacing: 0.025em; }
+.tracking-wider { letter-spacing: 0.05em; }
+.tracking-widest { letter-spacing: 0.1em; }
+.uppercase { text-transform: uppercase; }
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.text-base { font-size: 1rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-3\.5 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.outline-none { outline: 2px solid transparent; outline-offset: 2px; }
+.appearance-none { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+.cursor-pointer { cursor: pointer; }
+.absolute { position: absolute; }
+.relative { position: relative; }
+.inset-y-0 { top: 0; bottom: 0; }
+.right-0 { right: 0; }
+.left-1/2 { left: 50%; }
+.-translate-x-1/2 { transform: translateX(-50%); }
+.w-14 { width: 3.5rem; }
+.h-14 { height: 3.5rem; }
+.w-7 { width: 1.75rem; }
+.h-7 { height: 1.75rem; }
+.w-48 { width: 12rem; }
+.h-48 { height: 12rem; }
+.blur-\[60px\] { filter: blur(60px); }
+.blur-\[100px\] { filter: blur(100px); }
+.blur-\[80px\] { filter: blur(80px); }
+.z-10 { z-index: 10; }
+.-z-10 { z-index: -10; }
+.-z-20 { z-index: -20; }
+.shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+
+/* Animation Pulse helper */
+.animate-pulse {
+  animation: pulse-effect 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-effect {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+}

@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stable Audio 3 · Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #17171f;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c6cff;
+    --accent2: #ff6c9d;
+    --accent3: #6cffcc;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --danger: #ff4d4d;
+    --success: #4dffa0;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background orbs ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: -10%;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124,108,255,0.12) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    right: -10%;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(255,108,157,0.08) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── Layout ── */
+  .app { position: relative; z-index: 1; display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo span { color: var(--accent); }
+  .logo .badge {
+    display: inline-block;
+    background: rgba(124,108,255,0.15);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.05em;
+  }
+
+  .nav-section {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 14px 0 6px;
+    padding-left: 4px;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-btn .icon { font-size: 1rem; }
+  .nav-btn:hover { color: var(--text); background: var(--surface2); }
+  .nav-btn.active {
+    color: var(--text);
+    background: rgba(124,108,255,0.12);
+    border-color: rgba(124,108,255,0.25);
+  }
+  .nav-btn.active .icon { filter: none; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .health-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-right: 5px;
+    vertical-align: middle;
+    transition: background 0.3s;
+  }
+  .health-dot.ok { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+  /* ── Main Content ── */
+  .main {
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    min-width: 0;
+  }
+
+  .page { display: none; }
+  .page.active { display: flex; flex-direction: column; gap: 28px; }
+
+  /* ── Page Header ── */
+  .page-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .page-header p {
+    color: var(--muted);
+    margin-top: 4px;
+    font-size: 0.9rem;
+    font-weight: 400;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .card-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Form Controls ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+  }
+
+  input[type="text"], input[type="number"], textarea, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    transition: border-color 0.15s;
+    outline: none;
+    width: 100%;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,108,255,0.12);
+  }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+  select { cursor: pointer; }
+
+  /* model selector pills */
+  .model-pills { display: flex; gap: 10px; }
+  .model-pill {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .model-pill:hover { border-color: rgba(124,108,255,0.4); color: var(--text); }
+  .model-pill.active {
+    border-color: var(--accent);
+    background: rgba(124,108,255,0.12);
+    color: var(--accent);
+  }
+  .model-pill .pill-name { font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 2px; }
+  .model-pill .pill-desc { font-size: 0.6rem; opacity: 0.7; }
+
+  /* mode pills */
+  .mode-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-pill {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-pill.active { border-color: var(--accent2); background: rgba(255,108,157,0.1); color: var(--accent2); }
+
+  /* slider */
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); color: var(--text); background: rgba(124,108,255,0.04); }
+  .upload-zone .upload-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+  .upload-zone .upload-name { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--accent); margin-top: 6px; }
+
+  /* ── Generate Button ── */
+  .btn-generate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--accent), #9b6cff);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,108,255,0.35); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ── Job Status ── */
+  .job-status {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--surface2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .job-status.visible { display: flex; }
+
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid rgba(124,108,255,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .job-status .status-text {
+    flex: 1;
+    font-size: 0.875rem;
+  }
+  .job-status .elapsed {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .btn-download {
+    padding: 8px 18px;
+    background: var(--success);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: none;
+  }
+  .btn-download:hover { transform: scale(1.03); }
+
+  /* waveform visualiser */
+  .audio-player { display: none; margin-top: 12px; }
+  .audio-player audio { width: 100%; accent-color: var(--accent); }
+
+  /* ── History ── */
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.8rem;
+    transition: border-color 0.15s;
+  }
+  .history-item:hover { border-color: rgba(124,108,255,0.3); }
+  .status-pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+  .status-pill.done { background: rgba(77,255,160,0.15); color: var(--success); }
+  .status-pill.running { background: rgba(124,108,255,0.15); color: var(--accent); }
+  .status-pill.queued { background: rgba(255,200,0,0.1); color: #ffc800; }
+  .status-pill.error { background: rgba(255,77,77,0.15); color: var(--danger); }
+
+  .history-id { font-family: 'Space Mono', monospace; color: var(--muted); font-size: 0.7rem; }
+  .history-dl {
+    margin-left: auto;
+    padding: 5px 12px;
+    background: rgba(77,255,160,0.1);
+    color: var(--success);
+    border: 1px solid rgba(77,255,160,0.2);
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  /* ── Guide Page ── */
+  .guide-section { margin-bottom: 28px; }
+  .guide-section h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .guide-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.08em;
+  }
+  .tag-music { background: rgba(124,108,255,0.15); color: var(--accent); }
+  .tag-sfx { background: rgba(255,108,157,0.15); color: var(--accent2); }
+  .tag-inpaint { background: rgba(108,255,204,0.15); color: var(--accent3); }
+
+  .tip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tip-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  .tip-card strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 0.85rem; }
+  .tip-card p { color: var(--muted); }
+
+  .example-prompt {
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text);
+    line-height: 1.7;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .example-prompt:hover { background: rgba(124,108,255,0.06); }
+  .example-prompt::after { content: '↗ use'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 0.6rem; opacity: 0; transition: opacity 0.15s; }
+  .example-prompt:hover::after { opacity: 1; }
+
+  .sfx-prompt { border-left-color: var(--accent2); }
+  .inpaint-prompt { border-left-color: var(--accent3); }
+
+  .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .do-card, .dont-card {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  .do-card { border: 1px solid rgba(77,255,160,0.2); }
+  .dont-card { border: 1px solid rgba(255,77,77,0.2); }
+  .do-card .label { color: var(--success); font-family: 'Space Mono', monospace; font-size: 0.65rem; margin-bottom: 6px; font-weight: 700; }
+  .dont-card .label { color: var(--danger); font-family: 'Space Mono', monospace; font-size: 0.65rem; margin-bottom: 6px; font-weight: 700; }
+
+  /* ── Warnings / performance ── */
+  .perf-banner {
+    background: rgba(255,200,0,0.07);
+    border: 1px solid rgba(255,200,0,0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 0.82rem;
+    color: #ffc800;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    line-height: 1.6;
+  }
+  .perf-banner .icon { flex-shrink: 0; font-size: 1rem; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; overflow: visible; }
+    .logo { width: 100%; }
+    .main { padding: 20px; }
+    .form-grid, .tip-grid, .do-dont { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══════════════════════════════════════ SIDEBAR ═══════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="logo">
+      Stable Audio <span>3</span>
+      <span class="badge">CPU</span>
+    </div>
+
+    <div class="nav-section">Generate</div>
+    <button class="nav-btn active" onclick="showPage('generate')">
+      <span class="icon">🎛️</span> Studio
+    </button>
+    <button class="nav-btn" onclick="showPage('history')">
+      <span class="icon">📋</span> History
+    </button>
+
+    <div class="nav-section">Learn</div>
+    <button class="nav-btn" onclick="showPage('guide')">
+      <span class="icon">📖</span> Prompt Guide
+    </button>
+
+    <div class="sidebar-footer">
+      <div><span class="health-dot" id="health-dot"></span> <span id="health-text">Checking server…</span></div>
+      <div style="margin-top:6px">i5-4570 · CPU mode</div>
+      <div>Est. 2–8 min / gen</div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════ MAIN ═══════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- ─────────────────── GENERATE PAGE ─────────────────── -->
+    <section class="page active" id="page-generate">
+      <div class="page-header">
+        <h1>Audio Studio</h1>
+        <p>Generate music, stems, and sound effects for your content</p>
+      </div>
+
+      <div class="perf-banner">
+        <span class="icon">⚡</span>
+        <span><strong>CPU Mode:</strong> Expect 2–8 minutes per generation on your i5-4570. Use <strong>steps=4</strong> for quick previews, <strong>steps=8</strong> (default) for final output. Keep duration short (15–30s) for faster results.</span>
+      </div>
+
+      <!-- Model Select -->
+      <div class="card">
+        <div class="card-title">Model</div>
+        <div class="model-pills">
+          <div class="model-pill active" id="pill-small-music" onclick="selectModel('small-music')">
+            <span class="pill-name">small-music</span>
+            <span class="pill-desc">Music · Stems · Ambience</span>
+          </div>
+          <div class="model-pill" id="pill-small-sfx" onclick="selectModel('small-sfx')">
+            <span class="pill-name">small-sfx</span>
+            <span class="pill-desc">Sound Effects · One-shots</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generation Mode -->
+      <div class="card">
+        <div class="card-title">Generation Mode</div>
+        <div class="mode-pills">
+          <div class="mode-pill active" onclick="selectMode('text_to_audio')">🎼 Text → Audio</div>
+          <div class="mode-pill" onclick="selectMode('audio_to_audio')">🔄 Audio → Audio</div>
+          <div class="mode-pill" onclick="selectMode('inpaint')">✂️ Inpaint / Continue</div>
+        </div>
+      </div>
+
+      <!-- Prompt Card -->
+      <div class="card">
+        <div class="card-title">Prompt</div>
+        <div class="form-group full">
+          <label>Describe what you want</label>
+          <textarea id="prompt" placeholder="e.g. Upbeat lo-fi hip hop with jazzy piano, muted drums and warm vinyl crackle, 85 BPM"></textarea>
+        </div>
+        <div class="form-group full" style="margin-top:12px">
+          <label>Negative Prompt <span style="opacity:0.5">(optional)</span></label>
+          <input type="text" id="neg_prompt" value="poor quality, distorted, noise" placeholder="Things to avoid">
+        </div>
+      </div>
+
+      <!-- Upload Card (hidden by default) -->
+      <div class="card" id="upload-card" style="display:none">
+        <div class="card-title">Source Audio</div>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('audio-file').click()">
+          <span class="upload-icon">🎵</span>
+          <span>Click to upload audio file (WAV, MP3)</span>
+          <div class="upload-name" id="upload-name"></div>
+        </div>
+        <input type="file" id="audio-file" accept="audio/*" style="display:none" onchange="handleFileUpload(this)">
+
+        <div id="inpaint-controls" style="display:none; margin-top:16px">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Mask Start (seconds)</label>
+              <input type="number" id="mask_start" value="0" min="0" step="0.5">
+            </div>
+            <div class="form-group">
+              <label>Mask End (seconds)</label>
+              <input type="number" id="mask_end" value="10" min="0" step="0.5">
+            </div>
+          </div>
+          <p style="color:var(--muted);font-size:0.78rem;margin-top:8px">
+            Region between start/end will be regenerated. Set mask_start = audio length to <strong>extend</strong>.
+          </p>
+        </div>
+
+        <div id="a2a-controls" style="display:none; margin-top:16px">
+          <div class="form-group">
+            <label>Noise Level <span style="opacity:0.6">(0 = close variation · 1 = full replacement)</span></label>
+            <div class="slider-row">
+              <input type="range" id="noise_level" min="0" max="1" step="0.05" value="0.7" oninput="document.getElementById('noise-val').textContent=this.value">
+              <span class="slider-val" id="noise-val">0.7</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parameters -->
+      <div class="card">
+        <div class="card-title">Parameters</div>
+        <div class="form-grid three">
+          <div class="form-group">
+            <label>Duration (seconds)</label>
+            <input type="number" id="duration" value="30" min="5" max="120" step="5">
+          </div>
+          <div class="form-group">
+            <label>Steps <span style="opacity:0.6">(4=fast · 8=best)</span></label>
+            <div class="slider-row">
+              <input type="range" id="steps" min="2" max="16" value="8" oninput="document.getElementById('steps-val').textContent=this.value">
+              <span class="slider-val" id="steps-val">8</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Seed <span style="opacity:0.6">(-1 = random)</span></label>
+            <input type="number" id="seed" value="-1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <button class="btn-generate" id="gen-btn" onclick="generate()">
+        ▶ Generate Audio
+      </button>
+
+      <!-- Status -->
+      <div class="job-status" id="job-status">
+        <div class="spinner" id="status-spinner"></div>
+        <div class="status-text" id="status-text">Starting generation…</div>
+        <div class="elapsed" id="elapsed-text"></div>
+        <button class="btn-download" id="download-btn">⬇ Download</button>
+      </div>
+
+      <div class="audio-player" id="audio-player">
+        <audio id="audio-el" controls preload="auto"></audio>
+      </div>
+    </section>
+
+    <!-- ─────────────────── HISTORY PAGE ─────────────────── -->
+    <section class="page" id="page-history">
+      <div class="page-header">
+        <h1>Generation History</h1>
+        <p>Recent jobs from this session</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Jobs</div>
+        <div class="history-list" id="history-list">
+          <div style="color:var(--muted);font-size:0.85rem">No jobs yet</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────── GUIDE PAGE ─────────────────── -->
+    <section class="page" id="page-guide">
+      <div class="page-header">
+        <h1>Prompt Guide</h1>
+        <p>How to write great prompts for each generation type — click any example to use it</p>
+      </div>
+
+      <!-- General Tips -->
+      <div class="card">
+        <div class="card-title">General Tips</div>
+        <div class="tip-grid">
+          <div class="tip-card">
+            <strong>Be specific & descriptive</strong>
+            <p>The more detail you provide — genre, instruments, mood, tempo — the better the output. Don't just say "jazz"; say "smooth jazz piano trio with brushed drums and walking bass, 95 BPM"</p>
+          </div>
+          <div class="tip-card">
+            <strong>Include BPM for music</strong>
+            <p>Adding tempo like "120 BPM" or "85 BPM" significantly improves rhythmic coherence. Leave it out for ambient/non-rhythmic pieces.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Set a realistic duration</strong>
+            <p>Short durations (15–30s) generate faster and often sound more coherent. Only use long durations when you truly need them — on CPU, 120s takes a long time.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Use AudioSparx tags</strong>
+            <p>Prefixing with <code style="color:var(--accent);font-family:Space Mono;font-size:0.75rem">TrackType: Music, VocalType: Instrumental</code> or <code style="color:var(--accent2);font-family:Space Mono;font-size:0.75rem">TrackType: SFX</code> steers the model strongly.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Embrace randomness</strong>
+            <p>Use seed=-1 to explore variations. Once you find a seed you like, lock it in for consistent results.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Steps 4 vs 8</strong>
+            <p>On CPU, use steps=4 for quick previews and to test your prompt, then regenerate with steps=8 for the final export. Going above 8 doesn't help with small- models.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Music Guide -->
+      <div class="card guide-section">
+        <div class="card-title">
+          <span style="color:var(--accent)">🎵</span> Music Prompting <span class="guide-tag tag-music">small-music</span>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-card">
+            <div class="label">✓ DO</div>
+            Describe genre, instruments, mood, tempo, production style, and energy. The more layers of detail, the richer the output. Reference emotional states ("euphoric," "nostalgic," "tense") and sonic textures ("warm vinyl crackle," "fuzzy synth pads").
+          </div>
+          <div class="dont-card">
+            <div class="label">✗ DON'T</div>
+            Write vague one-word prompts ("jazz", "epic"), include lyrics or vocal descriptions (the model can only produce unintelligible vocal textures), or ask for copyrighted songs/artists.
+          </div>
+        </div>
+
+        <p style="margin-top:14px;margin-bottom:8px;font-size:0.8rem;color:var(--muted);font-family:Space Mono;">EXAMPLE PROMPTS — click to use:</p>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="TrackType: Music, VocalType: Instrumental, Genre: Lo-fi Hip Hop. Lazy afternoon lo-fi beat with dusty vinyl crackle, muted Rhodes piano chords, soft brushed snare, and a warm sub-bass groove. Melancholic but cosy mood, 85 BPM">
+          TrackType: Music, VocalType: Instrumental, Genre: Lo-fi Hip Hop. Lazy afternoon lo-fi beat with dusty vinyl crackle, muted Rhodes piano chords, soft brushed snare, and a warm sub-bass groove. Melancholic but cosy mood, 85 BPM
+        </div>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="An epic cinematic orchestral build with strings, brass swells, and a thunderous percussion section. Starts with a quiet, tense piano motif and builds into a full triumphant climax. Dramatic and emotionally overwhelming. No drums at the start.">
+          An epic cinematic orchestral build with strings, brass swells, and a thunderous percussion section. Starts with quiet, tense piano and builds into a full triumphant climax. Dramatic and emotionally overwhelming.
+        </div>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="TrackType: Music, Genre: Tech House. Pumping four-to-the-floor kick, driving 909 hi-hats, a syncopated acid bassline, and atmospheric dark synth stabs. Energetic and hypnotic, festival dance floor energy, 130 BPM">
+          TrackType: Music, Genre: Tech House. Pumping four-to-the-floor kick, driving 909 hi-hats, a syncopated acid bassline, and atmospheric dark synth stabs. Energetic and hypnotic, festival dance floor energy, 130 BPM
+        </div>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="TrackType: Music, VocalType: Instrumental, Genre: Chillwave. Dreamy synth-pop with shimmering reverb-drenched guitars, pulsing synth arpeggios, and gentle trap-style hi-hats. Nostalgic, bittersweet, 2000s summer aesthetic, 100 BPM">
+          TrackType: Music, VocalType: Instrumental, Genre: Chillwave. Dreamy synth-pop with shimmering reverb-drenched guitars, pulsing synth arpeggios, and gentle trap-style hi-hats. Nostalgic, bittersweet, summer aesthetic, 100 BPM
+        </div>
+      </div>
+
+      <!-- Stems Guide -->
+      <div class="card guide-section">
+        <div class="card-title">
+          <span style="color:var(--accent)">🎸</span> Stems & Solo Instruments <span class="guide-tag tag-music">small-music</span>
+        </div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px;line-height:1.6">Start with <code style="color:var(--accent);font-family:Space Mono;font-size:0.75rem">TrackType: Instrument</code> to maximize isolation. Great for creating backing tracks, B-roll music, or layering in your video editor.</p>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="TrackType: Instrument, a moody, melancholic solo piano with rich room reverb. Slow, reflective phrasing with occasional sustain pedal resonance. Classical and cinematic in tone.">
+          TrackType: Instrument, a moody, melancholic solo piano with rich room reverb. Slow, reflective phrasing with occasional sustain pedal resonance. Classical and cinematic in tone.
+        </div>
+
+        <div class="example-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="TrackType: Instrument, Format: Duo, energetic Latin percussion duo with tight conga and bongo interplay, deep tumbao pattern, bright and lively with a live-recorded studio feel.">
+          TrackType: Instrument, Format: Duo, energetic Latin percussion duo with tight conga and bongo interplay, deep tumbao pattern, bright and lively with a live-recorded studio feel.
+        </div>
+      </div>
+
+      <!-- SFX Guide -->
+      <div class="card guide-section">
+        <div class="card-title">
+          <span style="color:var(--accent2)">💥</span> Sound Effects Prompting <span class="guide-tag tag-sfx">small-sfx</span>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-card">
+            <div class="label">✓ DO</div>
+            Describe the <strong>source</strong> (what object), the <strong>action</strong> (how it's triggered, how long), and the <strong>acoustics</strong> (mic placement, room character, processing). Use <code style="color:var(--accent2);font-family:Space Mono;font-size:0.72rem">TrackType: SFX</code> prefix. Keep duration short (1–5s for one-shots).
+          </div>
+          <div class="dont-card">
+            <div class="label">✗ DON'T</div>
+            Use long durations for short sounds — SFX are brief by nature. Don't mix music and SFX in the same model call; switch to small-sfx specifically for effects.
+          </div>
+        </div>
+
+        <p style="margin-top:14px;margin-bottom:8px;font-size:0.8rem;color:var(--muted);font-family:Space Mono;">EXAMPLE PROMPTS — click to use:</p>
+
+        <div class="example-prompt sfx-prompt" onclick="usePrompt(this.dataset.prompt,'small-sfx')" data-prompt="TrackType: SFX. A satisfying UI button click — a tight, clean, bright tap with a short attack and very fast decay. Slightly warm and wooden, like a mechanical keyboard key, with no reverb.">
+          TrackType: SFX. A satisfying UI button click — a tight, clean, bright tap with a short attack and very fast decay. Slightly warm and wooden, like a mechanical keyboard key, with no reverb.
+        </div>
+
+        <div class="example-prompt sfx-prompt" onclick="usePrompt(this.dataset.prompt,'small-sfx')" data-prompt="TrackType: SFX. A whoosh sound effect — air rushing rapidly from left to right, starting subtle and building to a sharp peak. Clean, fast, and smooth, like a swipe transition in a mobile app.">
+          TrackType: SFX. A whoosh sound effect — air rushing rapidly from left to right, starting subtle and building to a sharp peak. Clean, fast, and smooth, like a swipe transition in a mobile app.
+        </div>
+
+        <div class="example-prompt sfx-prompt" onclick="usePrompt(this.dataset.prompt,'small-sfx')" data-prompt="TrackType: SFX. Deep cinematic bass drop impact — a massive sub-bass thud with a long rumbling tail, recorded with a close-mic setup in a large reverberant hall. Powerful and low-end heavy.">
+          TrackType: SFX. Deep cinematic bass drop impact — a massive sub-bass thud with a long rumbling tail, recorded with a close-mic setup in a large reverberant hall. Powerful and low-end heavy.
+        </div>
+
+        <div class="example-prompt sfx-prompt" onclick="usePrompt(this.dataset.prompt,'small-sfx')" data-prompt="TrackType: SFX. Notification chime — three ascending soft piano notes, gentle and friendly. Short duration, bright tone, light reverb, no harsh transients. Think iPhone-style notification.">
+          TrackType: SFX. Notification chime — three ascending soft piano notes, gentle and friendly. Short duration, bright tone, light reverb, no harsh transients. Think iPhone-style notification.
+        </div>
+      </div>
+
+      <!-- Inpainting Guide -->
+      <div class="card guide-section">
+        <div class="card-title">
+          <span style="color:var(--accent3)">✂️</span> Inpainting & Continuation <span class="guide-tag tag-inpaint">small-music · small-sfx</span>
+        </div>
+
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;line-height:1.6">
+          Upload an existing audio file and regenerate only a specific region. Great for fixing a section, swapping a sound, or extending a clip. For continuation: set <strong>Mask Start = end of your audio</strong> and <strong>Mask End = desired total length</strong>.
+        </p>
+
+        <div class="tip-grid">
+          <div class="tip-card">
+            <strong>Fixing a bad section</strong>
+            <p>Set mask to the problematic region (e.g., 15s → 20s). Use the same prompt style as the surrounding audio to maintain continuity.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Extending audio</strong>
+            <p>Set mask_start = length of clip, mask_end = desired total. The model uses context from the existing audio to continue naturally.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Style transfer a section</strong>
+            <p>Mask a large region and use a contrasting prompt. The transitions will blend with surrounding content.</p>
+          </div>
+          <div class="tip-card">
+            <strong>Context matters most</strong>
+            <p>The surrounding audio guides the output more than the prompt. Mask a tiny region and the result will closely match the original.</p>
+          </div>
+        </div>
+
+        <p style="margin-top:14px;margin-bottom:8px;font-size:0.8rem;color:var(--muted);font-family:Space Mono;">EXAMPLE PROMPTS for inpainting:</p>
+
+        <div class="example-prompt inpaint-prompt" onclick="usePrompt(this.dataset.prompt,'small-music')" data-prompt="A punchy live-recorded drum fill leading into the chorus, energetic with tight snare and crashing cymbal">
+          A punchy live-recorded drum fill leading into the chorus, energetic with tight snare and crashing cymbal
+        </div>
+        <div class="example-prompt sfx-prompt" onclick="usePrompt(this.dataset.prompt,'small-sfx')" data-prompt="TrackType: SFX. A short transitional whoosh that bridges two scenes, matching the existing audio's energy level">
+          TrackType: SFX. A short transitional whoosh that bridges two scenes, matching the existing audio's energy level
+        </div>
+      </div>
+
+      <!-- Audio-to-Audio Guide -->
+      <div class="card guide-section">
+        <div class="card-title">
+          <span style="color:var(--accent)">🔄</span> Audio-to-Audio (Style Transfer)
+        </div>
+
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;line-height:1.6">
+          Upload a seed audio and use a prompt to transform its style. The <strong>Noise Level</strong> slider controls how much the original is changed: <code style="color:var(--accent);font-family:Space Mono;font-size:0.72rem">0.1</code> = very close variation, <code style="color:var(--accent);font-family:Space Mono;font-size:0.72rem">0.9</code> = radical transformation.
+        </p>
+
+        <div class="tip-grid">
+          <div class="tip-card">
+            <strong>Timbre transfer</strong>
+            <p>Change the instrument but keep the melody. Try: input violin.wav → prompt "Heavy metal electric guitar" → noise level 0.4</p>
+          </div>
+          <div class="tip-card">
+            <strong>Genre shift</strong>
+            <p>Upload a track and shift the entire style. Try: input pop.wav → prompt "Cinematic orchestral version" → noise level 0.65</p>
+          </div>
+        </div>
+      </div>
+
+    </section><!-- /guide -->
+
+  </main>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────
+let currentModel = 'small-music';
+let currentMode  = 'text_to_audio';
+let uploadedPath = null;
+let currentJobId = null;
+let pollInterval = null;
+let elapsedStart = null;
+
+// ─── Navigation ───────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'history') loadHistory();
+}
+
+// ─── Model Selection ──────────────────────────────────────────────────────
+function selectModel(name) {
+  currentModel = name;
+  document.querySelectorAll('.model-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('pill-' + name).classList.add('active');
+}
+
+// ─── Mode Selection ───────────────────────────────────────────────────────
+function selectMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const uploadCard   = document.getElementById('upload-card');
+  const inpaintCtrl  = document.getElementById('inpaint-controls');
+  const a2aCtrl      = document.getElementById('a2a-controls');
+
+  if (mode === 'text_to_audio') {
+    uploadCard.style.display  = 'none';
+    inpaintCtrl.style.display = 'none';
+    a2aCtrl.style.display     = 'none';
+  } else if (mode === 'inpaint') {
+    uploadCard.style.display  = 'block';
+    inpaintCtrl.style.display = 'block';
+    a2aCtrl.style.display     = 'none';
+  } else if (mode === 'audio_to_audio') {
+    uploadCard.style.display  = 'block';
+    inpaintCtrl.style.display = 'none';
+    a2aCtrl.style.display     = 'block';
+  }
+}
+
+// ─── File Upload ──────────────────────────────────────────────────────────
+async function handleFileUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('upload-name').textContent = '⬆ Uploading…';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res  = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    uploadedPath = data.path;
+    document.getElementById('upload-name').textContent = '✓ ' + data.name;
+  } catch (e) {
+    document.getElementById('upload-name').textContent = '✗ Upload failed';
+  }
+}
+
+// Drag and drop
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag');
+  const dt = e.dataTransfer;
+  if (dt.files.length) {
+    document.getElementById('audio-file').files = dt.files;
+    handleFileUpload(document.getElementById('audio-file'));
+  }
+});
+
+// ─── Generate ────────────────────────────────────────────────────────────
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt && currentMode === 'text_to_audio') { alert('Please enter a prompt!'); return; }
+  if ((currentMode === 'inpaint' || currentMode === 'audio_to_audio') && !uploadedPath) {
+    alert('Please upload an audio file first!'); return;
+  }
+
+  // Build payload
+  const payload = {
+    model:           currentModel,
+    mode:            currentMode,
+    prompt:          prompt,
+    negative_prompt: document.getElementById('neg_prompt').value,
+    duration:        parseFloat(document.getElementById('duration').value),
+    steps:           parseInt(document.getElementById('steps').value),
+    seed:            parseInt(document.getElementById('seed').value),
+  };
+  if (uploadedPath) payload.audio_path = uploadedPath;
+  if (currentMode === 'inpaint') {
+    payload.mask_start = parseFloat(document.getElementById('mask_start').value);
+    payload.mask_end   = parseFloat(document.getElementById('mask_end').value);
+  }
+  if (currentMode === 'audio_to_audio') {
+    payload.noise_level = parseFloat(document.getElementById('noise_level').value);
+  }
+
+  // UI: start
+  document.getElementById('gen-btn').disabled = true;
+  const statusDiv    = document.getElementById('job-status');
+  const statusText   = document.getElementById('status-text');
+  const elapsedText  = document.getElementById('elapsed-text');
+  const spinner      = document.getElementById('status-spinner');
+  const dlBtn        = document.getElementById('download-btn');
+  const player       = document.getElementById('audio-player');
+
+  statusDiv.classList.add('visible');
+  statusText.textContent = 'Queuing generation…';
+  spinner.style.display  = 'block';
+  dlBtn.style.display    = 'none';
+  player.style.display   = 'none';
+  elapsedStart           = Date.now();
+
+  try {
+    const res  = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (data.error) { statusText.textContent = '✗ Error: ' + data.error; return; }
+
+    currentJobId = data.job_id;
+    statusText.textContent = `Job ${currentJobId} started — generating on CPU…`;
+
+    // Poll
+    clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+      const elapsed = ((Date.now() - elapsedStart) / 1000).toFixed(0);
+      elapsedText.textContent = elapsed + 's';
+
+      const r  = await fetch('/api/status/' + currentJobId);
+      const s  = await r.json();
+
+      if (s.status === 'done') {
+        clearInterval(pollInterval);
+        spinner.style.display = 'none';
+        statusText.textContent = `✓ Done in ${s.elapsed_seconds}s`;
+        dlBtn.style.display = 'inline-block';
+        dlBtn.onclick = () => window.open('/api/download/' + currentJobId);
+        // Play inline
+        const audioEl = document.getElementById('audio-el');
+        audioEl.src = '/api/download/' + currentJobId;
+        player.style.display = 'block';
+        audioEl.play().catch(()=>{});
+        document.getElementById('gen-btn').disabled = false;
+      } else if (s.status === 'error') {
+        clearInterval(pollInterval);
+        spinner.style.display = 'none';
+        statusText.textContent = '✗ Error: ' + s.error;
+        document.getElementById('gen-btn').disabled = false;
+      } else {
+        statusText.textContent = `Running… (${s.status}) — this may take several minutes on CPU`;
+      }
+    }, 3000);
+
+  } catch(e) {
+    statusText.textContent = '✗ Server error: ' + e.message;
+    document.getElementById('gen-btn').disabled = false;
+  }
+}
+
+// ─── History ──────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem">Loading…</div>';
+  try {
+    const res  = await fetch('/api/jobs');
+    const jobs = await res.json();
+    if (!jobs.length) { list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem">No jobs yet</div>'; return; }
+    list.innerHTML = jobs.map(j => `
+      <div class="history-item">
+        <span class="status-pill ${j.status}">${j.status}</span>
+        <span class="history-id">#${j.id}</span>
+        <span style="font-size:0.78rem;color:var(--muted);flex:1">${j.status === 'error' ? j.error || 'Unknown error' : (j.elapsed_seconds ? j.elapsed_seconds+'s' : '—')}</span>
+        ${j.status === 'done' ? `<a class="history-dl" href="/api/download/${j.id}" download>⬇ WAV</a>` : ''}
+      </div>
+    `).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--danger);font-size:0.85rem">Could not fetch history</div>';
+  }
+}
+
+// ─── Use Prompt from Guide ────────────────────────────────────────────────
+function usePrompt(prompt, model) {
+  document.getElementById('prompt').value = prompt;
+  selectModel(model);
+  // Navigate to generate
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-generate').classList.add('active');
+  document.querySelector('.nav-btn').classList.add('active');
+}
+
+// ─── Health Check ─────────────────────────────────────────────────────────
+async function checkHealth() {
+  const dot  = document.getElementById('health-dot');
+  const text = document.getElementById('health-text');
+  try {
+    const r = await fetch('/api/health');
+    if (r.ok) {
+      const d = await r.json();
+      dot.classList.add('ok');
+      text.textContent = 'Server online';
+    } else {
+      dot.classList.remove('ok');
+      text.textContent = 'Server error';
+    }
+  } catch {
+    dot.classList.remove('ok');
+    text.textContent = 'Server offline';
+  }
+}
+
+checkHealth();
+setInterval(checkHealth, 15000);
+</script>
+</body>
+</html>

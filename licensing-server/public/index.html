@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omni Automator · Licensing Portal</title>
+  
+  <!-- Curated Font families -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  
+  <!-- Premium Custom Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-carbon text-gray-200 font-sans h-screen flex items-center justify-center overflow-hidden">
+  
+  <div class="relative w-full max-w-[620px] p-8 rounded-3xl glass-card border border-white/5 shadow-2xl flex flex-col items-center gap-6 z-10">
+    
+    <!-- Decorative Glowing Accent -->
+    <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-accent-primary/20 rounded-full blur-[60px] -z-10 animate-pulse"></div>
+
+    <!-- Header Logo & Title -->
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-14 h-14 bg-gradient-to-tr from-accent-primary to-accent-secondary rounded-2xl flex items-center justify-center shadow-lg shadow-accent-primary/20 border border-white/10 glow-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" class="w-7 h-7 text-white">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+      </div>
+      <h1 class="text-4xl font-extrabold text-white tracking-tight text-center">Omni Automator</h1>
+      <p class="text-xs text-gray-400 font-medium uppercase tracking-wider text-center">Enterprise Portal & Control Center</p>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="w-full flex bg-[#0c0d13]/85 p-1 rounded-2xl border border-white/5 mt-2">
+      <button class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300 bg-accent-primary text-white shadow-lg" id="tab-generator">
+        🔑 Key Generator
+      </button>
+      <button class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-gray-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-300" id="tab-docs" onclick="alert('Omni Automator v1.0.0 Admin Documentation. Configure your environment variables on Vercel: ADMIN_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.')">
+        📖 About & Docs
+      </button>
+      <button class="flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-gray-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-300" id="tab-dev" onclick="alert('Developer Hub: Use endpoints /api/activate and /api/verify inside your desktop clients.')">
+        💼 Developer Hub
+      </button>
+    </div>
+
+    <!-- Key Generator Form -->
+    <div class="w-full flex flex-col gap-5 mt-3" id="generator-form">
+      
+      <!-- Admin Secret Key Input -->
+      <div class="flex flex-col gap-2">
+        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+          ADMIN SECRET KEY
+          <span class="text-emerald-400 font-bold text-xs" id="admin-check" style="display:none;">✓</span>
+        </label>
+        <input type="password" id="input-admin-key" placeholder="Enter Admin Secret Key" 
+               class="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-300 placeholder:text-gray-600 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]">
+      </div>
+
+      <!-- Licensing Plan Selection -->
+      <div class="flex flex-col gap-2">
+        <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+          LICENSING PLAN
+          <span class="text-emerald-400 font-bold text-xs">✓</span>
+        </label>
+        <div class="relative">
+          <select id="select-plan" 
+                  class="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-300 appearance-none cursor-pointer">
+            <option value="Pro" data-devices="1">Pro (Single User)</option>
+            <option value="Studio" data-devices="5">Studio Plan (5 Devices)</option>
+            <option value="Agency" data-devices="15">Agency Plan (15 Devices)</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Validity Days & Max Devices Grid -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="flex flex-col gap-2">
+          <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+            VALIDITY (DAYS)
+            <span class="text-emerald-400 font-bold text-xs">✓</span>
+          </label>
+          <input type="number" id="input-validity" value="30" min="1"
+                 class="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-300">
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+            MAX REGISTERED DEVICES
+            <span class="text-emerald-400 font-bold text-xs">✓</span>
+          </label>
+          <input type="number" id="input-devices" value="1" min="1"
+                 class="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-300">
+        </div>
+      </div>
+
+      <!-- Result Showcase -->
+      <div id="key-display-card" class="w-full bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 flex flex-col items-center gap-2 mt-2 transition-all duration-500 opacity-0 transform translate-y-4 pointer-events-none">
+        <div class="text-[9px] text-emerald-400 font-extrabold uppercase tracking-widest">ACTIVATION CODE GENERATED</div>
+        <div class="flex items-center gap-3 w-full bg-[#07080b]/90 border border-white/5 rounded-xl px-4 py-3.5 justify-between">
+          <code id="generated-key" class="text-base text-white font-mono tracking-wider font-bold">AS-XXXX-YYYY-ZZZZ-WWWW</code>
+          <button id="btn-copy" class="text-xs text-accent-primary hover:text-white font-bold tracking-wide py-1 px-3 bg-accent-primary/10 hover:bg-accent-primary rounded-lg border border-accent-primary/20 transition-all duration-300">
+            COPY KEY
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Trigger Button -->
+      <button id="btn-generate" class="w-full py-4 rounded-2xl bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-95 text-white font-bold text-sm tracking-wide shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] mt-2">
+        ⚡ Generate Activation Code
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Background Decorative Orbs -->
+  <div class="absolute w-[450px] h-[450px] bg-accent-primary/5 rounded-full blur-[100px] top-[-10%] right-[-10%] -z-20 animate-pulse"></div>
+  <div class="absolute w-[350px] h-[350px] bg-accent-secondary/5 rounded-full blur-[80px] bottom-[-5%] left-[-5%] -z-20 animate-pulse" style="animation-delay: 2s;"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
