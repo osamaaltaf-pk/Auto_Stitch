@@ -170,12 +170,19 @@ function App() {
   const [licenseStatus, setLicenseStatus] = useState({ valid: true, message: "", gmail: "", expiry_date: "", license_key: "" });
   const [isActivatingLicense, setIsActivatingLicense] = useState(false);
 
-  const [currentView, setCurrentView] = useState("start"); // "start" | "editor"
+  const [currentView, setCurrentView] = useState(() => {
+    try { return localStorage.getItem('as_current_view') || 'start'; } catch { return 'start'; }
+  }); // "start" | "editor"
   const [localProjects, setLocalProjects] = useState([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('as_theme') || 'dark'; } catch { return 'dark'; }
   });
+
+  // Persist current view changes to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('as_current_view', currentView); } catch (e) {}
+  }, [currentView]);
 
   // Advanced Preview and Mixer States
   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
@@ -446,6 +453,15 @@ function App() {
     fetchVoices();
     fetchLocalProjects();
 
+    // Session restore: if we were inside the editor, load the active project!
+    try {
+      const savedProj = localStorage.getItem('as_active_project');
+      const savedView = localStorage.getItem('as_current_view');
+      if (savedView === 'editor' && savedProj) {
+        loadProject(savedProj);
+      }
+    } catch (e) {}
+
     // Establish periodic health checks every 10 seconds
     const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
@@ -642,6 +658,7 @@ function App() {
       if (resp.ok) {
         const data = await resp.json();
         setProject(data);
+        try { localStorage.setItem('as_active_project', name); } catch (e) {}
         addLog(`Project '${name}' loaded successfully.`, "success");
       } else {
         addLog("Failed loading project.", "error");
@@ -1964,8 +1981,12 @@ function App() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => {
-              setCurrentView("start");
-              fetchLocalProjects();
+              if (window.showLanding) {
+                window.showLanding();
+              } else {
+                setCurrentView("start");
+                fetchLocalProjects();
+              }
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon hover:text-white text-gray-300 text-xs font-semibold font-sans transition-all active:scale-[0.97]"
             title="Return to Projects Dashboard"
