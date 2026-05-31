@@ -1434,7 +1434,7 @@ function App() {
         <div className="absolute w-[450px] h-[450px] bg-accent-primary/5 rounded-full blur-[100px] top-[-10%] right-[-10%] -z-10 animate-pulse"></div>
         <div className="absolute w-[350px] h-[350px] bg-accent-secondary/5 rounded-full blur-[80px] bottom-[-5%] left-[-5%] -z-10 animate-pulse" style={{ animationDelay: '2s' }}></div>
 
-        <div className="relative w-full max-w-[480px] p-8 rounded-3xl bg-[#0c0d15]/80 border border-white/5 shadow-2xl flex flex-col items-center gap-6 z-10 backdrop-blur-2xl">
+        <div className="relative w-full max-w-[480px] p-8 rounded-3xl bg-carbon-card/80 border border-white/5 shadow-2xl flex flex-col items-center gap-6 z-10 backdrop-blur-2xl">
           {/* Glowing logo lock icon */}
           <div className="w-14 h-14 bg-gradient-to-tr from-red-500 to-accent-secondary rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 border border-white/10 glow-logo">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-7 h-7 text-white">
@@ -1491,19 +1491,19 @@ function App() {
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">GMAIL ADDRESS</label>
               <input type="email" name="gmail" placeholder="Enter Gmail Address" required
-                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+                     className="w-full bg-carbon-card border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">PASSWORD</label>
               <input type="password" name="password" placeholder="Enter Password" required
-                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+                     className="w-full bg-carbon-card border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">MONTHLY LICENSE KEY</label>
               <input type="text" name="license_key" placeholder="OMNI-AS-XXXX-YYYY-ZZZZ-WWWW" required
-                     className="w-full bg-[#090a0f] border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs font-mono outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
+                     className="w-full bg-carbon-card border border-white/5 focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs font-mono outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.08)]" />
             </div>
 
             <button 
@@ -1578,7 +1578,7 @@ function App() {
                     playsInline 
                     className="w-full h-full object-cover opacity-80" 
                   />
-                  <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-0.5 rounded text-[8px] font-mono text-accent-secondary uppercase tracking-widest">
+                  <div className="absolute top-2.5 left-2.5 bg-carbon-card/70 backdrop-blur-md border border-white/10 px-2.5 py-0.5 rounded text-[8px] font-mono text-accent-secondary uppercase tracking-widest">
                     STOCK LOOP • ACTIVE
                   </div>
                 </div>
@@ -1594,7 +1594,7 @@ function App() {
                 </p>
                 <div className="w-full h-40 rounded-xl overflow-hidden border border-white/10 shadow-lg relative bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=600&auto=format&fit=crop')" }}>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                  <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg">
+                  <div className="absolute bottom-3 left-3 bg-carbon-card/70 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg">
                     <span className="text-[9px] font-bold text-white uppercase tracking-wider">4K Studio Environment</span>
                   </div>
                 </div>
@@ -1615,13 +1615,13 @@ function App() {
                 </p>
                 
                 {/* Embed the dashboard.png locally loaded! */}
-                <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl relative bg-black/40 group cursor-zoom-in">
+                <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl relative bg-carbon-card/50 group cursor-zoom-in">
                   <img 
                     src="/static/dashboard.png" 
                     alt="AutoStitch Studio Workspace Layout" 
                     className="w-full h-auto object-cover group-hover:scale-[1.01] transition-all duration-500" 
                   />
-                  <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md border border-white/10 px-3 py-1 rounded-lg text-[10px] text-accent-tertiary font-mono">
+                  <div className="absolute bottom-3 right-3 bg-carbon-card/75 backdrop-blur-md border border-white/10 px-3 py-1 rounded-lg text-[10px] text-accent-tertiary font-mono">
                     🟢 ACTIVE WORKSPACE LAYOUT
                   </div>
                 </div>
@@ -1892,28 +1892,28 @@ function App() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-1">
                   {/* Step 1 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
+                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
                     <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">01</div>
                     <div className="text-lg">🎬</div>
                     <h4 className="font-bold text-xs text-white leading-tight">Scan Media</h4>
                     <p className="text-[10px] text-gray-500 leading-snug">Load a local folder of clips directly into visual Lane 1.</p>
                   </div>
                   {/* Step 2 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
+                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
                     <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">02</div>
                     <div className="text-lg">🎵</div>
                     <h4 className="font-bold text-xs text-white leading-tight">Convert SFX</h4>
                     <p className="text-[10px] text-gray-500 leading-snug">Write prompt descriptions and synthesize Lane 2 audio.</p>
                   </div>
                   {/* Step 3 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
+                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
                     <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">03</div>
                     <div className="text-lg">🎙️</div>
                     <h4 className="font-bold text-xs text-white leading-tight">Narrate Voice</h4>
                     <p className="text-[10px] text-gray-500 leading-snug">Compose scripts, select cloned voices and synthesize Lane 3.</p>
                   </div>
                   {/* Step 4 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
+                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
                     <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">04</div>
                     <div className="text-lg">🚀</div>
                     <h4 className="font-bold text-xs text-white leading-tight">Master Render</h4>
@@ -1933,7 +1933,7 @@ function App() {
                 <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
                   AutoStitch Studio integrates high-fidelity video looping and visual canvas elements. Preview our pre-loaded cinematic stock graphic:
                 </p>
-                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-black/40 relative">
+                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-carbon-card/40 relative">
                   <video 
                     src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c022773507846992594a90f2d658b99d&profile_id=139&oauth2_token_id=57447761" 
                     autoPlay 
@@ -1942,7 +1942,7 @@ function App() {
                     playsInline 
                     className="w-full h-full object-cover opacity-85" 
                   />
-                  <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
+                  <div className="absolute top-2.5 left-2.5 bg-carbon-card/70 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
                     STOCK LOOP • ACTIVE
                   </div>
                 </div>
@@ -2202,7 +2202,7 @@ function App() {
                             preload="metadata" 
                             muted 
                             playsInline 
-                            className="w-10 h-7 rounded object-cover pointer-events-none bg-black/40" 
+                            className="w-10 h-7 rounded object-cover pointer-events-none bg-carbon-card/60" 
                           />
                         ) : (
                           <img src={v.thumbnail_path} className="w-10 h-7 rounded object-cover" />
@@ -2395,7 +2395,7 @@ function App() {
           <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/20 p-5 flex flex-col items-center justify-center gap-4 select-text">
             
             {/* Centered Video Screen Section */}
-            <div className="w-[600px] h-[280px] rounded-xl bg-black overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
+            <div className="w-[600px] h-[280px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
               {previewMode === 'composer' ? (
                 selectedBlock !== null && project.video_blocks[selectedBlock.index] ? (
                   project.video_blocks[selectedBlock.index].file_path ? (
@@ -2530,7 +2530,7 @@ function App() {
               )}
 
               {/* Screen Footer Info */}
-              <div className="absolute bottom-2 left-3 bg-black/60 backdrop-blur border border-white/5 px-2 py-0.5 rounded text-[9px] font-mono text-gray-400 z-10">
+              <div className="absolute bottom-2 left-3 bg-carbon-card/70 backdrop-blur border border-white/5 px-2 py-0.5 rounded text-[9px] font-mono text-gray-400 z-10">
                 {previewMode === 'composer' 
                   ? (selectedBlock ? `SLOT ${selectedBlock.index} ACTIVE PREVIEW` : "COMPOSER PREVIEW") 
                   : "MASTER EXPORT PREVIEW"
@@ -2803,7 +2803,7 @@ function App() {
                                     preload="metadata" 
                                     muted 
                                     playsInline 
-                                    className="w-full h-11 rounded object-cover pointer-events-none bg-black/40" 
+                                    className="w-full h-11 rounded object-cover pointer-events-none bg-carbon-card/60" 
                                   />
                                 ) : (
                                   <img src={block.thumbnail_path} className="w-full h-11 rounded object-cover" />
@@ -3063,7 +3063,7 @@ function App() {
                           preload="metadata" 
                           muted 
                           playsInline 
-                          className="w-full h-32 rounded-lg object-cover border border-carbon-border pointer-events-none bg-black/40" 
+                          className="w-full h-32 rounded-lg object-cover border border-carbon-border pointer-events-none bg-carbon-card/60" 
                         />
                       ) : (
                         <img src={blockData.thumbnail_path} className="w-full h-32 rounded-lg object-cover border border-carbon-border" />
@@ -3204,7 +3204,7 @@ function App() {
 
       {/* ── SETTINGS CONFIGURATION MODAL ── */}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-carbon-card/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-md bg-carbon-panel border border-carbon-border rounded-xl p-5 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-carbon-border pb-3">
               <h2 className="text-sm font-extrabold text-white tracking-wide font-mono">SETTINGS CONFIGURATION</h2>
