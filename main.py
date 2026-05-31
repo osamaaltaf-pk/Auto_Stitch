@@ -359,6 +359,24 @@ def save_settings(settings: Dict[str, Any]) -> None:
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
 
+def copy_master_to_custom_dir(project_name: str = None) -> None:
+    settings = load_settings()
+    custom_dir = settings.get("output_dir")
+    if not custom_dir:
+        return
+    try:
+        custom_path = Path(custom_dir)
+        custom_path.mkdir(parents=True, exist_ok=True)
+        src_file = OUTPUT_DIR / "master.mp4"
+        if src_file.exists():
+            import shutil
+            name = project_name or "master"
+            dest_file = custom_path / f"{name}_master.mp4"
+            shutil.copy2(src_file, dest_file)
+            logger.info(f"Successfully copied compiled master to custom output directory: {dest_file}")
+    except Exception as e:
+        logger.error(f"Error copying master to custom output directory '{custom_dir}': {e}")
+
 # Global state tracker for currently rendering projects
 active_renders = {}  # project_name -> {"status": "idle"|"rendering"|"done"|"error", "progress": 0.0, "error": None}
 
@@ -466,6 +484,10 @@ async def update_settings(model: SettingsModel):
     settings["tts_server_url"] = settings.get("tts_server_url", "").rstrip("/")
     settings["sfx_server_url"] = settings.get("sfx_server_url", "").rstrip("/")
     save_settings(settings)
+    try:
+        copy_master_to_custom_dir()
+    except Exception as e:
+        logger.warning(f"Could not copy current master on settings change: {e}")
     return {"status": "ok", "settings": settings}
 
 @app.get("/api/voices")
@@ -1008,6 +1030,8 @@ async def trigger_render(req: RenderRequest, background_tasks: BackgroundTasks):
             logger.info(f"Render completed successfully for {project_name}! Output: {output_path}")
             # Log successful render to SQLite
             db.log_render(project_name, req.concat, str(output_path), "success")
+            # Automatically copy compiled master to custom output directory
+            copy_master_to_custom_dir(project_name)
         except Exception as e:
             active_renders[project_name]["status"] = "error"
             active_renders[project_name]["error"] = str(e)
@@ -1285,8 +1309,8 @@ if __name__ == "__main__":
     logger.info("Starting AutoStitch Studio backend server...")
     
     print("\n" + "="*60)
-    print("  🎬 AUTOSTITCH STUDIO — SUCCESSFUL LAUNCH")
-    print("  👉 Click to open: http://localhost:8080")
+    print("  AUTOSTITCH STUDIO -- SUCCESSFUL LAUNCH")
+    print("  Click to open: http://localhost:8080")
     print("="*60 + "\n")
     
     uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=False)

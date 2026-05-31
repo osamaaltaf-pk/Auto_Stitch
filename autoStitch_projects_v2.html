@@ -1,0 +1,507 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08080d;
+  --bg2:#0e0e16;
+  --bg3:#13131e;
+  --surface:#16161f;
+  --surface2:#1c1c28;
+  --surface3:#222233;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.13);
+  --border3:rgba(255,255,255,0.2);
+  --text1:#eeeaff;
+  --text2:#8a87aa;
+  --text3:#4a4868;
+  --accent:#6c5fff;
+  --accent2:#8b7fff;
+  --accent3:#a99fff;
+  --gold:#e9a84b;
+  --gold2:#f5c96a;
+  --green:#2fcb82;
+  --teal:#2ec4cc;
+  --red:#e06b6b;
+}
+body,.root{background:var(--bg);color:var(--text1);font-family:'DM Sans',sans-serif;min-height:600px}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:54px;
+  background:rgba(14,14,22,0.85);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;letter-spacing:0.01em}
+.logo:hover{color:var(--text1)}
+.logo i{font-size:16px;color:var(--accent2)}
+.sep{width:1px;height:18px;background:var(--border2)}
+.breadcrumb{font-size:12px;color:var(--text3)}
+.breadcrumb b{color:var(--text2);font-weight:400}
+
+/* ── PREMIUM BUTTON SYSTEM ── */
+
+/* Primary — vivid purple pill (matches Create Project) */
+.btn-primary{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 20px;border-radius:9px;border:none;
+  background:linear-gradient(135deg,#6c5fff 0%,#8b4fff 100%);
+  color:#fff;font-size:13px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  box-shadow:0 0 0 1px rgba(108,95,255,0.5),0 4px 20px rgba(108,95,255,0.35),inset 0 1px 0 rgba(255,255,255,0.15);
+  transition:all 0.18s;letter-spacing:0.01em;position:relative;overflow:hidden;
+}
+.btn-primary::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%);
+  border-radius:inherit;
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,#7a6fff 0%,#9b5fff 100%);
+  box-shadow:0 0 0 1px rgba(139,127,255,0.6),0 6px 28px rgba(108,95,255,0.5),inset 0 1px 0 rgba(255,255,255,0.2);
+  transform:translateY(-1px);
+}
+.btn-primary:active{transform:translateY(0);box-shadow:0 0 0 1px rgba(108,95,255,0.4),0 2px 10px rgba(108,95,255,0.3)}
+.btn-primary i{font-size:14px;position:relative;z-index:1}
+.btn-primary span{position:relative;z-index:1}
+
+/* Render — bold gradient (matches RENDER button) */
+.btn-render{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 20px;border-radius:9px;border:none;
+  background:linear-gradient(135deg,#7c3fff 0%,#5b2dcc 100%);
+  color:#fff;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  box-shadow:0 0 0 1px rgba(92,45,204,0.6),0 4px 22px rgba(92,45,204,0.4),inset 0 1px 0 rgba(255,255,255,0.12);
+  transition:all 0.18s;position:relative;overflow:hidden;
+}
+.btn-render::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent 50%);border-radius:inherit}
+.btn-render:hover{background:linear-gradient(135deg,#8e4fff 0%,#6b3de0 100%);transform:translateY(-1px);box-shadow:0 0 0 1px rgba(142,79,255,0.7),0 6px 28px rgba(92,45,204,0.55),inset 0 1px 0 rgba(255,255,255,0.15)}
+.btn-render i{font-size:15px;position:relative;z-index:1}
+.btn-render span{position:relative;z-index:1}
+
+/* Ghost outlined (matches BROWSE FOLDER / ADD SLOT) */
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 16px;border-radius:9px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);
+  color:var(--text2);font-size:12px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  transition:all 0.15s;letter-spacing:0.02em;
+}
+.btn-ghost:hover{background:rgba(255,255,255,0.08);border-color:var(--border3);color:var(--text1)}
+.btn-ghost i{font-size:14px}
+
+/* Filter pill — active/inactive (matches status filter chips) */
+.filter-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 13px;border-radius:20px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);
+  color:var(--text3);font-size:12px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;
+}
+.filter-pill:hover{color:var(--text2);border-color:var(--border2)}
+.filter-pill.active{
+  background:rgba(108,95,255,0.14);
+  border-color:rgba(108,95,255,0.45);
+  color:var(--accent3);
+  box-shadow:0 0 12px rgba(108,95,255,0.12);
+}
+.filter-pill .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:0.7}
+
+/* View toggle */
+.view-toggle{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.view-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:34px;height:34px;background:none;border:none;
+  color:var(--text3);cursor:pointer;transition:all 0.12s;
+}
+.view-btn i{font-size:15px}
+.view-btn.active{background:rgba(108,95,255,0.18);color:var(--accent2)}
+.view-btn:hover:not(.active){color:var(--text2)}
+
+/* ── GLASSMORPHIC SEARCH ── */
+.glass-search{
+  display:flex;align-items:center;gap:10px;
+  padding:0 16px;height:38px;
+  background:rgba(255,255,255,0.04);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:12px;
+  flex:1;min-width:180px;max-width:300px;
+  box-shadow:0 2px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.06);
+  transition:all 0.2s;
+}
+.glass-search:focus-within{
+  border-color:rgba(108,95,255,0.4);
+  background:rgba(108,95,255,0.06);
+  box-shadow:0 0 0 3px rgba(108,95,255,0.12),0 2px 16px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.glass-search i{font-size:15px;color:var(--text3);flex-shrink:0}
+.glass-search input{
+  background:none;border:none;outline:none;
+  color:var(--text1);font-family:'DM Sans',sans-serif;
+  font-size:13px;width:100%;
+}
+.glass-search input::placeholder{color:var(--text3)}
+
+/* ── PAGE ── */
+.page{padding:36px 32px;max-width:1380px;margin:0 auto}
+.page-header{margin-bottom:32px}
+.workspace-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:12px;
+}
+.workspace-tag::before{content:'';display:block;width:20px;height:1px;background:var(--gold);opacity:0.6}
+.page-title{font-size:30px;font-weight:300;color:var(--text1);line-height:1;letter-spacing:-0.02em}
+.page-title em{font-style:italic;font-weight:400;color:var(--gold)}
+.page-sub{font-size:13px;color:var(--text3);margin-top:8px}
+
+/* ── TOOLBAR ── */
+.toolbar{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:28px;flex-wrap:wrap;
+}
+.toolbar-divider{width:1px;height:26px;background:var(--border2)}
+
+/* ── STATS ── */
+.stats-row{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
+.stat-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  font-size:12px;color:var(--text3);
+}
+.stat-pill .sdot{width:5px;height:5px;border-radius:50%}
+.stat-pill .scount{font-weight:600;color:var(--text1);font-variant-numeric:tabular-nums}
+
+/* ── SECTION LABEL ── */
+.section-label{
+  font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--text3);margin-bottom:16px;
+  display:flex;align-items:center;gap:10px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── GRID ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+
+.project-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;padding:20px;cursor:pointer;
+  transition:all 0.2s;position:relative;overflow:hidden;
+}
+.project-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:transparent;transition:0.2s;border-radius:14px 14px 0 0;
+}
+.project-card:hover{
+  border-color:rgba(108,95,255,0.3);
+  background:var(--surface2);
+  transform:translateY(-3px);
+  box-shadow:0 12px 40px rgba(0,0,0,0.4),0 0 0 1px rgba(108,95,255,0.1);
+}
+.project-card:hover::before{background:linear-gradient(90deg,#6c5fff,#a855f7)}
+.project-card.rendered::before{background:linear-gradient(90deg,#2fcb82,#2ec4cc)}
+.project-card.rendered:hover{border-color:rgba(47,203,130,0.3);box-shadow:0 12px 40px rgba(0,0,0,0.4),0 0 0 1px rgba(47,203,130,0.1)}
+
+.card-icon{
+  width:40px;height:40px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:16px;font-size:18px;
+}
+.ci-purple{background:rgba(108,95,255,0.18);color:var(--accent2)}
+.ci-gold{background:rgba(233,168,75,0.18);color:var(--gold)}
+.ci-teal{background:rgba(46,196,204,0.18);color:var(--teal)}
+.ci-green{background:rgba(47,203,130,0.18);color:var(--green)}
+
+.card-name{font-size:14px;font-weight:500;color:var(--text1);margin-bottom:6px}
+.card-meta{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;line-height:1.9}
+.card-meta b{color:var(--text2);font-weight:400}
+
+.card-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:16px;padding-top:14px;
+  border-top:1px solid var(--border);
+}
+.sbadge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 9px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:0.02em;
+}
+.sbadge .d{width:5px;height:5px;border-radius:50%}
+.sb-progress{background:rgba(108,95,255,0.12);color:var(--accent3)}
+.sb-progress .d{background:var(--accent2)}
+.sb-rendered{background:rgba(47,203,130,0.1);color:var(--green)}
+.sb-rendered .d{background:var(--green)}
+.sb-draft{background:rgba(255,255,255,0.05);color:var(--text3)}
+.sb-draft .d{background:var(--text3)}
+
+.open-link{
+  display:flex;align-items:center;gap:4px;
+  font-size:11px;color:var(--accent2);opacity:0;
+  transition:opacity 0.15s;
+}
+.project-card:hover .open-link{opacity:1}
+.open-link i{font-size:12px}
+
+/* New project card */
+.new-card{
+  background:transparent;
+  border:1px dashed rgba(108,95,255,0.25);
+  border-radius:14px;padding:20px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;min-height:170px;text-align:center;
+  transition:all 0.2s;
+}
+.new-card:hover{
+  border-color:rgba(108,95,255,0.55);
+  background:rgba(108,95,255,0.05);
+  box-shadow:0 0 30px rgba(108,95,255,0.1);
+}
+.new-card-icon{
+  width:40px;height:40px;border-radius:11px;
+  background:rgba(108,95,255,0.12);border:1px solid rgba(108,95,255,0.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:var(--accent2);
+  transition:all 0.2s;
+}
+.new-card:hover .new-card-icon{background:rgba(108,95,255,0.2);border-color:rgba(108,95,255,0.4)}
+.new-card p{font-size:12px;color:var(--text3)}
+
+/* ── LIST VIEW ── */
+.list-view{display:none;flex-direction:column;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.lrow{
+  display:grid;grid-template-columns:32px 1fr 130px 80px 100px 90px 50px;
+  align-items:center;gap:14px;padding:11px 18px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background 0.12s;
+}
+.lrow:last-child{border-bottom:none}
+.lrow:hover{background:var(--surface2)}
+.lrow.lhdr{background:var(--bg3);cursor:default}
+.lrow.lhdr span{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600}
+.lname{font-size:13px;font-weight:500;color:var(--text1)}
+.lmono{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.lmono b{color:var(--text2);font-weight:400}
+.lopen{font-size:11px;color:var(--accent2);opacity:0;display:flex;align-items:center;gap:3px;transition:0.12s}
+.lrow:hover .lopen{opacity:1}
+.licon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px}
+
+/* ── MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  z-index:200;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--bg2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:18px;padding:32px;width:420px;max-width:92vw;
+  box-shadow:0 40px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);
+}
+.modal-title{font-size:17px;font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.modal-title i{color:var(--accent2);font-size:18px}
+.modal-sub{font-size:12px;color:var(--text3);margin-bottom:24px}
+.modal label{
+  font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--text3);display:block;margin-bottom:8px;
+}
+.modal-input{
+  width:100%;padding:11px 16px;border-radius:10px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);
+  color:var(--text1);font-family:'DM Mono',monospace;font-size:13px;
+  outline:none;margin-bottom:24px;
+  box-shadow:inset 0 1px 0 rgba(0,0,0,0.2);
+  transition:border-color 0.15s,box-shadow 0.15s;
+}
+.modal-input:focus{border-color:rgba(108,95,255,0.5);box-shadow:0 0 0 3px rgba(108,95,255,0.12),inset 0 1px 0 rgba(0,0,0,0.2)}
+.modal-input::placeholder{color:var(--text3)}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+
+.empty-state{text-align:center;padding:70px 20px;color:var(--text3)}
+.empty-state i{font-size:38px;margin-bottom:14px;display:block;color:var(--text3)}
+.empty-state p{font-size:13px}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+<div class="root">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo"><i class="ti ti-layout-grid"></i> AutoStitch</div>
+      <div class="sep"></div>
+      <div class="breadcrumb"><b>Workspace</b> · Projects</div>
+    </div>
+    <button class="btn-primary" onclick="openModal()">
+      <i class="ti ti-plus"></i><span>New Project</span>
+    </button>
+  </div>
+
+  <div class="page">
+    <div class="page-header">
+      <div class="workspace-tag">Workspace</div>
+      <div class="page-title">Your <em>Projects</em></div>
+      <div class="page-sub">6 projects · last updated just now</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="glass-search">
+        <i class="ti ti-search"></i>
+        <input type="text" id="searchInput" placeholder="Search projects..." oninput="render()">
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <button class="filter-pill active" data-f="all" onclick="setFilter(this,'all')"><span class="dot"></span>All</button>
+      <button class="filter-pill" data-f="In Progress" onclick="setFilter(this,'In Progress')"><span class="dot"></span>Active</button>
+      <button class="filter-pill" data-f="Rendered" onclick="setFilter(this,'Rendered')"><span class="dot"></span>Rendered</button>
+      <button class="filter-pill" data-f="Draft" onclick="setFilter(this,'Draft')"><span class="dot"></span>Draft</button>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="view-toggle">
+        <button class="view-btn active" id="gbtn" onclick="setView('grid')"><i class="ti ti-layout-grid"></i></button>
+        <button class="view-btn" id="lbtn" onclick="setView('list')"><i class="ti ti-list"></i></button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-pill"><span class="sdot" style="background:var(--accent2)"></span><span class="scount" id="sAll">7</span>&nbsp;total</div>
+      <div class="stat-pill"><span class="sdot" style="background:var(--accent2)"></span><span class="scount" id="sActive">6</span>&nbsp;active</div>
+      <div class="stat-pill"><span class="sdot" style="background:var(--green)"></span><span class="scount" id="sRendered">1</span>&nbsp;rendered</div>
+      <div class="stat-pill"><span class="sdot" style="background:var(--text3)"></span><span class="scount" id="sDraft">0</span>&nbsp;draft</div>
+    </div>
+
+    <div class="section-label" id="sectionLabel">All Projects</div>
+
+    <div class="grid" id="gridView"></div>
+    <div class="list-view" id="listView">
+      <div class="lrow lhdr">
+        <span></span><span>Name</span><span>Last Saved</span><span>Clips</span><span>Duration</span><span>Status</span><span></span>
+      </div>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <i class="ti ti-mood-empty"></i>
+      <p>No projects match your search.</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="mo" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-folder-plus"></i> Create New Project</div>
+    <div class="modal-sub">Give your project a name to get started</div>
+    <label>Project Name</label>
+    <input class="modal-input" id="pname" type="text" placeholder="e.g. Promo_Video_v1" onkeydown="if(event.key==='Enter')createProject()">
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="createProject()"><i class="ti ti-rocket"></i><span>Create Project</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS=[['ti-video','ci-gold'],['ti-folder','ci-purple'],['ti-device-tv','ci-teal'],['ti-wand','ci-green'],['ti-music','ci-purple'],['ti-folder','ci-gold'],['ti-photo','ci-teal'],['ti-stars','ci-purple']];
+let projects=[
+  {id:1,name:'Short_01',status:'Rendered',clips:5,dur:'26s',created:'5/31/2026',saved:'6/1/2026 01:08 AM',icon:ICONS[0]},
+  {id:2,name:'osama',status:'In Progress',clips:0,dur:'0s',created:'6/1/2026',saved:'6/1/2026 01:20 AM',icon:ICONS[1]},
+  {id:3,name:'gh',status:'In Progress',clips:0,dur:'0s',created:'6/1/2026',saved:'6/1/2026 01:10 AM',icon:ICONS[2]},
+  {id:4,name:'okay',status:'In Progress',clips:0,dur:'0s',created:'6/1/2026',saved:'6/1/2026 01:00 AM',icon:ICONS[3]},
+  {id:5,name:'ALi',status:'In Progress',clips:0,dur:'0s',created:'6/1/2026',saved:'6/1/2026 12:06 AM',icon:ICONS[4]},
+  {id:6,name:'hello',status:'In Progress',clips:0,dur:'0s',created:'6/1/2026',saved:'6/1/2026 12:06 AM',icon:ICONS[5]},
+];
+let cf='all',cv='grid';
+
+function sc(s){return s==='Rendered'?'sb-rendered':s==='Draft'?'sb-draft':'sb-progress'}
+
+function render(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  let list=projects.filter(p=>(cf==='all'||p.status===cf)&&p.name.toLowerCase().includes(q));
+  document.getElementById('sAll').textContent=projects.length;
+  document.getElementById('sActive').textContent=projects.filter(p=>p.status==='In Progress').length;
+  document.getElementById('sRendered').textContent=projects.filter(p=>p.status==='Rendered').length;
+  document.getElementById('sDraft').textContent=projects.filter(p=>p.status==='Draft').length;
+  const lbl=cf==='all'?'All Projects':cf+' Projects';
+  document.getElementById('sectionLabel').textContent=lbl+' — '+list.length+' project'+(list.length!==1?'s':'');
+  document.getElementById('emptyState').style.display=list.length===0?'block':'none';
+  if(cv==='grid') renderGrid(list); else renderList(list);
+}
+
+function renderGrid(list){
+  const g=document.getElementById('gridView');g.innerHTML='';
+  list.forEach(p=>{
+    const d=document.createElement('div');
+    d.className='project-card'+(p.status==='Rendered'?' rendered':'');
+    d.innerHTML=`<div class="card-icon ${p.icon[1]}"><i class="ti ${p.icon[0]}"></i></div>
+<div class="card-name">${p.name}</div>
+<div class="card-meta">Saved&nbsp;<b>${p.saved}</b><br>Clips&nbsp;<b>${p.clips}</b> · Duration&nbsp;<b>${p.dur}</b></div>
+<div class="card-footer">
+  <span class="sbadge ${sc(p.status)}"><span class="d"></span>${p.status}</span>
+  <span class="open-link">Open <i class="ti ti-arrow-right"></i></span>
+</div>`;
+    g.appendChild(d);
+  });
+  const nc=document.createElement('div');
+  nc.className='new-card';nc.onclick=openModal;
+  nc.innerHTML=`<div class="new-card-icon"><i class="ti ti-plus"></i></div>
+<div style="font-size:13px;font-weight:500;color:var(--text2)">New Project</div>
+<p>Start a fresh composition</p>`;
+  g.appendChild(nc);
+}
+
+function renderList(list){
+  const lv=document.getElementById('listView');
+  lv.querySelectorAll('.lrow:not(.lhdr)').forEach(r=>r.remove());
+  list.forEach(p=>{
+    const r=document.createElement('div');r.className='lrow';
+    const bg=p.icon[1]==='ci-purple'?'rgba(108,95,255,0.18)':p.icon[1]==='ci-gold'?'rgba(233,168,75,0.18)':p.icon[1]==='ci-teal'?'rgba(46,196,204,0.18)':'rgba(47,203,130,0.18)';
+    const cl=p.icon[1]==='ci-purple'?'var(--accent2)':p.icon[1]==='ci-gold'?'var(--gold)':p.icon[1]==='ci-teal'?'var(--teal)':'var(--green)';
+    r.innerHTML=`<div class="licon" style="background:${bg};color:${cl}"><i class="ti ${p.icon[0]}"></i></div>
+<div class="lname">${p.name}</div>
+<div class="lmono"><b>${p.saved}</b></div>
+<div class="lmono"><b>${p.clips}</b> clips</div>
+<div class="lmono"><b>${p.dur}</b></div>
+<span class="sbadge ${sc(p.status)}" style="font-size:10px"><span class="d"></span>${p.status}</span>
+<div class="lopen">Open <i class="ti ti-arrow-right"></i></div>`;
+    lv.appendChild(r);
+  });
+}
+
+function setFilter(btn,val){
+  cf=val;
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');render();
+}
+function setView(v){
+  cv=v;
+  document.getElementById('gridView').style.display=v==='grid'?'grid':'none';
+  document.getElementById('listView').style.display=v==='list'?'flex':'none';
+  document.getElementById('gbtn').classList.toggle('active',v==='grid');
+  document.getElementById('lbtn').classList.toggle('active',v==='list');
+  render();
+}
+function openModal(){document.getElementById('mo').classList.add('open');setTimeout(()=>document.getElementById('pname').focus(),50)}
+function closeModal(){document.getElementById('mo').classList.remove('open');document.getElementById('pname').value=''}
+function createProject(){
+  const n=document.getElementById('pname').value.trim();if(!n)return;
+  const idx=projects.length%ICONS.length;
+  const now=new Date();
+  const ts=`${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}`;
+  projects.unshift({id:Date.now(),name:n,status:'Draft',clips:0,dur:'0s',created:ts,saved:ts,icon:ICONS[idx]});
+  closeModal();render();
+}
+render();
+</script>

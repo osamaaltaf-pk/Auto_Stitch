@@ -164,6 +164,9 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [renderState, setRenderState] = useState({ status: 'idle', progress: 0.0, error: null });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [isConsoleCollapsed, setIsConsoleCollapsed] = useState(false);
+  const [consoleHeight, setConsoleHeight] = useState(160); // Default bottom console logger height in px
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
   const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
@@ -178,11 +181,31 @@ function App() {
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('as_theme') || 'dark'; } catch { return 'dark'; }
   });
+  const [projectsFilter, setProjectsFilter] = useState("all"); // "all" | "active" | "rendered" | "draft"
+  const [projectsView, setProjectsView] = useState("grid"); // "grid" | "list"
+  const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
 
   // Persist current view changes to localStorage
   useEffect(() => {
     try { localStorage.setItem('as_current_view', currentView); } catch (e) {}
   }, [currentView]);
+
+  // Synchronize view changes triggered by outer landing page navigation links
+  useEffect(() => {
+    const handleViewChange = () => {
+      try {
+        const targetView = localStorage.getItem('as_current_view') || 'start';
+        setCurrentView(targetView);
+        if (targetView === 'start') {
+          fetchLocalProjects();
+        }
+      } catch (e) {
+        console.error("Error handling view change:", e);
+      }
+    };
+    window.addEventListener('as_view_change', handleViewChange);
+    return () => window.removeEventListener('as_view_change', handleViewChange);
+  }, []);
 
   // Advanced Preview and Mixer States
   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
@@ -1711,263 +1734,306 @@ function App() {
   }
 
   if (currentView === "start") {
+    const filteredProjects = localProjects.filter(p => {
+      const nameMatch = p.project_name.toLowerCase().includes(projectsSearchQuery.toLowerCase());
+      
+      const clipsCount = p.clips_count || 0;
+      const isRendered = p.render_complete;
+      
+      let status = "In Progress";
+      if (isRendered) {
+        status = "Rendered";
+      } else if (clipsCount === 0) {
+        status = "Draft";
+      }
+      
+      const filterMatch = (projectsFilter === "all" || 
+                           (projectsFilter === "active" && status === "In Progress") ||
+                           (projectsFilter === "rendered" && status === "Rendered") ||
+                           (projectsFilter === "draft" && status === "Draft"));
+                           
+      return nameMatch && filterMatch;
+    });
+
+    const totalCount = localProjects.length;
+    const renderedCount = localProjects.filter(p => p.render_complete).length;
+    const draftCount = localProjects.filter(p => !p.render_complete && (p.clips_count || 0) === 0).length;
+    const activeCount = localProjects.filter(p => !p.render_complete && (p.clips_count || 0) > 0).length;
+
+    const cardIcons = [
+      { icon: "folder", bg: "ci-purple" },
+      { icon: "video", bg: "ci-gold" },
+      { icon: "device-tv", bg: "ci-teal" },
+      { icon: "wand", bg: "ci-green" },
+      { icon: "music", bg: "ci-purple" },
+      { icon: "photo", bg: "ci-teal" },
+      { icon: "stars", bg: "ci-purple" }
+    ];
+
     return (
-      <div className="h-full w-full bg-carbon flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
-        <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
-          
-          {/* Header Row */}
-          <div className="flex items-center justify-between border-b border-carbon-border/30 pb-6">
-            <div className="flex items-center gap-3.5">
-              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-primary to-purple-800 text-white font-extrabold text-2xl shadow-xl shadow-accent-primary/20">
-                A
-              </div>
-              <div>
-                <h1 className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-                  AutoStitch Studio
-                </h1>
-                <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-0.5">AI-Powered Video Composer • v1.0.0</p>
-              </div>
+      <div className="w-full h-full bg-[#08080d] text-[#eeeaff] flex flex-col overflow-hidden select-text font-sans">
+        {/* Sleek Topbar Navigation */}
+        <div className="flex items-center justify-between px-8 h-[54px] bg-[#0e0e16]/85 backdrop-blur border-b border-white/5 sticky top-0 z-[100] shrink-0">
+          <div className="flex items-center gap-4">
+            <div 
+              onClick={() => {
+                if (window.showLanding) {
+                  window.showLanding();
+                }
+              }} 
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#8a87aa] hover:text-[#eeeaff] cursor-pointer tracking-wide"
+            >
+              <i className="ti ti-layout-grid text-[16px] text-[#8b7fff]"></i>
+              AutoStitch
+            </div>
+            <div className="w-[1px] bg-white/10 self-center h-4"></div>
+            <div className="text-[11px] text-[#4a4868]">
+              <span className="text-[#8a87aa]">Workspace</span> · Projects
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                if (window.showLanding) {
+                  window.showLanding();
+                }
+              }}
+              className="text-xs text-[#8a87aa] hover:text-white transition-all font-semibold font-mono border border-carbon-border px-3 py-1.5 rounded-lg bg-carbon-card/30"
+            >
+              ← HOME
+            </button>
+            <button 
+              onClick={async () => {
+                const name = await showPrompt("Enter a name for your new AutoStitch composition project:", "", "Initialize Project");
+                if (name && name.trim()) {
+                  await loadProject(name.trim());
+                  await fetchLocalProjects();
+                }
+              }}
+              className="btn-primary"
+            >
+              <i className="ti ti-plus"></i>
+              <span>New Project</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Body Page */}
+        <div className="projects-page animate-fade-in flex-1">
+          <div className="page-header">
+            <div className="workspace-tag">Workspace</div>
+            <div className="page-title">Your <em>Projects</em></div>
+            <div className="page-sub">{totalCount} project{totalCount !== 1 ? 's' : ''} · last updated just now</div>
+          </div>
+
+          {/* Search, Filters, View Toggles Toolbar */}
+          <div className="toolbar">
+            <div className="glass-search">
+              <i className="ti ti-search"></i>
+              <input 
+                type="text" 
+                placeholder="Search projects..." 
+                value={projectsSearchQuery}
+                onChange={(e) => setProjectsSearchQuery(e.target.value)}
+              />
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Soft Theme toggler button */}
+            <div className="toolbar-divider"></div>
+
+            <button 
+              className={`filter-pill ${projectsFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setProjectsFilter('all')}
+            >
+              <span className="dot"></span>All
+            </button>
+            <button 
+              className={`filter-pill ${projectsFilter === 'active' ? 'active' : ''}`}
+              onClick={() => setProjectsFilter('active')}
+            >
+              <span className="dot"></span>Active
+            </button>
+            <button 
+              className={`filter-pill ${projectsFilter === 'rendered' ? 'active' : ''}`}
+              onClick={() => setProjectsFilter('rendered')}
+            >
+              <span className="dot"></span>Rendered
+            </button>
+            <button 
+              className={`filter-pill ${projectsFilter === 'draft' ? 'active' : ''}`}
+              onClick={() => setProjectsFilter('draft')}
+            >
+              <span className="dot"></span>Draft
+            </button>
+
+            <div className="toolbar-divider"></div>
+
+            <div className="view-toggle">
               <button 
-                onClick={() => {
-                  const nextTheme = theme === 'dark' ? 'light' : 'dark';
-                  setTheme(nextTheme);
-                  try { localStorage.setItem('as_theme', nextTheme); } catch {}
-                  addLog(`Toggled UI theme to: ${nextTheme.toUpperCase()}`, "success");
-                }}
-                className="p-3 rounded-2xl border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-gray-400 hover:text-white transition-all duration-300 active:scale-[0.96] shadow-lg flex items-center justify-center"
-                title={theme === 'dark' ? "Switch to Soft Light Theme" : "Switch to Dark Theme"}
+                className={`view-btn ${projectsView === 'grid' ? 'active' : ''}`}
+                onClick={() => setProjectsView('grid')}
+                title="Grid View"
               >
-                {theme === 'dark' ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-amber-400">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-indigo-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-                  </svg>
-                )}
+                <i className="ti ti-layout-grid"></i>
               </button>
-
-              {/* License details */}
-              <div className="flex items-center gap-3 bg-carbon-card border border-carbon-border/80 px-4.5 py-2.5 rounded-2xl backdrop-blur-md shadow-lg shadow-black/30">
-                <span className="w-2.5 h-2.5 rounded-full bg-accent-tertiary animate-pulse shadow-[0_0_8px_#6cffcc]"></span>
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">ACTIVE USER</span>
-                  <span className="text-xs font-mono font-bold text-gray-300 mt-1">{licenseStatus.gmail || "osamaaltaf.pk@gmail.com"}</span>
-                </div>
-              </div>
+              <button 
+                className={`view-btn ${projectsView === 'list' ? 'active' : ''}`}
+                onClick={() => setProjectsView('list')}
+                title="List View"
+              >
+                <i className="ti ti-list"></i>
+              </button>
             </div>
           </div>
 
-          {/* Majestic Balanced Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* Left Column (Span 4): Configuration & Actions */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              
-              {/* Card: Create New Project */}
-              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-accent-primary/10 text-accent-primary">
-                    <Icon name="plus" className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-extrabold text-sm text-white uppercase tracking-wider">CREATE NEW PROJECT</h3>
-                </div>
-                
-                <form onSubmit={handleCreateProject} className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">Project Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Promo_Video_v1" 
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      required
-                      className="w-full bg-carbon border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-primary to-indigo-600 hover:from-accent-primary hover:to-indigo-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] mt-1"
-                  >
-                    <span>Create Project 🚀</span>
-                  </button>
-                </form>
-              </div>
-
-              {/* Card: System Developer Credit */}
-              <div className="glass-card p-6 rounded-2xl border border-carbon-border flex flex-col gap-4 bg-[linear-gradient(135deg,rgba(20,22,34,0.4),rgba(124,108,255,0.03))]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center text-white font-extrabold text-base shadow-lg shadow-accent-primary/20">
-                    OA
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">SYSTEM CREATOR</h4>
-                    <p className="text-sm font-extrabold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent font-sans">Osama Altaf</p>
-                  </div>
-                </div>
-                
-                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
-                  Professional Fullstack Architect & AI Specialist. Hit me up on Fiverr or WhatsApp for enterprise-level automation tools, custom local AI integrations, and desktop apps.
-                </p>
-                
-                <div className="grid grid-cols-2 gap-2.5 text-[10px] font-bold">
-                  <a href="https://wa.me/923187661096" target="_blank" rel="noopener noreferrer" 
-                     className="flex items-center justify-center gap-1.5 py-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all font-mono">
-                    <span>💬 WhatsApp</span>
-                  </a>
-                  <a href="https://www.linkedin.com/in/osamaaltafpk" target="_blank" rel="noopener noreferrer" 
-                     className="flex items-center justify-center gap-1.5 py-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 transition-all font-mono">
-                    <span>👔 LinkedIn</span>
-                  </a>
-                  <a href="https://www.fiverr.com/neural_networks" target="_blank" rel="noopener noreferrer" 
-                     className="col-span-2 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-accent-tertiary/20 bg-accent-tertiary/5 hover:bg-accent-tertiary/10 text-accent-tertiary transition-all font-mono">
-                    <span>🛒 Fiverr Profile</span>
-                  </a>
-                </div>
-              </div>
-
+          {/* Stats Summary Row */}
+          <div className="stats-row">
+            <div className="stat-pill">
+              <span className="sdot bg-[#8b7fff]"></span>
+              <span className="scount">{totalCount}</span>&nbsp;total
             </div>
+            <div className="stat-pill">
+              <span className="sdot bg-[#8b7fff]"></span>
+              <span className="scount">{activeCount}</span>&nbsp;active
+            </div>
+            <div className="stat-pill">
+              <span className="sdot bg-[#2fcb82]"></span>
+              <span className="scount">{renderedCount}</span>&nbsp;rendered
+            </div>
+            <div className="stat-pill">
+              <span className="sdot bg-[#4a4868]"></span>
+              <span className="scount">{draftCount}</span>&nbsp;draft
+            </div>
+          </div>
 
-            {/* Right Column (Span 8): Recent Folders & Interactive Pipeline Map */}
-            <div className="lg:col-span-8 flex flex-col gap-6">
-              
-              {/* Card 1: Recent Projects Grid */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-carbon-border/30 pb-2">
-                  <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">🕒 RECENT PROJECTS ({localProjects.length})</h3>
-                  <button 
-                    onClick={fetchLocalProjects}
-                    className="px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-accent-primary text-[10px] font-mono font-bold hover:border-accent-primary transition-all active:scale-[0.98]"
-                  >
-                    SYNC DATABASE 🔄
-                  </button>
-                </div>
+          <div className="section-label">
+            {projectsFilter === 'all' ? 'All Projects' : `${projectsFilter.charAt(0).toUpperCase() + projectsFilter.slice(1)} Projects`} — {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+          </div>
 
-                {localProjects.length === 0 ? (
-                  <div className="glass-card p-12 rounded-2xl border border-carbon-border/50 bg-carbon-panel/20 flex flex-col items-center justify-center gap-4 text-center">
-                    <div className="w-12 h-12 rounded-full bg-carbon-border/50 flex items-center justify-center text-gray-600">
-                      📂
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-gray-300">No Projects Found</h4>
-                      <p className="text-xs text-gray-500 max-w-[280px] leading-relaxed mt-1">
-                        You haven't initialized any composition projects yet. Enter a name on the left to start!
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[320px] overflow-y-auto pr-2">
-                    {localProjects.map(p => (
-                      <div 
-                        key={p.project_name}
-                        onClick={() => handleSelectProject(p.project_name)}
-                        className="glass-card p-5 rounded-2xl border border-carbon-border/80 hover:border-accent-primary/60 bg-carbon-panel/30 hover:bg-[linear-gradient(135deg,rgba(13,14,20,0.6),rgba(124,108,255,0.04))] flex items-center justify-between cursor-pointer group transition-all"
-                      >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-accent-primary/5 group-hover:bg-accent-primary/10 flex items-center justify-center text-xl text-accent-primary border border-accent-primary/15 group-hover:scale-105 transition-all">
-                            📂
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-bold text-sm text-white truncate leading-tight group-hover:text-accent-primary transition-colors">{p.project_name}</h4>
-                            <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 font-mono mt-1 leading-none">
-                              <span>CREATED: {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                              <span className="text-accent-primary/50 group-hover:text-accent-primary/80 transition-colors">SAVED: {new Date(p.updated_at).toLocaleDateString()} {new Date(p.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="w-8 h-8 rounded-full border border-carbon-border flex items-center justify-center text-gray-500 group-hover:text-accent-primary group-hover:border-accent-primary group-hover:translate-x-0.5 transition-all shrink-0">
-                          →
-                        </div>
+          {/* Project View (Grid vs List) */}
+          {filteredProjects.length === 0 ? (
+            <div className="empty-state">
+              <i className="ti ti-mood-empty text-3xl"></i>
+              <p className="mt-2 font-mono text-xs text-[#4a4868]">No projects match your search.</p>
+            </div>
+          ) : (
+            projectsView === 'grid' ? (
+              <div className="grid">
+                {filteredProjects.map((p, idx) => {
+                  const savedDate = new Date(p.updated_at).toLocaleDateString() + ' ' + new Date(p.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  
+                  const isRendered = p.render_complete;
+                  const clipsCount = p.clips_count || 0;
+                  
+                  let status = "In Progress";
+                  let badgeClass = "sb-progress";
+                  if (isRendered) {
+                    status = "Rendered";
+                    badgeClass = "sb-rendered";
+                  } else if (clipsCount === 0) {
+                    status = "Draft";
+                    badgeClass = "sb-draft";
+                  }
+
+                  const activeIcon = cardIcons[idx % cardIcons.length];
+
+                  return (
+                    <div 
+                      key={p.project_name} 
+                      className={`project-card ${isRendered ? 'rendered' : ''}`}
+                      onClick={() => handleSelectProject(p.project_name)}
+                    >
+                      <div className={`card-icon ${activeIcon.bg}`}>
+                        <i className={`ti ti-${activeIcon.icon}`}></i>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Card 2: Gorgeous Horizontal Production Pipeline Step Guide */}
-              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4 mt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-accent-secondary/10 text-accent-secondary">
-                      <Icon name="sparkles" className="w-4 h-4" />
+                      <div className="card-name truncate" title={p.project_name}>{p.project_name}</div>
+                      <div className="card-meta">
+                        Saved&nbsp;<b>{savedDate}</b><br/>
+                        Clips&nbsp;<b>{clipsCount}</b> · Duration&nbsp;<b>{(p.duration_s || 0.0).toFixed(1)}s</b>
+                      </div>
+                      <div className="card-footer">
+                        <span className={`sbadge ${badgeClass}`}>
+                          <span className="d"></span>{status}
+                        </span>
+                        <span className="open-link font-sans font-semibold">Open <i className="ti ti-arrow-right"></i></span>
+                      </div>
                     </div>
-                    <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE PRODUCTION PIPELINE</h3>
+                  );
+                })}
+
+                {/* Dotted "New Project" Card */}
+                <div 
+                  className="new-card"
+                  onClick={async () => {
+                    const name = await showPrompt("Enter a name for your new AutoStitch composition project:", "", "Initialize Project");
+                    if (name && name.trim()) {
+                      await loadProject(name.trim());
+                      await fetchLocalProjects();
+                    }
+                  }}
+                >
+                  <div className="new-card-icon">
+                    <i className="ti ti-plus"></i>
                   </div>
-                  <button 
-                    onClick={() => setCurrentView("guide")}
-                    className="flex items-center gap-1.5 bg-accent-secondary/15 hover:bg-accent-secondary/30 text-accent-secondary text-[10px] font-bold px-3 py-1.5 rounded-lg border border-accent-secondary/20 transition-all active:scale-[0.98]"
-                  >
-                    <span>📖 Open Interactive Guide</span>
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-1">
-                  {/* Step 1 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
-                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">01</div>
-                    <div className="text-lg">🎬</div>
-                    <h4 className="font-bold text-xs text-white leading-tight">Scan Media</h4>
-                    <p className="text-[10px] text-gray-500 leading-snug">Load a local folder of clips directly into visual Lane 1.</p>
-                  </div>
-                  {/* Step 2 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
-                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">02</div>
-                    <div className="text-lg">🎵</div>
-                    <h4 className="font-bold text-xs text-white leading-tight">Convert SFX</h4>
-                    <p className="text-[10px] text-gray-500 leading-snug">Write prompt descriptions and synthesize Lane 2 audio.</p>
-                  </div>
-                  {/* Step 3 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
-                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">03</div>
-                    <div className="text-lg">🎙️</div>
-                    <h4 className="font-bold text-xs text-white leading-tight">Narrate Voice</h4>
-                    <p className="text-[10px] text-gray-500 leading-snug">Compose scripts, select cloned voices and synthesize Lane 3.</p>
-                  </div>
-                  {/* Step 4 */}
-                  <div className="p-4 rounded-xl border border-carbon-border bg-carbon-panel/20 flex flex-col gap-2 relative">
-                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">04</div>
-                    <div className="text-lg">🚀</div>
-                    <h4 className="font-bold text-xs text-white leading-tight">Master Render</h4>
-                    <p className="text-[10px] text-gray-500 leading-snug">Preview in sync, then render the master video using FFmpeg.</p>
-                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)' }}>New Project</div>
+                  <p>Start a fresh composition</p>
                 </div>
               </div>
+            ) : (
+              <div className="list-view">
+                <div className="lrow lhdr">
+                  <span></span>
+                  <span>Name</span>
+                  <span>Last Saved</span>
+                  <span>Clips</span>
+                  <span>Duration</span>
+                  <span>Status</span>
+                  <span></span>
+                </div>
+                {filteredProjects.map((p, idx) => {
+                  const savedDate = new Date(p.updated_at).toLocaleDateString() + ' ' + new Date(p.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  
+                  const isRendered = p.render_complete;
+                  const clipsCount = p.clips_count || 0;
+                  
+                  let status = "In Progress";
+                  let badgeClass = "sb-progress";
+                  if (isRendered) {
+                    status = "Rendered";
+                    badgeClass = "sb-rendered";
+                  } else if (clipsCount === 0) {
+                    status = "Draft";
+                    badgeClass = "sb-draft";
+                  }
 
-              {/* Card 3: Creative Loops Stock Media Showcase */}
-              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3.5 mt-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-accent-tertiary/10 text-accent-tertiary">
-                    <Icon name="video" className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE STOCK SHOWCASE</h3>
-                </div>
-                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
-                  AutoStitch Studio integrates high-fidelity video looping and visual canvas elements. Preview our pre-loaded cinematic stock graphic:
-                </p>
-                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-carbon-card/40 relative">
-                  <video 
-                    src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c022773507846992594a90f2d658b99d&profile_id=139&oauth2_token_id=57447761" 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline 
-                    className="w-full h-full object-cover opacity-85" 
-                  />
-                  <div className="absolute top-2.5 left-2.5 bg-carbon-card/70 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
-                    STOCK LOOP • ACTIVE
-                  </div>
-                </div>
+                  const activeIcon = cardIcons[idx % cardIcons.length];
+                  const bgStyle = activeIcon.bg === 'ci-purple' ? 'rgba(108,95,255,0.18)' : activeIcon.bg === 'ci-gold' ? 'rgba(233,168,75,0.18)' : activeIcon.bg === 'ci-teal' ? 'rgba(46,196,204,0.18)' : 'rgba(47,203,130,0.18)';
+                  const clStyle = activeIcon.bg === 'ci-purple' ? 'var(--accent2)' : activeIcon.bg === 'ci-gold' ? 'var(--gold)' : activeIcon.bg === 'ci-teal' ? 'var(--teal)' : 'var(--green)';
+
+                  return (
+                    <div 
+                      key={p.project_name} 
+                      className="lrow"
+                      onClick={() => handleSelectProject(p.project_name)}
+                    >
+                      <div className="licon" style={{ background: bgStyle, color: clStyle }}>
+                        <i className={`ti ti-${activeIcon.icon}`}></i>
+                      </div>
+                      <div className="lname truncate" title={p.project_name}>{p.project_name}</div>
+                      <div className="lmono"><b>{savedDate}</b></div>
+                      <div className="lmono"><b>{clipsCount}</b> clips</div>
+                      <div className="lmono"><b>{(p.duration_s || 0.0).toFixed(1)}s</b></div>
+                      <div>
+                        <span className={`sbadge ${badgeClass}`}>
+                          <span className="d"></span>{status}
+                        </span>
+                      </div>
+                      <div className="lopen font-sans font-semibold">Open <i className="ti ti-arrow-right"></i></div>
+                    </div>
+                  );
+                })}
               </div>
-
-            </div>
-
-          </div>
+            )
+          )}
         </div>
       </div>
     );
@@ -2133,30 +2199,58 @@ function App() {
       </nav>
 
       {/* ── WORKSPACE CORE LAYOUT ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         
+        {/* Floating Side Panel Toggle Buttons */}
+        {!isLeftSidebarOpen && (
+          <button 
+            onClick={() => setIsLeftSidebarOpen(true)}
+            className="absolute left-0 top-3 z-40 bg-carbon-panel/90 backdrop-blur border-y border-r border-carbon-border hover:border-accent-primary text-accent-primary hover:text-white px-2.5 py-3 rounded-r-lg transition-all shadow-[0_0_10px_rgba(124,108,255,0.15)] flex items-center justify-center font-bold"
+            title="Expand Asset Browser"
+          >
+            ▶
+          </button>
+        )}
+        {!isSidebarOpen && (
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute right-0 top-3 z-40 bg-carbon-panel/90 backdrop-blur border-y border-l border-carbon-border hover:border-accent-secondary text-accent-secondary hover:text-white px-2.5 py-3 rounded-l-lg transition-all shadow-[0_0_10px_rgba(255,108,157,0.15)] flex items-center justify-center font-bold"
+            title="Expand Slot Settings"
+          >
+            ◀
+          </button>
+        )}
+
         {/* Expandable Left asset Browser */}
-        <div className="w-64 border-r border-carbon-border bg-carbon-panel flex flex-col overflow-hidden">
-          <div className="flex border-b border-carbon-border">
-            <button 
-              onClick={() => setActiveTab("video")}
-              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'video' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              VIDEOS
-            </button>
-            <button 
-              onClick={() => setActiveTab("sfx")}
-              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'sfx' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              SFX
-            </button>
-            <button 
-              onClick={() => setActiveTab("voice")}
-              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'voice' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              VOICE
-            </button>
-          </div>
+        {isLeftSidebarOpen && (
+          <div className="w-64 border-r border-carbon-border bg-carbon-panel flex flex-col overflow-hidden shrink-0">
+            <div className="flex border-b border-carbon-border">
+              <button 
+                onClick={() => setActiveTab("video")}
+                className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'video' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                VIDEOS
+              </button>
+              <button 
+                onClick={() => setActiveTab("sfx")}
+                className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'sfx' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                SFX
+              </button>
+              <button 
+                onClick={() => setActiveTab("voice")}
+                className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'voice' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                VOICE
+              </button>
+              <button 
+                onClick={() => setIsLeftSidebarOpen(false)}
+                className="px-3 border-l border-carbon-border text-gray-500 hover:text-white flex items-center justify-center transition-all bg-carbon-card/10 hover:bg-carbon-card/30"
+                title="Collapse Asset Browser"
+              >
+                ✕
+              </button>
+            </div>
 
           <div className="flex-1 overflow-y-auto p-4">
             
@@ -2409,7 +2503,7 @@ function App() {
             )}
 
           </div>
-        </div>
+        )}
 
         {/* CENTER TIMELINE & RUN CONTROL */}
         <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden">
@@ -3012,19 +3106,55 @@ function App() {
 
           </div>
 
+          {/* Vertical Resizer Handle between Timeline and Console Logs */}
+          {!isConsoleCollapsed && (
+            <div 
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const startY = e.clientY;
+                const startHeight = consoleHeight;
+                const doDrag = (moveEvent) => {
+                  const newHeight = Math.max(80, Math.min(400, startHeight - (moveEvent.clientY - startY)));
+                  setConsoleHeight(newHeight);
+                };
+                const stopDrag = () => {
+                  document.removeEventListener('mousemove', doDrag);
+                  document.removeEventListener('mouseup', stopDrag);
+                };
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', stopDrag);
+              }}
+              className="h-1 cursor-row-resize hover:bg-accent-primary/60 active:bg-accent-primary/80 bg-transparent transition-all z-40 shrink-0"
+              style={{ marginTop: '-2px', marginBottom: '-2px' }}
+            />
+          )}
+
           {/* REAL TIME CONSOLE LOGGER (Bottom) */}
-          <div className="h-44 border-t border-carbon-border bg-carbon-panel flex flex-col overflow-hidden">
-            <div className="h-8 border-b border-carbon-border bg-carbon-card/20 px-4 flex items-center justify-between">
+          <div 
+            style={{ height: isConsoleCollapsed ? '32px' : `${consoleHeight}px` }}
+            className="shrink-0 border-t border-carbon-border bg-carbon-panel flex flex-col overflow-hidden transition-all duration-200"
+          >
+            <div className="h-8 border-b border-carbon-border bg-carbon-card/20 px-4 flex items-center justify-between shrink-0">
               <span className="text-xs font-bold font-mono text-gray-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent-primary shadow-[0_0_6px_#7c6cff]"></span>
                 LIVE CONSOLE LOGS
               </span>
-              <button 
-                onClick={() => setLogs([])}
-                className="text-[10px] text-gray-500 hover:text-gray-300 transition-all font-mono"
-              >
-                CLEAR LOGS
-              </button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setLogs([])}
+                  className="text-[10px] text-gray-500 hover:text-gray-300 transition-all font-mono"
+                >
+                  CLEAR LOGS
+                </button>
+                <span className="text-gray-700 font-mono">|</span>
+                <button 
+                  onClick={() => setIsConsoleCollapsed(prev => !prev)}
+                  className="text-xs text-gray-500 hover:text-white transition-all font-mono flex items-center justify-center w-5 h-5 rounded hover:bg-carbon-card/40"
+                  title={isConsoleCollapsed ? "Expand Console Log Area" : "Collapse Console Log Area"}
+                >
+                  {isConsoleCollapsed ? "▲" : "▼"}
+                </button>
+              </div>
             </div>
             <div className="flex-1 p-3 overflow-y-auto font-mono text-xs flex flex-col gap-1 select-text selection:bg-accent-primary/30">
               {logs.length === 0 ? (
@@ -3264,11 +3394,36 @@ function App() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-gray-500">OUTPUT MASTER DIRECTORY</label>
-                <input 
-                  value={settings.output_dir}
-                  onChange={(e) => setSettings(prev => ({ ...prev, output_dir: e.target.value }))}
-                  className="bg-carbon border border-carbon-border/50 focus:border-accent-primary outline-none px-3 py-2 rounded-lg text-white font-mono"
-                />
+                <div className="flex gap-2">
+                  <input 
+                    value={settings.output_dir}
+                    onChange={(e) => setSettings(prev => ({ ...prev, output_dir: e.target.value }))}
+                    className="flex-1 bg-carbon border border-carbon-border/50 focus:border-accent-primary outline-none px-3 py-2 rounded-lg text-white font-mono"
+                  />
+                  <button 
+                    onClick={async () => {
+                      addLog("Opening native output directory picker...", "info");
+                      try {
+                        const resp = await fetch("/api/videos/select-folder", { method: "POST" });
+                        if (resp.ok) {
+                          const data = await resp.json();
+                          if (data.status === 'ok' && data.folder) {
+                            setSettings(prev => ({ ...prev, output_dir: data.folder }));
+                            addLog(`Selected output directory: "${data.folder}"`, "success");
+                          } else {
+                            addLog("Folder selection cancelled.", "info");
+                          }
+                        }
+                      } catch (e) {
+                        addLog("Failed loading native directory picker.", "error");
+                      }
+                    }}
+                    className="flex items-center justify-center gap-1.5 bg-carbon border border-carbon-border hover:border-accent-primary text-[10px] text-gray-300 px-3 py-2 rounded-lg transition-all font-semibold font-mono"
+                    title="Open Windows directory selection dialog"
+                  >
+                    <span>BROWSE 📂</span>
+                  </button>
+                </div>
               </div>
             </div>
 

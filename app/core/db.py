@@ -106,11 +106,30 @@ def list_projects() -> list:
     conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT project_name, created_at, updated_at FROM projects ORDER BY updated_at DESC")
+    cursor.execute("SELECT project_name, created_at, updated_at, manifest_json FROM projects ORDER BY updated_at DESC")
     rows = cursor.fetchall()
     conn.close()
     
-    return [dict(r) for r in rows]
+    projects_list = []
+    for r in rows:
+        d = dict(r)
+        manifest_json = d.pop('manifest_json', '{}')
+        try:
+            manifest_dict = json.loads(manifest_json)
+            # count clips
+            video_blocks = manifest_dict.get('video_blocks', [])
+            d['clips_count'] = len(video_blocks)
+            # sum duration
+            total_duration = sum(float(b.get('duration_s', 0.0)) for b in video_blocks)
+            d['duration_s'] = round(total_duration, 1)
+            # status
+            d['render_complete'] = manifest_dict.get('render_complete', False)
+        except Exception:
+            d['clips_count'] = 0
+            d['duration_s'] = 0.0
+            d['render_complete'] = False
+        projects_list.append(d)
+    return projects_list
 
 def log_generation(project_name: str, block_id: str, block_type: str, prompt: str, path: str, status: str):
     """Logs an AI generation audit trail in SQLite."""
