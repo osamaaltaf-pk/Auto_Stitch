@@ -5,13 +5,13 @@
 
 :root {
   /* ── DARK THEME — matches dashboard.png deep navy-blue exactly ── */
-  --bg-color:     #070a1c;   /* Deep space navy — R7 G10 B28, clearly blue */
-  --panel-bg:     #0c1028;   /* Sidebar navy — distinctly blue panel */
-  --card-bg:      #101530;   /* Card surfaces — rich midnight blue */
-  --border-color: #252d5c;   /* Vivid indigo borders — clearly visible */
-  --border-subtle:#182048;   /* Inner subtle blue borders */
-  --text-main:    #e8eaf6;   /* Crisp near-white main text */
-  --text-muted:   #8fa0cc;   /* Steel-blue muted text */
+  --bg-color:     #070a1c;            /* Deep space navy */
+  --panel-bg:     #0c1028;            /* Sidebar/panel navy */
+  --card-bg:      #101530;            /* Card surfaces */
+  --border-color: rgba(255,255,255,0.05);  /* Barely-there separator — like original */
+  --border-subtle: rgba(255,255,255,0.03); /* Near-invisible inner dividers */
+  --text-main:    #e8eaf6;
+  --text-muted:   #8fa0cc;
   --text-bright:  #ffffff;
 }
 
@@ -157,26 +157,27 @@ body,
 ::-webkit-scrollbar-thumb  { background: rgba(124, 108, 255, 0.30); border-radius: 4px; transition: all 0.3s ease; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(124, 108, 255, 0.60); }
 
-/* ── GLASS PANEL (navbar, sidebars) — uses CSS variables ── */
+/* ── GLASS PANEL (navbar, sidebars) — subtle separator, no harsh lines ── */
 .glass-panel {
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: inset 0 0 0 0 transparent;
 }
 
-/* ── GLASS CARD (content cards) — uses CSS variables ── */
+/* ── GLASS CARD (content cards) — near-invisible borders ── */
 .glass-card {
   background: var(--card-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid rgba(255,255,255,0.04);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(124, 108, 255, 0.40);
-  box-shadow: 0 6px 20px rgba(124, 108, 255, 0.12);
+  border-color: rgba(124, 108, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(124, 108, 255, 0.10);
 }
 
 /* ── GLOW ACTIVE (selected timeline blocks) ── */
