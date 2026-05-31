@@ -4,15 +4,15 @@
    ============================================================ */
 
 :root {
-  /* ── DARK THEME — matches dashboard.png deep navy-blue exactly ── */
-  --bg-color:     #070a1c;            /* Deep space navy */
-  --panel-bg:     #0c1028;            /* Sidebar/panel navy */
-  --card-bg:      #101530;            /* Card surfaces */
-  --border-color: rgba(255,255,255,0.05);  /* Barely-there separator — like original */
-  --border-subtle: rgba(255,255,255,0.03); /* Near-invisible inner dividers */
-  --text-main:    #e8eaf6;
-  --text-muted:   #8fa0cc;
-  --text-bright:  #ffffff;
+  /* ── DARK THEME — matches the sleek original carbon/space-black theme ── */
+  --bg-color:     #07070a;            /* Deep space black */
+  --panel-bg:     rgba(13, 14, 20, 0.75); /* Sleek translucent carbon panel background */
+  --card-bg:      rgba(20, 22, 34, 0.70); /* Sleek translucent card background */
+  --border-color: rgba(255, 255, 255, 0.03); /* Extremely subtle panel borders */
+  --border-subtle: rgba(255, 255, 255, 0.05); /* Extremely subtle inner card borders */
+  --text-main:    #e2e2e9;            /* Readable off-white text */
+  --text-muted:   #888a9e;            /* Soft muted gray/blue text */
+  --text-bright:  #ffffff;            /* Crisp white text for emphasis */
 }
 
 .light-theme {
@@ -99,6 +99,24 @@ body,
 .light-theme .border-carbon-border\/40 { border-color: rgba(70, 62, 54, 0.10) !important; }
 .light-theme .border-carbon-border\/50 { border-color: rgba(70, 62, 54, 0.12) !important; }
 
+/* ── DARK THEME BORDER OVERRIDES ── */
+:root:not(.light-theme) .border-white\/5        { border-color: rgba(255, 255, 255, 0.015) !important; }
+:root:not(.light-theme) .border-white\/10       { border-color: rgba(255, 255, 255, 0.03) !important; }
+:root:not(.light-theme) .border-white\/15       { border-color: rgba(255, 255, 255, 0.04) !important; }
+:root:not(.light-theme) .border-white\/20       { border-color: rgba(255, 255, 255, 0.05) !important; }
+:root:not(.light-theme) .border-white\/30       { border-color: rgba(255, 255, 255, 0.06) !important; }
+:root:not(.light-theme) .border-carbon-border    { border-color: rgba(255, 255, 255, 0.03) !important; }
+:root:not(.light-theme) .border-carbon-border\/5 { border-color: rgba(255, 255, 255, 0.01) !important; }
+:root:not(.light-theme) .border-carbon-border\/10 { border-color: rgba(255, 255, 255, 0.015) !important; }
+:root:not(.light-theme) .border-carbon-border\/15 { border-color: rgba(255, 255, 255, 0.02) !important; }
+:root:not(.light-theme) .border-carbon-border\/20 { border-color: rgba(255, 255, 255, 0.025) !important; }
+:root:not(.light-theme) .border-carbon-border\/30 { border-color: rgba(255, 255, 255, 0.03) !important; }
+:root:not(.light-theme) .border-carbon-border\/40 { border-color: rgba(255, 255, 255, 0.04) !important; }
+:root:not(.light-theme) .border-carbon-border\/50 { border-color: rgba(255, 255, 255, 0.05) !important; }
+:root:not(.light-theme) .border-carbon-border\/60 { border-color: rgba(255, 255, 255, 0.06) !important; }
+:root:not(.light-theme) .border-carbon-border\/70 { border-color: rgba(255, 255, 255, 0.07) !important; }
+:root:not(.light-theme) .border-carbon-border\/80 { border-color: rgba(255, 255, 255, 0.08) !important; }
+
 /* ── LIGHT THEME GLASS OVERRIDES ── */
 .light-theme .glass-panel {
   background: rgba(238, 234, 224, 0.92) !important;
@@ -162,7 +180,7 @@ body,
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 0 0 0 transparent;
 }
 
@@ -171,7 +189,7 @@ body,
   background: var(--card-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card:hover {
@@ -208,12 +226,12 @@ body,
 /* ── TIMELINE LANE TRACKS ── */
 .timeline-lane-track {
   background-size: 146px 100%;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   position: relative;
 }
 .timeline-ruler {
   background-size: 146px 100%;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
 /* ── HORIZONTAL SYNC SCROLL ── */
