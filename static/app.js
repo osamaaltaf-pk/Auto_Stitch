@@ -1508,6 +1508,176 @@ function App() {
     );
   }
 
+  if (currentView === "guide") {
+    return (
+      <div className="h-full w-full bg-[#07070a] flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
+        <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
+          
+          {/* Header Row */}
+          <div className="flex items-center justify-between border-b border-carbon-border/50 pb-6">
+            <div className="flex items-center gap-3.5">
+              <button 
+                onClick={() => setCurrentView("start")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon hover:text-white text-gray-300 text-xs font-semibold font-sans transition-all active:scale-[0.97]"
+                title="Return to Projects Dashboard"
+              >
+                <span>🏠 Projects Dashboard</span>
+              </button>
+              <div>
+                <h1 className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+                  Interactive Quick Start Guide
+                </h1>
+                <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-0.5">Mastering the AutoStitch Studio Engine</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-carbon-card border border-carbon-border/80 px-4.5 py-2.5 rounded-2xl backdrop-blur-md shadow-lg shadow-black/30">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-primary animate-pulse shadow-[0_0_8px_#7c6cff]"></span>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">SYSTEM EDITION</span>
+                <span className="text-xs font-mono font-bold text-gray-300 mt-1">Enterprise Studio v1</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Guide Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Left Column: Visual Medias & Showcase */}
+            <div className="flex flex-col gap-6">
+              
+              {/* Card: Stock Video Preview Loop */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3">
+                <h3 className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>🎥</span> SYSTEM COMPILATION LOOP
+                </h3>
+                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+                  Your final output is rendered using our proprietary multi-lane FFmpeg compiler. Here is a visual preview of high-fidelity particle compositions:
+                </p>
+                <div className="w-full h-44 rounded-xl overflow-hidden border border-white/10 shadow-lg relative bg-black">
+                  <video 
+                    src="https://player.vimeo.com/external/435674703.sd.mp4?s=79d5df65d4ebcfc2807f6e492ad170949d2149b1&profile_id=139&oauth2_token_id=57447761" 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover opacity-80" 
+                  />
+                  <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-0.5 rounded text-[8px] font-mono text-accent-secondary uppercase tracking-widest">
+                    STOCK LOOP • ACTIVE
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Premium Workspace Image */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3">
+                <h3 className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>💡</span> CREATIVE WORKSPACE DESIGN
+                </h3>
+                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+                  AutoStitch Studio offers a dark-themed space, preventing eye strain during intense composition and editing sessions.
+                </p>
+                <div className="w-full h-40 rounded-xl overflow-hidden border border-white/10 shadow-lg relative bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=600&auto=format&fit=crop')" }}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                  <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg">
+                    <span className="text-[9px] font-bold text-white uppercase tracking-wider">4K Studio Environment</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column (Spans 2): Interactive Chapters & Image callouts */}
+            <div className="lg:col-span-2 flex flex-col gap-8">
+              
+              {/* Interactive Dashboard Showcase (With our dashboard.png!) */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4">
+                <h3 className="font-extrabold text-sm text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>🖥️</span> INTERACTIVE DASHBOARD MAP
+                </h3>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Review the exact layout of the AutoStitch Studio editing timeline. Click on the dashboard layout illustration to learn all the system controls:
+                </p>
+                
+                {/* Embed the dashboard.png locally loaded! */}
+                <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl relative bg-black/40 group cursor-zoom-in">
+                  <img 
+                    src="/static/dashboard.png" 
+                    alt="AutoStitch Studio Workspace Layout" 
+                    className="w-full h-auto object-cover group-hover:scale-[1.01] transition-all duration-500" 
+                  />
+                  <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md border border-white/10 px-3 py-1 rounded-lg text-[10px] text-accent-tertiary font-mono">
+                    🟢 ACTIVE WORKSPACE LAYOUT
+                  </div>
+                </div>
+              </div>
+
+              {/* Guide Chapters Accordion */}
+              <div className="flex flex-col gap-4">
+                <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">📖 CORE COMPOSITION CHAPTERS</h3>
+
+                {/* Chapter 1 */}
+                <div className="glass-card p-5 rounded-2xl border border-carbon-border bg-carbon-panel/30 flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary font-bold text-sm shrink-0 border border-accent-primary/20">
+                    01
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Video Scanning & Timeline Layout</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed mt-1">
+                      Start by scanning a local folder of MP4 files. The compiler parses the frame count, duration, and extracts thumbnails. The timeline (Lane 1) will expand to match the total count of scanned clips. You can also manually upload custom video clips into any specific timeline slot!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Chapter 2 */}
+                <div className="glass-card p-5 rounded-2xl border border-carbon-border bg-carbon-panel/30 flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-accent-secondary/10 flex items-center justify-center text-accent-secondary font-bold text-sm shrink-0 border border-accent-secondary/20">
+                    02
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Sound Effects (SFX) AI Orchestration</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed mt-1">
+                      Type sound effect descriptions directly into the SFX row slots (Lane 2). AutoStitch leverages our local Stable Audio generator to convert text descriptions to realistic high-fidelity WAV files. You can customize the generation steps, seeds, and duration, or clear assets instantly to keep your storage neat.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Chapter 3 */}
+                <div className="glass-card p-5 rounded-2xl border border-carbon-border bg-carbon-panel/30 flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-accent-tertiary/10 flex items-center justify-center text-accent-tertiary font-bold text-sm shrink-0 border border-accent-tertiary/20">
+                    03
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Voiceover (TTS) Speech Synthesizer</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed mt-1">
+                      Enter script texts into the Voice row slots (Lane 3). The local PocketTTS engine synthesizes scripts into professional voice narration. You can select standard voices or upload an audio sample to clone a new custom voice. When you edit a script and regenerate, previous audios are physically deleted to ensure optimal disk cleanliness.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Chapter 4 */}
+                <div className="glass-card p-5 rounded-2xl border border-carbon-border bg-carbon-panel/30 flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 font-bold text-sm shrink-0 border border-purple-500/20">
+                    04
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Multi-Track Rendering & Mastering</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed mt-1">
+                      Preview synchronized multi-track audio elements inline within the Composer screen. Once you are satisfied with the timeline composition, click the <b>RENDER ▶</b> button. Our back-end FFmpeg engine seamlessly weaves all visual tracks, AI sound effects, and voice narration into a master cinematic MP4 file ready for download!
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === "start") {
     return (
       <div className="h-full w-full bg-[#07070a] flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans">
@@ -1599,6 +1769,38 @@ function App() {
                     <span>Preview synchronized playbacks in real-time, then click the top-right <b>RENDER ▶</b> button to export the final master MP4!</span>
                   </li>
                 </ul>
+                <button 
+                  onClick={() => setCurrentView("guide")}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-accent-secondary/35 bg-accent-secondary/5 hover:bg-accent-secondary/10 text-accent-secondary text-xs font-bold font-sans transition-all active:scale-[0.98] mt-2.5"
+                >
+                  <span>📖 Open Interactive Guide</span>
+                </button>
+              </div>
+
+              {/* Card: Stock Media Showcase */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-accent-tertiary/10 text-accent-tertiary">
+                    <Icon name="video" className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE STOCK SHOWCASE</h3>
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+                  AutoStitch Studio integrates high-fidelity video looping and visual canvas elements. Preview our pre-loaded cinematic stock graphic:
+                </p>
+                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-black/40 relative">
+                  <video 
+                    src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c022773507846992594a90f2d658b99d&profile_id=139&oauth2_token_id=57447761" 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover opacity-85" 
+                  />
+                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
+                    STOCK LOOP • ACTIVE
+                  </div>
+                </div>
               </div>
 
               {/* Card: System Developer Credit */}
