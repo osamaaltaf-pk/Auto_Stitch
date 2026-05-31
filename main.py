@@ -222,7 +222,7 @@ async def check_license_validity() -> tuple[bool, str]:
     url = f"{server_url}/api/verify"
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             resp = await client.post(
                 url,
                 json={"license_key": key, "machine_id": machine_id},
@@ -406,7 +406,7 @@ async def health_check():
     tts_online = False
     tts_model_loaded = False
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             resp = await client.get(
                 f"{settings['tts_server_url']}/api/health",
                 headers={"bypass-tunnel-reminder": "true"},
@@ -422,7 +422,7 @@ async def health_check():
     sfx_online = False
     sfx_device = "unknown"
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             resp = await client.get(
                 f"{settings['sfx_server_url']}/api/health",
                 headers={"bypass-tunnel-reminder": "true"},
@@ -475,7 +475,7 @@ async def list_available_voices():
     tts_url = settings["tts_server_url"]
     default_voices = ["alba", "marius", "fantine", "cosette", "jean", "eponine"]
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             resp = await client.get(
                 f"{tts_url}/api/voices",
                 headers={"bypass-tunnel-reminder": "true"},
@@ -501,7 +501,7 @@ async def proxy_delete_voice(voice_name: str):
     settings = load_settings()
     tts_url = settings["tts_server_url"]
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             resp = await client.post(
                 f"{tts_url}/api/voices/delete?voice_name={voice_name}",
                 headers={"bypass-tunnel-reminder": "true"},
@@ -521,7 +521,7 @@ async def proxy_clone_voice(file: UploadFile = File(...)):
     settings = load_settings()
     tts_url = settings["tts_server_url"]
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             # Read file content and build dynamic upload multipart payload
             content = await file.read()
             files = {"file": (file.filename, content, file.content_type)}
@@ -764,7 +764,7 @@ async def generate_tts(req: TtsGenerateRequest):
     
     async def run_tts():
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 payload = {
                     "text": req.text,
                     "voice": req.voice,
@@ -842,7 +842,7 @@ async def generate_sfx(req: SfxGenerateRequest):
     
     async def run_sfx():
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 payload = {
                     "prompt": req.prompt,
                     "model": req.model,
