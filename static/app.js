@@ -169,6 +169,7 @@ function App() {
   const [consoleHeight, setConsoleHeight] = useState(160); // Default bottom console logger height in px
   const [leftPanelWidth, setLeftPanelWidth] = useState(256); // Default left panel width in px (w-64)
   const [rightPanelWidth, setRightPanelWidth] = useState(320); // Default right panel width in px (w-80)
+  const [previewSectionHeight, setPreviewSectionHeight] = useState(420); // Draggable preview section height in px
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
   const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
@@ -2558,10 +2559,12 @@ function App() {
         <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden relative">
           
           {/* ── UPPER PART: MASTER MEDIA PREVIEWER & AUDIO COMPOSER MIXER ── */}
-          <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/40 p-5 flex flex-col items-center justify-center gap-4 select-text">
-            
-            {/* Centered Video Screen Section */}
-            <div className="w-[600px] h-[280px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
+          <div
+            style={{ height: `${previewSectionHeight}px`, minHeight: '260px', maxHeight: '75vh' }}
+            className="shrink-0 border-b border-carbon-border bg-carbon-panel/40 flex flex-col items-center justify-start gap-3 select-text overflow-hidden pt-4 pb-3 px-5"
+          >
+            {/* Centered Video Screen Section — grows with preview section height */}
+            <div className="w-[600px] flex-1 min-h-[160px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
               {previewMode === 'composer' ? (
                 selectedBlock !== null && project.video_blocks[selectedBlock.index] ? (
                   project.video_blocks[selectedBlock.index].file_path ? (
@@ -2819,8 +2822,30 @@ function App() {
 
           </div>
 
+          {/* ── HORIZONTAL RESIZE HANDLE between Preview and Timeline ── */}
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startY = e.clientY;
+              const startH = previewSectionHeight;
+              const doDrag = (mv) => {
+                const newH = Math.max(260, Math.min(window.innerHeight * 0.75, startH + (mv.clientY - startY)));
+                setPreviewSectionHeight(newH);
+              };
+              const stopDrag = () => {
+                document.removeEventListener('mousemove', doDrag);
+                document.removeEventListener('mouseup', stopDrag);
+              };
+              document.addEventListener('mousemove', doDrag);
+              document.addEventListener('mouseup', stopDrag);
+            }}
+            className="h-2 cursor-row-resize shrink-0 bg-carbon-border/10 hover:bg-accent-primary/40 active:bg-accent-primary/60 transition-colors group relative z-20"
+            title="Drag to resize preview / timeline split"
+          >
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 mx-auto w-16 bg-carbon-border/40 group-hover:bg-accent-primary/60 rounded-full transition-colors" />
+          </div>
           {/* ── LOWER PART: INTERACTIVE MULTI-LANE TRACKS TIMELINE ── */}
-          <div className="flex-1 flex flex-col overflow-y-auto p-6 overflow-x-hidden min-h-[220px]">
+          <div className="flex-1 min-h-0 flex flex-col overflow-y-auto p-6 overflow-x-hidden">
             
             {/* Timeline Wrapper Container */}
             <div className="flex-1 flex flex-col border border-carbon-border/50 rounded-xl bg-carbon-panel/30 overflow-hidden relative select-none">
