@@ -178,6 +178,7 @@ function App() {
   }); // "start" | "editor"
   const [localProjects, setLocalProjects] = useState([]);
   const [newProjectName, setNewProjectName] = useState("");
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('as_theme') || 'dark'; } catch { return 'dark'; }
   });
@@ -1803,13 +1804,7 @@ function App() {
               ← HOME
             </button>
             <button 
-              onClick={async () => {
-                const name = await showPrompt("Enter a name for your new AutoStitch composition project:", "", "Initialize Project");
-                if (name && name.trim()) {
-                  await loadProject(name.trim());
-                  await fetchLocalProjects();
-                }
-              }}
+              onClick={() => setShowNewProjectModal(true)}
               className="btn-primary"
             >
               <i className="ti ti-plus"></i>
@@ -1963,13 +1958,7 @@ function App() {
                 {/* Dotted "New Project" Card */}
                 <div 
                   className="new-card"
-                  onClick={async () => {
-                    const name = await showPrompt("Enter a name for your new AutoStitch composition project:", "", "Initialize Project");
-                    if (name && name.trim()) {
-                      await loadProject(name.trim());
-                      await fetchLocalProjects();
-                    }
-                  }}
+                  onClick={() => setShowNewProjectModal(true)}
                 >
                   <div className="new-card-icon">
                     <i className="ti ti-plus"></i>
@@ -2035,6 +2024,67 @@ function App() {
             )
           )}
         </div>
+
+        {/* ── CREATE NEW PROJECT MODAL ── */}
+        {showNewProjectModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-[#0e0e16] border border-white/10 rounded-[18px] p-8 w-[420px] max-w-full shadow-2xl flex flex-col gap-4">
+              <div className="text-[17px] font-medium text-white flex items-center gap-2 font-mono">
+                <i className="ti ti-folder-plus text-[#8b7fff] text-lg"></i> Create New Project
+              </div>
+              <div className="text-xs text-[#8a87aa]">Give your project a name to get started</div>
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold tracking-wider uppercase text-[#4a4868]">Project Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Promo_Video_v1" 
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && newProjectName.trim()) {
+                      const name = newProjectName.trim();
+                      setShowNewProjectModal(false);
+                      setNewProjectName("");
+                      await loadProject(name);
+                      await fetchLocalProjects();
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white font-mono text-sm outline-none focus:border-[#6c5fff] transition-all"
+                  autoFocus
+                />
+              </div>
+              
+              <div className="flex gap-3 justify-end mt-4">
+                <button 
+                  onClick={() => {
+                    setShowNewProjectModal(false);
+                    setNewProjectName("");
+                  }}
+                  className="btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (newProjectName.trim()) {
+                      const name = newProjectName.trim();
+                      setShowNewProjectModal(false);
+                      setNewProjectName("");
+                      await loadProject(name);
+                      await fetchLocalProjects();
+                    }
+                  }}
+                  className="btn-primary"
+                >
+                  <i className="ti ti-rocket"></i>
+                  <span>Create Project</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
