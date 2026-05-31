@@ -167,6 +167,8 @@ function App() {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isConsoleCollapsed, setIsConsoleCollapsed] = useState(false);
   const [consoleHeight, setConsoleHeight] = useState(160); // Default bottom console logger height in px
+  const [leftPanelWidth, setLeftPanelWidth] = useState(256); // Default left panel width in px (w-64)
+  const [rightPanelWidth, setRightPanelWidth] = useState(320); // Default right panel width in px (w-80)
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
   const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
@@ -2262,7 +2264,7 @@ function App() {
 
         {/* Expandable Left asset Browser */}
         {isLeftSidebarOpen && (
-          <div className="w-64 border-r border-carbon-border bg-carbon-panel flex flex-col overflow-hidden shrink-0">
+          <div style={{ width: `${leftPanelWidth}px`, minWidth: '180px', maxWidth: '420px' }} className="border-r border-carbon-border bg-carbon-panel flex flex-col overflow-hidden shrink-0 relative">
             <div className="flex border-b border-carbon-border">
               <button 
                 onClick={() => setActiveTab("video")}
@@ -2289,6 +2291,28 @@ function App() {
               >
                 ✕
               </button>
+            </div>
+            {/* Left Panel Resize Handle */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startW = leftPanelWidth;
+                const doDrag = (mv) => {
+                  const newW = Math.max(180, Math.min(420, startW + (mv.clientX - startX)));
+                  setLeftPanelWidth(newW);
+                };
+                const stopDrag = () => {
+                  document.removeEventListener('mousemove', doDrag);
+                  document.removeEventListener('mouseup', stopDrag);
+                };
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', stopDrag);
+              }}
+              className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-accent-primary/50 active:bg-accent-primary/70 bg-transparent transition-colors z-50 group"
+              title="Drag to resize panel"
+            >
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-12 bg-carbon-border group-hover:bg-accent-primary/60 rounded-full transition-colors" />
             </div>
 
           <div className="flex-1 overflow-y-auto p-4">
@@ -2546,7 +2570,7 @@ function App() {
       )}
 
         {/* CENTER TIMELINE & RUN CONTROL */}
-        <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden relative">
           
           {/* ── UPPER PART: MASTER MEDIA PREVIEWER & AUDIO COMPOSER MIXER ── */}
           <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/40 p-5 flex flex-col items-center justify-center gap-4 select-text">
@@ -2699,7 +2723,7 @@ function App() {
             <div className="w-[600px] flex flex-col gap-3">
               
               {/* Preview Selection toggles below player screen */}
-              <div className="flex gap-2 justify-center">
+              <div className="flex gap-2 justify-center items-center">
                 <button
                   onClick={() => setPreviewMode("composer")}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${previewMode === 'composer' ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30 shadow-[0_0_10px_rgba(124,108,255,0.1)]' : 'text-gray-500 hover:text-gray-300'}`}
@@ -2714,6 +2738,27 @@ function App() {
                   <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary"></span>
                   🎬 MASTER VIDEO
                 </button>
+                {/* Small green download icon for master preview — always visible in master mode */}
+                {previewMode === 'master' && (
+                  <a
+                    href={`/output/master.mp4`}
+                    download={`${project.project_name}_master.mp4`}
+                    onClick={(e) => {
+                      if (!project.render_complete) {
+                        e.preventDefault();
+                        addLog("Cannot download! Master video has not been rendered yet.", "error");
+                      }
+                    }}
+                    title={project.render_complete ? "Download Master Render" : "Master not rendered yet"}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all shadow-sm ${
+                      project.render_complete
+                        ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/40 hover:border-emerald-400 hover:scale-110'
+                        : 'bg-carbon-card/20 border-carbon-border/30 text-gray-600 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <Icon name="download" className="w-3.5 h-3.5" />
+                  </a>
+                )}
               </div>
 
               {/* Slider Controls directly below buttons (Composer Mode) */}
@@ -2778,26 +2823,10 @@ function App() {
                 </div>
               )}
 
-              {/* Master Video Download bar (Master Mode) */}
-              {previewMode === 'master' && (
-                <div className="flex gap-4 items-center bg-carbon-card/25 border border-carbon-border/30 rounded-xl p-3 shadow-lg select-none">
-                  <div className="flex-1 text-[10px] font-mono text-gray-400">
-                    <span className="text-white font-bold">🎬 master.mp4: </span>
-                    {project.render_complete ? "Your master render is compiled! Click to download final composition." : "Master video compilation has not been run yet."}
-                  </div>
-                  <a 
-                    href={`/output/master.mp4`} 
-                    download={`${project.project_name}_master.mp4`}
-                    onClick={(e) => {
-                      if (!project.render_complete) {
-                        e.preventDefault();
-                        addLog("Cannot download! Master video has not been rendered yet.", "error");
-                      }
-                    }}
-                    className={`flex items-center justify-center gap-2 bg-gradient-to-r from-accent-secondary to-pink-600 hover:from-accent-secondary hover:to-pink-500 text-white font-bold px-4 py-2 rounded-lg transition-all text-xs font-mono shrink-0 shadow-md ${!project.render_complete ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <span>DOWNLOAD MASTER 📥</span>
-                  </a>
+              {/* Master render status hint — small, not a big bar */}
+              {previewMode === 'master' && !project.render_complete && (
+                <div className="text-[10px] font-mono text-gray-600 text-center italic">
+                  Hit <strong className="text-gray-400">RENDER ▶</strong> to compile your master video, then download via the green icon above.
                 </div>
               )}
 
@@ -2864,7 +2893,7 @@ function App() {
                           setDraggedIndex(null);
                           setDragOverIndex(null);
                         }}
-                        style={{ width: '140px', minWidth: '140px' }}
+                        style={{ width: '140px', minWidth: '140px', flexShrink: 0 }}
                         className={`h-full border-r border-carbon-border/20 flex items-center pl-2 font-mono text-[10px] text-gray-400 select-none gap-1.5 draggable-ruler-tick ${dragOverIndex === i && draggedIndex !== i ? 'bg-accent-primary/20 border-l-2 border-accent-primary' : 'hover:bg-carbon-card/30'}`}
                         title="Drag to reposition sequence"
                       >
@@ -2945,7 +2974,7 @@ function App() {
                       <div 
                         ref={layer.type === 'video' ? laneVideoRef : (layer.type === 'sfx' ? laneSfxRef : laneVoiceRef)}
                         onScroll={handleScroll}
-                        className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track gap-1.5"
+                        className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track" style={{ gap: '0px' }}
                       >
                         {layer.blocks.map((block, i) => {
                           const isBlockSelected = selectedBlock?.layerId === layer.id && selectedBlock?.index === i;
@@ -2964,7 +2993,7 @@ function App() {
                                     setSelectedBlock({ lane: 'video', index: i, layerId: layer.id });
                                   }
                                 }}
-                                style={{ width: '140px', minWidth: '140px' }}
+                                style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
                                 className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
                                   isBlockSelected
                                     ? 'bg-accent-primary/10 border-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)] text-white'
@@ -3017,7 +3046,7 @@ function App() {
                                     setSelectedBlock({ lane: 'sfx', index: i, layerId: layer.id });
                                   }
                                 }}
-                                style={{ width: '140px', minWidth: '140px' }}
+                                style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
                                 className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
                                   isBlockSelected
                                     ? 'bg-accent-secondary/15 border-accent-secondary shadow-[0_0_8px_rgba(255,108,157,0.25)] text-white'
@@ -3091,7 +3120,7 @@ function App() {
                                     setSelectedBlock({ lane: 'voice', index: i, layerId: layer.id });
                                   }
                                 }}
-                                style={{ width: '140px', minWidth: '140px' }}
+                                style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
                                 className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${
                                   isBlockSelected
                                     ? 'bg-accent-tertiary/15 border-accent-tertiary shadow-[0_0_8px_rgba(108,255,204,0.25)] text-white'
@@ -3201,7 +3230,7 @@ function App() {
 
           </div>
 
-          {/* Vertical Resizer Handle between Timeline and Console Logs */}
+          {/* Vertical Resizer Handle between Timeline and Console Logs (always shown when not collapsed) */}
           {!isConsoleCollapsed && (
             <div 
               onMouseDown={(e) => {
@@ -3219,37 +3248,39 @@ function App() {
                 document.addEventListener('mousemove', doDrag);
                 document.addEventListener('mouseup', stopDrag);
               }}
-              className="h-1 cursor-row-resize hover:bg-accent-primary/60 active:bg-accent-primary/80 bg-transparent transition-all z-40 shrink-0"
-              style={{ marginTop: '-2px', marginBottom: '-2px' }}
+              className="h-1.5 cursor-row-resize hover:bg-accent-primary/60 active:bg-accent-primary/80 bg-carbon-border/20 transition-all z-40 shrink-0 group"
+              title="Drag to resize console"
             />
           )}
 
+          {/* Persistent console collapse toggle — always visible regardless of collapsed state */}
+          <div className="absolute bottom-0 right-4 z-50 pointer-events-none" style={{ bottom: isConsoleCollapsed ? '4px' : `${consoleHeight + 4}px` }}>
+            <button
+              onClick={() => setIsConsoleCollapsed(prev => !prev)}
+              className="pointer-events-auto flex items-center gap-1.5 bg-carbon-panel/95 backdrop-blur border border-carbon-border hover:border-accent-primary/50 text-gray-400 hover:text-white px-2.5 py-1 rounded-t-lg text-[10px] font-mono font-bold transition-all shadow-lg"
+              title={isConsoleCollapsed ? 'Expand Console' : 'Collapse Console'}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-primary shadow-[0_0_4px_#7c6cff]"></span>
+              CONSOLE {isConsoleCollapsed ? '▲' : '▼'}
+            </button>
+          </div>
+
           {/* REAL TIME CONSOLE LOGGER (Bottom) */}
           <div 
-            style={{ height: isConsoleCollapsed ? '32px' : `${consoleHeight}px` }}
-            className="shrink-0 border-t border-carbon-border bg-carbon-panel flex flex-col overflow-hidden transition-all duration-200"
+            style={{ height: isConsoleCollapsed ? '0px' : `${consoleHeight}px` }}
+            className="shrink-0 border-t border-carbon-border bg-carbon-panel flex flex-col overflow-hidden transition-[height] duration-200"
           >
             <div className="h-8 border-b border-carbon-border bg-carbon-card/20 px-4 flex items-center justify-between shrink-0">
               <span className="text-xs font-bold font-mono text-gray-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent-primary shadow-[0_0_6px_#7c6cff]"></span>
                 LIVE CONSOLE LOGS
               </span>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setLogs([])}
-                  className="text-[10px] text-gray-500 hover:text-gray-300 transition-all font-mono"
-                >
-                  CLEAR LOGS
-                </button>
-                <span className="text-gray-700 font-mono">|</span>
-                <button 
-                  onClick={() => setIsConsoleCollapsed(prev => !prev)}
-                  className="text-xs text-gray-500 hover:text-white transition-all font-mono flex items-center justify-center w-5 h-5 rounded hover:bg-carbon-card/40"
-                  title={isConsoleCollapsed ? "Expand Console Log Area" : "Collapse Console Log Area"}
-                >
-                  {isConsoleCollapsed ? "▲" : "▼"}
-                </button>
-              </div>
+              <button 
+                onClick={() => setLogs([])}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-all font-mono"
+              >
+                CLEAR LOGS
+              </button>
             </div>
             <div className="flex-1 p-3 overflow-y-auto font-mono text-xs flex flex-col gap-1 select-text selection:bg-accent-primary/30">
               {logs.length === 0 ? (
@@ -3272,7 +3303,29 @@ function App() {
 
         {/* SIDEBAR BLOCK PARAMETER CONTROLLER (Right) */}
         {isSidebarOpen && (
-          <div className="w-80 border-l border-carbon-border bg-carbon-panel flex flex-col overflow-hidden">
+          <div style={{ width: `${rightPanelWidth}px`, minWidth: '220px', maxWidth: '500px' }} className="border-l border-carbon-border bg-carbon-panel flex flex-col overflow-hidden relative">
+            {/* Right panel resize handle */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startW = rightPanelWidth;
+                const doDrag = (mv) => {
+                  const newW = Math.max(220, Math.min(500, startW - (mv.clientX - startX)));
+                  setRightPanelWidth(newW);
+                };
+                const stopDrag = () => {
+                  document.removeEventListener('mousemove', doDrag);
+                  document.removeEventListener('mouseup', stopDrag);
+                };
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', stopDrag);
+              }}
+              className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-accent-secondary/50 active:bg-accent-secondary/70 bg-transparent transition-colors z-50 group"
+              title="Drag to resize panel"
+            >
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-12 bg-carbon-border group-hover:bg-accent-secondary/60 rounded-full transition-colors" />
+            </div>
             <div className="h-12 border-b border-carbon-border px-4 flex items-center justify-between bg-carbon-card/10">
               <span className="font-bold text-xs text-gray-400 uppercase tracking-wider font-mono">Slot Settings</span>
               <button 
