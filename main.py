@@ -732,6 +732,7 @@ async def scan_video_folder(req: VideoScanRequest):
     manifest.voice_blocks = manifest.voice_blocks[:len(video_blocks)]
     
     manifest.save()
+    db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "manifest": manifest.to_dict()}
 
 # --- TTS GENERATION ---
@@ -764,6 +765,12 @@ async def generate_tts(req: TtsGenerateRequest):
     
     async def run_tts():
         try:
+            if out_wav.exists():
+                try:
+                    out_wav.unlink()
+                    logger.info(f"Deleted old version of TTS file: {out_wav}")
+                except Exception as e:
+                    logger.warning(f"Failed deleting old TTS file: {e}")
             async with httpx.AsyncClient(trust_env=False) as client:
                 payload = {
                     "text": req.text,
@@ -842,6 +849,12 @@ async def generate_sfx(req: SfxGenerateRequest):
     
     async def run_sfx():
         try:
+            if out_wav.exists():
+                try:
+                    out_wav.unlink()
+                    logger.info(f"Deleted old version of SFX file: {out_wav}")
+                except Exception as e:
+                    logger.warning(f"Failed deleting old SFX file: {e}")
             async with httpx.AsyncClient(trust_env=False) as client:
                 payload = {
                     "prompt": req.prompt,
@@ -1070,6 +1083,7 @@ async def upload_custom_video(project_name: str, index: int, file: UploadFile = 
     block.thumbnail_path = f"/static/thumbnails/{thumb_name}"
     
     manifest.save()
+    db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "block": block.to_dict(), "manifest": manifest.to_dict()}
 
 @app.post("/api/upload/voice")
@@ -1108,6 +1122,7 @@ async def upload_custom_voice(project_name: str, index: int, file: UploadFile = 
     block.error_msg = None
     
     manifest.save()
+    db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "block": block.to_dict(), "manifest": manifest.to_dict()}
 
 @app.post("/api/upload/sfx")
@@ -1146,6 +1161,7 @@ async def upload_custom_sfx(project_name: str, index: int, file: UploadFile = Fi
     block.error_msg = None
     
     manifest.save()
+    db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "block": block.to_dict(), "manifest": manifest.to_dict()}
 
 @app.post("/api/clear/block")
@@ -1170,6 +1186,14 @@ async def clear_block_media(project_name: str, lane: str, index: int):
         if index < 0 or index >= len(manifest.voice_blocks):
             raise HTTPException(status_code=400, detail="Invalid index")
         block = manifest.voice_blocks[index]
+        if block.file_path:
+            try:
+                p = Path(block.file_path)
+                if p.exists():
+                    p.unlink()
+                    logger.info(f"Deleted physical voice file on clear: {p}")
+            except Exception as e:
+                logger.warning(f"Failed to delete voice file: {e}")
         block.file_path = None
         block.prompt = ""
         block.status = BlockStatus.IDLE
@@ -1178,6 +1202,14 @@ async def clear_block_media(project_name: str, lane: str, index: int):
         if index < 0 or index >= len(manifest.sfx_blocks):
             raise HTTPException(status_code=400, detail="Invalid index")
         block = manifest.sfx_blocks[index]
+        if block.file_path:
+            try:
+                p = Path(block.file_path)
+                if p.exists():
+                    p.unlink()
+                    logger.info(f"Deleted physical SFX file on clear: {p}")
+            except Exception as e:
+                logger.warning(f"Failed to delete SFX file: {e}")
         block.file_path = None
         block.prompt = ""
         block.status = BlockStatus.IDLE
@@ -1186,6 +1218,7 @@ async def clear_block_media(project_name: str, lane: str, index: int):
         raise HTTPException(status_code=400, detail="Invalid lane")
         
     manifest.save()
+    db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "manifest": manifest.to_dict()}
 
 # --- STATIC CONTENT & SPA SERVING ---

@@ -170,6 +170,10 @@ function App() {
   const [licenseStatus, setLicenseStatus] = useState({ valid: true, message: "", gmail: "", expiry_date: "", license_key: "" });
   const [isActivatingLicense, setIsActivatingLicense] = useState(false);
 
+  const [currentView, setCurrentView] = useState("start"); // "start" | "editor"
+  const [localProjects, setLocalProjects] = useState([]);
+  const [newProjectName, setNewProjectName] = useState("");
+
   // Advanced Preview and Mixer States
   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
   const [isPlaying, setIsPlaying] = useState(false);
@@ -418,12 +422,17 @@ function App() {
     }
   };
 
-  // Sync database history on tab activation
-  useEffect(() => {
-    if (activeTab === "history") {
-      fetchDbHistory();
+  const fetchLocalProjects = async () => {
+    try {
+      const resp = await fetch("/api/db/projects");
+      if (resp.ok) {
+        const data = await resp.json();
+        setLocalProjects(data.projects || []);
+      }
+    } catch (e) {
+      console.error("Failed to load local projects:", e);
     }
-  }, [activeTab]);
+  };
 
   // Load project & health on launch
   useEffect(() => {
@@ -432,12 +441,30 @@ function App() {
     fetchSettings();
     checkHealth();
     fetchVoices();
-    loadProject("Short_01");
+    fetchLocalProjects();
 
     // Establish periodic health checks every 10 seconds
     const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSelectProject = async (name) => {
+    await loadProject(name);
+    setCurrentView("editor");
+  };
+
+  const handleCreateProject = async (e) => {
+    if (e) e.preventDefault();
+    const name = newProjectName.trim();
+    if (!name) {
+      alert("Please enter a valid project name!");
+      return;
+    }
+    await loadProject(name);
+    await fetchLocalProjects();
+    setCurrentView("editor");
+    setNewProjectName("");
+  };
 
   // Poll render progress when rendering
   useEffect(() => {
@@ -590,6 +617,7 @@ function App() {
   // API Call: Load project manifest
   const loadProject = async (name) => {
     addLog(`Loading project '${name}'...`, "info");
+    setTimelineLayers([]); // Clear dynamic layers to prevent memory leaking from other projects
     try {
       const resp = await fetch("/api/project/load", {
         method: "POST",
@@ -609,7 +637,7 @@ function App() {
   };
 
   // API Call: Save manifest
-  const saveProject = async (newManifest = null) => {
+  const saveProject = async (newManifest = null, showNotification = false) => {
     const manifestToSave = newManifest || getMergedManifest();
     try {
       const resp = await fetch("/api/project/save", {
@@ -619,11 +647,20 @@ function App() {
       });
       if (resp.ok) {
         addLog("Project workspace saved.", "success");
+        if (showNotification) {
+          alert("💾 Progress saved successfully!");
+        }
       } else {
         addLog("Failed saving project.", "error");
+        if (showNotification) {
+          alert("❌ Failed to save project progress.");
+        }
       }
     } catch (e) {
       addLog("Connection failed when saving project.", "error");
+      if (showNotification) {
+        alert("❌ Network error: Could not contact local backend.");
+      }
     }
   };
 
@@ -1471,12 +1508,209 @@ function App() {
     );
   }
 
+  if (currentView === "start") {
+    return (
+      <div className="h-full w-full bg-[#07070a] flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans">
+        <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
+          
+          {/* Header Row */}
+          <div className="flex items-center justify-between border-b border-carbon-border/50 pb-6">
+            <div className="flex items-center gap-3.5">
+              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-primary to-purple-800 text-white font-extrabold text-2xl shadow-xl shadow-accent-primary/20">
+                A
+              </div>
+              <div>
+                <h1 className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+                  AutoStitch Studio
+                </h1>
+                <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase mt-0.5">AI-Powered Video Composer • v1.0.0</p>
+              </div>
+            </div>
+
+            {/* License details */}
+            <div className="flex items-center gap-3 bg-carbon-card border border-carbon-border/80 px-4.5 py-2.5 rounded-2xl backdrop-blur-md shadow-lg shadow-black/30">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-tertiary animate-pulse shadow-[0_0_8px_#6cffcc]"></span>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">ACTIVE USER</span>
+                <span className="text-xs font-mono font-bold text-gray-300 mt-1">{licenseStatus.gmail || "osamaaltaf.pk@gmail.com"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Grid Content */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Left Column: Actions */}
+            <div className="flex flex-col gap-6">
+              
+              {/* Card: New Project */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-accent-primary/10 text-accent-primary">
+                    <Icon name="plus" className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-extrabold text-sm text-white uppercase tracking-wider">CREATE NEW PROJECT</h3>
+                </div>
+                
+                <form onSubmit={handleCreateProject} className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest font-mono">Project Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Promo_Video_v1" 
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      required
+                      className="w-full bg-[#07070a] border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-accent-primary to-indigo-600 hover:from-accent-primary hover:to-indigo-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] mt-1"
+                  >
+                    <span>Create Project 🚀</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Card: Quick Creative Onboarding Guide */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-accent-secondary/10 text-accent-secondary">
+                    <Icon name="sparkles" className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">QUICK CREATIVE GUIDE</h3>
+                </div>
+                <ul className="text-xs text-gray-400 flex flex-col gap-2.5 leading-relaxed font-sans mt-1">
+                  <li className="flex gap-2">
+                    <span className="text-accent-secondary font-bold shrink-0">🎬 Step 1:</span>
+                    <span>Create a project, then click <b>Browse Folder 📂</b> in the left panel to scan and load your video clip folder.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent-secondary font-bold shrink-0">🎵 Step 2:</span>
+                    <span>Write sound effect descriptions into the <b>SFX track slots</b> (Lane 2) and hit generate.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent-secondary font-bold shrink-0">🎙️ Step 3:</span>
+                    <span>Write voiceover scripts in <b>Voice track slots</b> (Lane 3), select standard or custom cloned voices, and generate instantly!</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent-secondary font-bold shrink-0">🚀 Step 4:</span>
+                    <span>Preview synchronized playbacks in real-time, then click the top-right <b>RENDER ▶</b> button to export the final master MP4!</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Card: System Developer Credit */}
+              <div className="glass-card p-6 rounded-2xl border border-carbon-border flex flex-col gap-4 bg-[linear-gradient(135deg,rgba(20,22,34,0.4),rgba(124,108,255,0.03))]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center text-white font-extrabold text-base shadow-lg shadow-accent-primary/20">
+                    OA
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">SYSTEM CREATOR</h4>
+                    <p className="text-sm font-extrabold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent font-sans">Osama Altaf</p>
+                  </div>
+                </div>
+                
+                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+                  Professional Fullstack Architect & AI Specialist. Hit me up on Fiverr or WhatsApp for enterprise-level automation tools, custom local AI integrations, and desktop apps.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                  <a href="https://wa.me/923187661096" target="_blank" rel="noopener noreferrer" 
+                     className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all font-mono">
+                    <span>💬 WhatsApp</span>
+                  </a>
+                  <a href="https://www.linkedin.com/in/osamaaltafpk" target="_blank" rel="noopener noreferrer" 
+                     className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 transition-all font-mono">
+                    <span>👔 LinkedIn</span>
+                  </a>
+                  <a href="https://www.fiverr.com/neural_networks" target="_blank" rel="noopener noreferrer" 
+                     className="col-span-2 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-accent-tertiary/20 bg-accent-tertiary/5 hover:bg-accent-tertiary/10 text-accent-tertiary transition-all font-mono">
+                    <span>🛒 Fiverr Profile</span>
+                  </a>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column (Spans 2): Recent Projects List */}
+            <div className="col-span-1 md:col-span-2 flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-carbon-border/50 pb-2">
+                <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">🕒 RECENT PROJECTS ({localProjects.length})</h3>
+                <button 
+                  onClick={fetchLocalProjects}
+                  className="px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-accent-primary text-[10px] font-mono font-bold hover:border-accent-primary transition-all active:scale-[0.98]"
+                >
+                  SYNC DATABASE 🔄
+                </button>
+              </div>
+
+              {localProjects.length === 0 ? (
+                <div className="glass-card p-12 rounded-2xl border border-carbon-border/50 bg-carbon-panel/20 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="w-12 h-12 rounded-full bg-carbon-border/50 flex items-center justify-center text-gray-600">
+                    📂
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-300">No Projects Found</h4>
+                    <p className="text-xs text-gray-500 max-w-[280px] leading-relaxed mt-1">
+                      You haven't initialized any composition projects yet. Enter a name on the left to start!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto pr-2">
+                  {localProjects.map(p => (
+                    <div 
+                      key={p.project_name}
+                      onClick={() => handleSelectProject(p.project_name)}
+                      className="glass-card p-5 rounded-2xl border border-carbon-border/80 hover:border-accent-primary/60 bg-carbon-panel/30 hover:bg-[linear-gradient(135deg,rgba(13,14,20,0.6),rgba(124,108,255,0.04))] flex items-center justify-between cursor-pointer group transition-all"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-11 h-11 rounded-xl bg-accent-primary/5 group-hover:bg-accent-primary/10 flex items-center justify-center text-xl text-accent-primary border border-accent-primary/15 group-hover:scale-105 transition-all">
+                          📂
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-white truncate leading-tight group-hover:text-accent-primary transition-colors">{p.project_name}</h4>
+                          <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 font-mono mt-1 leading-none">
+                            <span>CREATED: {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span className="text-accent-primary/50 group-hover:text-accent-primary/80 transition-colors">SAVED: {new Date(p.updated_at).toLocaleDateString()} {new Date(p.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="w-8 h-8 rounded-full border border-carbon-border flex items-center justify-center text-gray-500 group-hover:text-accent-primary group-hover:border-accent-primary group-hover:translate-x-0.5 transition-all shrink-0">
+                        →
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col select-text text-sm">
       
       {/* ── TOP NAV BAR ── */}
       <nav className="h-14 flex items-center justify-between px-6 bg-carbon-panel border-b border-carbon-border z-10 glass-panel">
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              setCurrentView("start");
+              fetchLocalProjects();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon hover:text-white text-gray-300 text-xs font-semibold font-sans transition-all active:scale-[0.97]"
+            title="Return to Projects Dashboard"
+          >
+            <span>🏠 Projects</span>
+          </button>
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-purple-800 text-white font-extrabold text-lg shadow-lg">
             A
           </div>
@@ -1566,6 +1800,14 @@ function App() {
           </button>
           
           <button 
+            onClick={() => saveProject(null, true)}
+            className="flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 px-3.5 py-2 rounded-lg transition-all text-xs font-bold font-sans active:scale-[0.98]"
+            title="Save Project Progress to Local Database & Disk"
+          >
+            <span>💾 SAVE PROGRESS</span>
+          </button>
+
+          <button 
             onClick={startRender}
             disabled={renderState.status === 'rendering'}
             className="flex items-center gap-2 bg-gradient-to-r from-accent-primary to-indigo-600 hover:from-accent-primary hover:to-indigo-500 text-white font-semibold px-4 py-2 rounded-lg shadow-lg hover:shadow-accent-primary/20 disabled:opacity-50 transition-all"
@@ -1608,12 +1850,6 @@ function App() {
               className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'voice' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
             >
               VOICE
-            </button>
-            <button 
-              onClick={() => setActiveTab("history")}
-              className={`flex-1 py-3 text-center text-[10px] font-semibold ${activeTab === 'history' ? 'text-accent-primary border-b-2 border-accent-primary bg-carbon-card/20' : 'text-gray-500 hover:text-gray-300'}`}
-            >
-              HISTORY
             </button>
           </div>
 
@@ -1867,103 +2103,6 @@ function App() {
               </div>
             )}
 
-            {/* Tab: SQLite Audits & History logs */}
-            {activeTab === 'history' && (
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-carbon-border pb-2.5">
-                  <h3 className="text-xs font-bold font-mono text-gray-400">🕒 USAGE HISTORY LOGS</h3>
-                  <button 
-                    onClick={fetchDbHistory}
-                    className="p-1.5 rounded hover:bg-carbon bg-carbon-card/50 text-[10px] text-accent-primary border border-carbon-border hover:border-accent-primary font-mono font-bold leading-none"
-                    title="Refresh logs from local SQLite DB"
-                  >
-                    SYNC
-                  </button>
-                </div>
-
-                {/* 1. Generations logs */}
-                <div className="flex flex-col gap-2">
-                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider font-mono">Recent Generations ({dbHistory.length})</div>
-                  {dbHistory.length === 0 ? (
-                    <span className="text-[11px] text-gray-600 italic">No generations audit trail found.</span>
-                  ) : (
-                    <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-                      {dbHistory.map(row => (
-                        <div 
-                          key={row.id}
-                          className="p-2 border border-carbon-border/50 bg-[#090a0f]/60 rounded-lg flex flex-col gap-1.5 hover:border-carbon-border transition-all"
-                        >
-                          <div className="flex items-center justify-between text-[8px] font-mono text-gray-500">
-                            <span>{new Date(row.created_at).toLocaleTimeString()}</span>
-                            <span className={`px-1.5 py-0.2 rounded-full border ${row.block_type === 'sfx' ? 'text-accent-secondary border-accent-secondary/20 bg-accent-secondary/5' : 'text-accent-tertiary border-accent-tertiary/20 bg-accent-tertiary/5'}`}>
-                              {row.block_type === 'sfx' ? '🎵 SFX' : '🎤 VOICE'}
-                            </span>
-                          </div>
-                          
-                          <p className="text-[11px] font-mono text-gray-300 line-clamp-2 select-text" title={row.prompt}>
-                            {row.prompt}
-                          </p>
-
-                          <div className="flex items-center justify-between mt-0.5">
-                            <span className={`text-[8px] font-bold uppercase tracking-wider ${row.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              ● {row.status}
-                            </span>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(row.prompt);
-                                addLog(`Copied past prompt to clipboard: "${row.prompt}"`, "success");
-                                if (selectedBlock) {
-                                  handlePromptChange(selectedBlock.lane, selectedBlock.index, row.prompt);
-                                  addLog(`Auto-pasted prompt into selected timeline block!`, "success");
-                                }
-                              }}
-                              className="text-[9px] font-bold text-accent-primary hover:text-white bg-accent-primary/10 hover:bg-accent-primary px-2 py-0.5 border border-accent-primary/20 rounded transition-all"
-                              title="Click to copy and auto-paste into active block"
-                            >
-                              REUSE
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Renders logs */}
-                <div className="flex flex-col gap-2 mt-2">
-                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider font-mono">Recent Render Exports ({dbRenders.length})</div>
-                  {dbRenders.length === 0 ? (
-                    <span className="text-[11px] text-gray-600 italic">No video rendering audits logged yet.</span>
-                  ) : (
-                    <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
-                      {dbRenders.map(row => (
-                        <div 
-                          key={row.id}
-                          className="p-2 border border-carbon-border/50 bg-[#090a0f]/60 rounded-lg flex flex-col gap-1 hover:border-carbon-border transition-all"
-                        >
-                          <div className="flex items-center justify-between text-[8px] font-mono text-gray-500">
-                            <span>{new Date(row.created_at).toLocaleDateString()} {new Date(row.created_at).toLocaleTimeString()}</span>
-                            <span className={`text-[8px] font-bold uppercase tracking-wider ${row.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              ● {row.status}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] font-semibold text-gray-300 truncate">
-                            Project: {row.project_name}
-                          </div>
-
-                          {row.output_path && (
-                            <div className="text-[9px] font-mono text-gray-500 truncate" title={row.output_path}>
-                              Path: {row.output_path.split('\\').pop().split('/').pop()}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
