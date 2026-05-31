@@ -6,6 +6,15 @@
 
 ---
 
+## Standalone Licensing Server Backend
+
+The online, hardware-locked licensing server and key generator dashboard for AutoStitch Studio is maintained in its own dedicated repository:
+👉 **[auto_Stitch_backend](https://github.com/osamaaltaf-pk/auto_Stitch_backend)**
+
+Deploy this backend repository directly to Vercel for the license activation and key generation management system.
+
+---
+
 ## What it does
 
 AutoStitch gives you a three-lane timeline:
