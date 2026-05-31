@@ -2503,7 +2503,8 @@ function App() {
             )}
 
           </div>
-        )}
+        </div>
+      )}
 
         {/* CENTER TIMELINE & RUN CONTROL */}
         <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden">
