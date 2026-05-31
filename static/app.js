@@ -2163,17 +2163,6 @@ function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          {selectedIndices.length > 0 && (
-            <button 
-              onClick={deleteSelectedSlots}
-              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500 text-red-400 px-3 py-2 rounded-lg transition-all text-xs font-semibold font-mono"
-              title="Delete all selected timeline slots"
-            >
-              <Icon name="trash-2" className="w-3.5 h-3.5" />
-              <span>DELETE SELECTED ({selectedIndices.length})</span>
-            </button>
-          )}
-
           <button 
             onClick={() => setShowSettingsModal(true)}
             className="p-2 border border-carbon-border hover:bg-carbon-card/50 text-gray-400 hover:text-white rounded-lg transition-all"
@@ -2824,7 +2813,7 @@ function App() {
               
               {/* RULER TRACK HEADER */}
               <div className="flex h-10 border-b border-carbon-border bg-carbon-panel/60">
-                <div className="w-20 border-r border-carbon-border flex items-center justify-center font-mono text-xs text-gray-300 font-semibold select-none gap-1.5">
+                <div className="w-20 border-r border-carbon-border flex items-center justify-center font-mono text-xs text-gray-300 font-semibold select-none gap-1">
                   <input 
                     type="checkbox"
                     checked={selectedIndices.length === project.video_blocks.length && project.video_blocks.length > 0}
@@ -2832,7 +2821,17 @@ function App() {
                     className="rounded border-carbon-border bg-carbon text-accent-primary focus:ring-0 cursor-pointer"
                     title="Select All Slots"
                   />
-                  <span>TIME</span>
+                  {selectedIndices.length > 0 ? (
+                    <button
+                      onClick={deleteSelectedSlots}
+                      className="text-red-400 hover:text-red-500 transition-colors focus:outline-none flex items-center justify-center cursor-pointer"
+                      title={`Delete selected slots (${selectedIndices.length})`}
+                    >
+                      <Icon name="trash-2" className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <span>TIME</span>
+                  )}
                 </div>
                 
                 <div 
@@ -2879,14 +2878,23 @@ function App() {
                         />
                         <span>{formatTime(i * 5)}s</span>
                         
-                        {/* Quick Insert button inside ruler tick */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); insertBlankSlotAt(i + 1); }}
-                          className="flex items-center justify-center w-5 h-5 rounded-full border border-carbon-border/50 bg-carbon hover:bg-accent-primary hover:border-accent-primary text-gray-400 hover:text-white text-[11px] font-extrabold ml-auto mr-1.5 focus:outline-none transition-all shadow-sm cursor-pointer"
-                          title="Insert blank slot to the right of this column"
-                        >
-                          +
-                        </button>
+                        {/* Quick Insert and Delete buttons inside ruler tick */}
+                        <div className="flex items-center gap-1.5 ml-auto mr-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteSlot(i); }}
+                            className="flex items-center justify-center w-4 h-4 rounded-full border border-red-500/30 bg-carbon hover:bg-red-600 hover:border-red-600 text-red-500 hover:text-white text-[11px] font-extrabold focus:outline-none transition-all shadow-sm cursor-pointer"
+                            title="Delete this column slot sequence"
+                          >
+                            -
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); insertBlankSlotAt(i + 1); }}
+                            className="flex items-center justify-center w-4 h-4 rounded-full border border-carbon-border/50 bg-carbon hover:bg-accent-primary hover:border-accent-primary text-gray-400 hover:text-white text-[11px] font-extrabold focus:outline-none transition-all shadow-sm cursor-pointer"
+                            title="Insert blank slot to the right of this column"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -2980,6 +2988,18 @@ function App() {
                                   <span className="truncate font-semibold text-gray-300 max-w-[80px]">{block.filename}</span>
                                   <span className="font-mono text-gray-500">{block.duration_s.toFixed(1)}s</span>
                                 </div>
+                                {block.file_path && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      clearBlockMedia('video', i);
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-[9px] font-bold shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none z-30"
+                                    title="Clear video slot composition"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
                             );
                           }
@@ -3006,6 +3026,18 @@ function App() {
                                         : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-secondary/40 hover:bg-carbon-card/35')
                                 }`}
                               >
+                                {block.prompt && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      clearBlockMedia('sfx', i);
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-[9px] font-bold shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none z-30"
+                                    title="Clear sfx prompt composition"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                                 <div className="flex-1 flex flex-col gap-1 w-full h-full">
                                   <textarea
                                     value={block.prompt}
@@ -3068,6 +3100,18 @@ function App() {
                                         : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/40 hover:bg-carbon-card/35')
                                 }`}
                               >
+                                {block.prompt && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      clearBlockMedia('voice', i);
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-[9px] font-bold shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none z-30"
+                                    title="Clear voice composition script"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                                 <div className="flex-1 flex flex-col gap-1 w-full h-full">
                                   <textarea
                                     value={block.prompt || ""}
