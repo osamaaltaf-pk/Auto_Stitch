@@ -113,4 +113,41 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Failed to copy: ', err);
     });
   });
+
+  // 5. Dynamic Tab Switching
+  const tabGenerator = document.getElementById('tab-generator');
+  const tabDocs = document.getElementById('tab-docs');
+  const tabDev = document.getElementById('tab-dev');
+
+  const viewGenerator = document.getElementById('generator-form');
+  const viewDocs = document.getElementById('docs-view');
+  const viewDev = document.getElementById('dev-view');
+
+  function switchTab(activeTab, activeView) {
+    // Reset all tabs to inactive classes
+    [tabGenerator, tabDocs, tabDev].forEach(tab => {
+      if (tab) {
+        tab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-gray-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-300';
+      }
+    });
+    // Hide all views
+    [viewGenerator, viewDocs, viewDev].forEach(view => {
+      if (view) view.style.display = 'none';
+    });
+
+    // Set active tab styling
+    activeTab.className = 'flex-1 py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300 bg-accent-primary text-white shadow-lg';
+    // Show active view
+    if (activeView) {
+      if (activeView === viewDev) {
+        activeView.style.display = 'flex';
+      } else {
+        activeView.style.display = 'block'; // Block matches flex-col for forms & docs grids
+      }
+    }
+  }
+
+  if (tabGenerator) tabGenerator.addEventListener('click', () => switchTab(tabGenerator, viewGenerator));
+  if (tabDocs) tabDocs.addEventListener('click', () => switchTab(tabDocs, viewDocs));
+  if (tabDev) tabDev.addEventListener('click', () => switchTab(tabDev, viewDev));
 });
