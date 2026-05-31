@@ -1525,7 +1525,7 @@ function App() {
 
   if (currentView === "guide") {
     return (
-      <div className="h-full w-full bg-[#07070a] flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
+      <div className="h-full w-full bg-carbon flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
         <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
           
           {/* Header Row */}
@@ -1770,7 +1770,7 @@ function App() {
                       value={newProjectName}
                       onChange={(e) => setNewProjectName(e.target.value)}
                       required
-                      className="w-full bg-[#07070a] border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
+                      className="w-full bg-carbon border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
                     />
                   </div>
                   <button 

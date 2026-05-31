@@ -1,10 +1,10 @@
 :root {
-  --bg-color: #07070a;
-  --panel-bg: rgba(13, 14, 20, 0.7);
-  --card-bg: rgba(20, 22, 34, 0.6);
-  --border-color: #1f2235;
-  --text-main: #e2e8f0;
-  --text-muted: #9ca3af;
+  --bg-color: #060814; /* Deep, rich midnight navy matching your dashboard.png mockup */
+  --panel-bg: rgba(10, 12, 26, 0.75); /* Deep translucent blue panel backing */
+  --card-bg: rgba(16, 20, 42, 0.65); /* Elegant deep navy card base */
+  --border-color: #161a38; /* Crisp deep indigo-blue borders matching the dashboard.png mockup */
+  --text-main: #dfe4f5; /* Soft glowing steel-blue main text */
+  --text-muted: #8e9bbd; /* Muted slate-blue text */
   --text-bright: #ffffff;
 }
 
