@@ -91,6 +91,66 @@ body,
 .light-theme .bg-carbon-panel\/40{ background-color: rgba(238, 234, 224, 0.55) !important; }
 .light-theme .bg-carbon-panel\/60{ background-color: rgba(238, 234, 224, 0.70) !important; }
 
+/* ── DARK THEME BACKGROUND OVERRIDES ── */
+:root:not(.light-theme) .bg-carbon-card\/10 { background-color: rgba(20, 22, 34, 0.1) !important; }
+:root:not(.light-theme) .bg-carbon-card\/15 { background-color: rgba(20, 22, 34, 0.15) !important; }
+:root:not(.light-theme) .bg-carbon-card\/20 { background-color: rgba(20, 22, 34, 0.2) !important; }
+:root:not(.light-theme) .bg-carbon-card\/25 { background-color: rgba(20, 22, 34, 0.65) !important; } /* Sleek timeline cards background */
+:root:not(.light-theme) .bg-carbon-card\/30 { background-color: rgba(20, 22, 34, 0.35) !important; }
+:root:not(.light-theme) .bg-carbon-card\/35 { background-color: rgba(20, 22, 34, 0.85) !important; } /* Timeline cards hover */
+:root:not(.light-theme) .bg-carbon-card\/40 { background-color: rgba(20, 22, 34, 0.90) !important; } /* Selected column cardbg */
+:root:not(.light-theme) .bg-carbon-card\/50 { background-color: rgba(20, 22, 34, 0.5) !important; }
+:root:not(.light-theme) .bg-carbon-card\/60 { background-color: rgba(20, 22, 34, 0.6) !important; }
+:root:not(.light-theme) .bg-carbon-card\/70 { background-color: rgba(20, 22, 34, 0.7) !important; }
+:root:not(.light-theme) .bg-carbon-card\/75 { background-color: rgba(20, 22, 34, 0.75) !important; }
+:root:not(.light-theme) .bg-carbon-card\/80 { background-color: rgba(20, 22, 34, 0.8) !important; }
+
+:root:not(.light-theme) .bg-carbon-panel\/10 { background-color: rgba(13, 14, 20, 0.3) !important; }
+:root:not(.light-theme) .bg-carbon-panel\/20 { background-color: rgba(13, 14, 20, 0.2) !important; }
+:root:not(.light-theme) .bg-carbon-panel\/30 { background-color: rgba(13, 14, 20, 0.3) !important; }
+:root:not(.light-theme) .bg-carbon-panel\/40 { background-color: rgba(13, 14, 20, 0.4) !important; }
+:root:not(.light-theme) .bg-carbon-panel\/60 { background-color: rgba(13, 14, 20, 0.6) !important; }
+
+/* ── DARK THEME ADVANCED PANEL GRADIENTS & SHADERS (4-POINT ALIGNMENT) ── */
+/* Point 1: Workspace/Preview Panel - Deep Indigo Radial Shader */
+:root:not(.light-theme) .bg-carbon-panel\/40 {
+  background: radial-gradient(ellipse at 50% -20%, rgba(124, 108, 255, 0.10), rgba(13, 14, 20, 0.7)) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Point 2: Timeline Column Headers (Ruler) & Ruler Tick Shading */
+:root:not(.light-theme) .bg-carbon-panel\/60 {
+  background: linear-gradient(to bottom, rgba(20, 22, 34, 0.85), rgba(13, 14, 20, 0.95)) !important;
+}
+:root:not(.light-theme) .draggable-ruler-tick {
+  background: rgba(255, 255, 255, 0.015) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
+}
+:root:not(.light-theme) .draggable-ruler-tick:hover {
+  background: rgba(124, 108, 255, 0.04) !important;
+}
+
+/* Point 3: Real Time Console Logger - Metallic top border and sleek carbon dock gradient */
+:root:not(.light-theme) div.h-44.bg-carbon-panel {
+  background: linear-gradient(to bottom, rgba(11, 12, 17, 0.96), rgba(7, 7, 10, 0.98)) !important;
+  border-top: 1px solid rgba(124, 108, 255, 0.08) !important;
+  box-shadow: inset 0 8px 24px -8px rgba(124, 108, 255, 0.04) !important;
+}
+
+/* Point 4: Timeline Lanes Container - recessed dark metallic shading */
+:root:not(.light-theme) .bg-carbon-panel\/30 {
+  background: linear-gradient(to bottom, rgba(16, 17, 26, 0.75), rgba(9, 10, 15, 0.90)) !important;
+  box-shadow: inset 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Sidebar Shaders (Left & Right) - Linear Graphite Gradient */
+:root:not(.light-theme) div.w-64.bg-carbon-panel,
+:root:not(.light-theme) div.w-80.bg-carbon-panel {
+  background: linear-gradient(to bottom, rgba(15, 16, 22, 0.88), rgba(11, 12, 17, 0.96)) !important;
+}
+
+
 /* ── LIGHT THEME BORDER OVERRIDES ── */
 .light-theme .border-white\/5    { border-color: rgba(70, 62, 54, 0.06) !important; }
 .light-theme .border-white\/10   { border-color: rgba(70, 62, 54, 0.10) !important; }
