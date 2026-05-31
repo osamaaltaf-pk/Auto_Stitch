@@ -2194,22 +2194,7 @@ function App() {
             )}
           </button>
 
-          <button 
-            onClick={() => setIsSidebarOpen(prev => !prev)}
-            className={`p-2 border rounded-lg transition-all ${isSidebarOpen ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' : 'border-carbon-border text-gray-400 hover:text-white hover:bg-carbon-card/50'}`}
-            title="Toggle Slot Settings Sidebar"
-          >
-            <Icon name="sliders-horizontal" className="w-4 h-4" />
-          </button>
 
-          <button 
-            onClick={addBlankSlot}
-            className="flex items-center gap-1.5 border border-accent-primary/50 hover:bg-accent-primary/10 text-accent-primary px-3 py-2 rounded-lg transition-all text-xs font-semibold"
-            title="Add blank timeline slot"
-          >
-            <Icon name="plus" className="w-3.5 h-3.5" />
-            <span>+ ADD SLOT</span>
-          </button>
           
           <button 
             onClick={() => saveProject(null, true)}
