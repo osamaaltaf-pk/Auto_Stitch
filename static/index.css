@@ -1,249 +1,175 @@
+/* ============================================================
+   AutoStitch Studio — Global Stylesheet
+   Dark theme precisely matched to dashboard.png mockup
+   ============================================================ */
+
 :root {
-  --bg-color: #060814; /* Deep, rich midnight navy matching your dashboard.png mockup */
-  --panel-bg: rgba(10, 12, 26, 0.75); /* Deep translucent blue panel backing */
-  --card-bg: rgba(16, 20, 42, 0.65); /* Elegant deep navy card base */
-  --border-color: #161a38; /* Crisp deep indigo-blue borders matching the dashboard.png mockup */
-  --text-main: #dfe4f5; /* Soft glowing steel-blue main text */
-  --text-muted: #8e9bbd; /* Muted slate-blue text */
-  --text-bright: #ffffff;
+  /* ── DARK THEME (default, matches dashboard.png exactly) ── */
+  --bg-color:     #0b0c14;          /* Main deep cool navy-black canvas */
+  --panel-bg:     #0f1019;          /* Left/right sidebar panel - slightly lighter navy */
+  --card-bg:      #13151f;          /* Card surfaces inside panels */
+  --border-color: #1e2040;          /* Crisp subtle indigo-blue borders */
+  --text-main:    #e2e8f0;          /* Soft near-white main text */
+  --text-muted:   #8892aa;          /* Muted steel-blue secondary text */
+  --text-bright:  #ffffff;
 }
 
 .light-theme {
-  --bg-color: #f7f5f0; /* Soothing warm oatmeal/linen canvas - zero blue light strain */
-  --panel-bg: rgba(244, 242, 234, 0.75); /* Translucent warm sand panel backing */
-  --card-bg: rgba(255, 255, 255, 0.85); /* Premium ivory-white card base */
-  --border-color: rgba(90, 80, 70, 0.09); /* Soft warm earth borders */
-  --text-main: #3e382f; /* Premium warm graphite main text */
-  --text-muted: #736b5e; /* Elegant warm taupe muted text */
-  --text-bright: #1c1a16; /* Deep dark charcoal for high emphasis headers */
+  /* ── LIGHT THEME — soft warm oatmeal/linen, zero glare ── */
+  --bg-color:     #f5f3ee;
+  --panel-bg:     rgba(241, 238, 230, 0.85);
+  --card-bg:      rgba(255, 255, 255, 0.90);
+  --border-color: rgba(80, 70, 60, 0.10);
+  --text-main:    #3a342c;
+  --text-muted:   #706860;
+  --text-bright:  #1a1814;
 }
 
+/* ── BASE BODY ── */
 body {
   background-color: var(--bg-color);
   color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Specific Light Theme Override Rules for standard text classes */
-.light-theme .text-white {
-  color: #1c1a16 !important; /* Deep dark charcoal */
-}
-.light-theme .text-gray-100 {
-  color: #2d2822 !important;
-}
-.light-theme .text-gray-200 {
-  color: #3e382f !important; /* Warm graphite */
-}
-.light-theme .text-gray-300 {
-  color: #554e43 !important;
-}
-.light-theme .text-gray-400 {
-  color: #736b5e !important; /* Warm taupe */
-}
-.light-theme .text-gray-500 {
-  color: #8c8273 !important;
-}
-.light-theme .text-gray-600 {
-  color: #9d9282 !important;
-}
-.light-theme .bg-black\/40 {
-  background-color: rgba(90, 80, 70, 0.04) !important;
-}
-.light-theme .bg-black\/10 {
-  background-color: rgba(90, 80, 70, 0.02) !important;
-}
-.light-theme .bg-\[\#07070a\] {
-  background-color: #eceae1 !important; /* Soft warm gray base */
-}
-.light-theme .bg-\[\#090a0f\] {
-  background-color: #f4f2ea !important; /* Warm sand inputs */
-}
-.light-theme .bg-\[\#0c0d13\]\/85 {
-  background-color: rgba(247, 245, 240, 0.95) !important;
-}
-.light-theme .bg-carbon-card\/50 {
-  background-color: rgba(255, 255, 255, 0.5) !important;
-}
-.light-theme .bg-carbon-panel\/20 {
-  background-color: rgba(244, 242, 234, 0.3) !important;
-}
-.light-theme .bg-carbon-panel\/40 {
-  background-color: rgba(244, 242, 234, 0.55) !important;
-}
-.light-theme .border-white\/5 {
-  border-color: rgba(90, 80, 70, 0.06) !important;
-}
-.light-theme .border-white\/10 {
-  border-color: rgba(90, 80, 70, 0.08) !important;
-}
-.light-theme .border-carbon-border\/50 {
-  border-color: rgba(90, 80, 70, 0.05) !important;
-}
+/* ── LIGHT THEME TEXT OVERRIDES ── */
+.light-theme .text-white         { color: #1a1814 !important; }
+.light-theme .text-gray-100      { color: #2a2520 !important; }
+.light-theme .text-gray-200      { color: #3a342c !important; }
+.light-theme .text-gray-300      { color: #504840 !important; }
+.light-theme .text-gray-400      { color: #706860 !important; }
+.light-theme .text-gray-500      { color: #887e72 !important; }
+.light-theme .text-gray-600      { color: #9a9082 !important; }
+.light-theme .text-emerald-400   { color: #047857 !important; }
+.light-theme .text-red-400       { color: #b91c1c !important; }
+
+/* ── LIGHT THEME BACKGROUND OVERRIDES ── */
+.light-theme .bg-black\/40       { background-color: rgba(80, 70, 60, 0.04) !important; }
+.light-theme .bg-black\/10       { background-color: rgba(80, 70, 60, 0.02) !important; }
+.light-theme .bg-black\/60       { background-color: rgba(80, 70, 60, 0.06) !important; }
+.light-theme .bg-carbon          { background-color: var(--bg-color) !important; }
+.light-theme .bg-carbon-card\/50 { background-color: rgba(255, 255, 255, 0.55) !important; }
+.light-theme .bg-carbon-panel\/20{ background-color: rgba(241, 238, 230, 0.35) !important; }
+.light-theme .bg-carbon-panel\/40{ background-color: rgba(241, 238, 230, 0.55) !important; }
+
+/* ── LIGHT THEME BORDER OVERRIDES ── */
+.light-theme .border-white\/5    { border-color: rgba(80, 70, 60, 0.06) !important; }
+.light-theme .border-white\/10   { border-color: rgba(80, 70, 60, 0.09) !important; }
+.light-theme .border-carbon-border\/50 { border-color: rgba(80, 70, 60, 0.05) !important; }
+
+/* ── LIGHT THEME GLASS OVERRIDES ── */
 .light-theme .glass-panel {
-  background: rgba(244, 242, 234, 0.8) !important;
-  border-color: rgba(90, 80, 70, 0.07) !important;
-  box-shadow: 0 4px 20px rgba(90, 80, 70, 0.02) !important;
+  background: rgba(241, 238, 230, 0.85) !important;
+  border-color: rgba(80, 70, 60, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(80, 70, 60, 0.02) !important;
 }
 .light-theme .glass-card {
-  background: rgba(255, 255, 255, 0.75) !important;
-  border-color: rgba(90, 80, 70, 0.07) !important;
-  box-shadow: 0 4px 12px rgba(90, 80, 70, 0.01) !important;
+  background: rgba(255, 255, 255, 0.80) !important;
+  border-color: rgba(80, 70, 60, 0.08) !important;
 }
 .light-theme .glass-card:hover {
   border-color: rgba(124, 108, 255, 0.45) !important;
-  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.05) !important;
+  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.06) !important;
+}
+.light-theme .mixer-fader {
+  background: rgba(241, 238, 230, 0.7) !important;
+  border-color: rgba(80, 70, 60, 0.10) !important;
 }
 
-/* Light Theme overrides for timeline tracks, scrollbars, and logs */
+/* ── LIGHT THEME TIMELINE ── */
 .light-theme .timeline-lane-track {
-  background-image: linear-gradient(to right, rgba(90, 80, 70, 0.04) 1px, transparent 1px) !important;
+  background-image: linear-gradient(to right, rgba(80, 70, 60, 0.04) 1px, transparent 1px) !important;
 }
 .light-theme .timeline-ruler {
-  background-image: linear-gradient(to right, rgba(90, 80, 70, 0.07) 1px, transparent 1px) !important;
-}
-.light-theme ::-webkit-scrollbar-track {
-  background: rgba(244, 242, 234, 0.5) !important;
-}
-.light-theme ::-webkit-scrollbar-thumb {
-  background: rgba(124, 108, 255, 0.15) !important;
-}
-.light-theme ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 108, 255, 0.35) !important;
-}
-.light-theme .text-emerald-400 {
-  color: #047857 !important; /* Soothing deep forest emerald */
-}
-.light-theme .text-red-400 {
-  color: #b91c1c !important; /* Deep cherry red */
-}
-.light-theme .text-gray-300 {
-  color: #3e382f !important; /* Highly readable warm charcoal */
+  background-image: linear-gradient(to right, rgba(80, 70, 60, 0.07) 1px, transparent 1px) !important;
 }
 
-/* Elegant custom scrollbar designed for timeline */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+/* ── LIGHT THEME SCROLLBAR ── */
+.light-theme ::-webkit-scrollbar-track { background: rgba(241, 238, 230, 0.5) !important; }
+.light-theme ::-webkit-scrollbar-thumb { background: rgba(124, 108, 255, 0.15) !important; }
+.light-theme ::-webkit-scrollbar-thumb:hover { background: rgba(124, 108, 255, 0.35) !important; }
 
-::-webkit-scrollbar-track {
-  background: rgba(7, 7, 10, 0.5);
-  border-radius: 4px;
-}
+/* ──────────────────────────────────────────────────── */
+/* GLOBAL COMPONENT STYLES                              */
+/* ──────────────────────────────────────────────────── */
 
-::-webkit-scrollbar-thumb {
-  background: rgba(124, 108, 255, 0.2);
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
+/* Elegant custom scrollbar */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: rgba(11, 12, 20, 0.5); border-radius: 4px; }
+::-webkit-scrollbar-thumb  { background: rgba(124, 108, 255, 0.25); border-radius: 4px; transition: all 0.3s ease; }
+::-webkit-scrollbar-thumb:hover { background: rgba(124, 108, 255, 0.55); }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 108, 255, 0.5);
-}
-
-/* Glassmorphism styling helpers */
+/* ── GLASS PANEL (navbar, sidebars) ── */
 .glass-panel {
-  background: rgba(13, 14, 20, 0.7);
+  background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
 }
 
+/* ── GLASS CARD (content cards) ── */
 .glass-card {
-  background: rgba(20, 22, 34, 0.6);
+  background: var(--card-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .glass-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(124, 108, 255, 0.3);
-  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.1);
+  border-color: rgba(124, 108, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.12);
 }
 
-/* Glow highlights for selected elements */
+/* ── GLOW ACTIVE ── */
 .glow-active {
   box-shadow: 0 0 15px rgba(124, 108, 255, 0.25);
   border-color: rgba(124, 108, 255, 0.6) !important;
 }
 
-/* Status indicator glows & animation pulses */
+/* ── STATUS PULSES ── */
 @keyframes generating-pulse {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
-  }
-  50% {
-    opacity: 0.4;
-    box-shadow: 0 0 2px rgba(251, 191, 36, 0.2);
-  }
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(251, 191, 36, 0.6); }
+  50%       { opacity: 0.4; box-shadow: 0 0 2px rgba(251, 191, 36, 0.2); }
 }
-
 .status-generating {
   animation: generating-pulse 1.5s infinite ease-in-out;
   border-color: rgba(251, 191, 36, 0.5) !important;
   background: rgba(251, 191, 36, 0.04) !important;
 }
-
-.status-done {
-  border-color: rgba(16, 185, 129, 0.4) !important;
-  background: rgba(16, 185, 129, 0.03) !important;
-}
-
-.status-provided {
-  border-color: rgba(6, 182, 212, 0.4) !important;
-  background: rgba(6, 182, 212, 0.03) !important;
-}
+.status-done     { border-color: rgba(16, 185, 129, 0.4) !important; background: rgba(16, 185, 129, 0.03) !important; }
+.status-provided { border-color: rgba(6, 182, 212, 0.4)  !important; background: rgba(6, 182, 212, 0.03)  !important; }
 
 @keyframes error-blink {
-  0%, 100% {
-    border-color: rgba(239, 68, 68, 0.4);
-    background: rgba(239, 68, 68, 0.03);
-  }
-  50% {
-    border-color: rgba(239, 68, 68, 0.8);
-    background: rgba(239, 68, 68, 0.1);
-  }
+  0%, 100% { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03); }
+  50%       { border-color: rgba(239, 68, 68, 0.8); background: rgba(239, 68, 68, 0.10); }
 }
+.status-error { animation: error-blink 2s infinite ease-in-out; }
 
-.status-error {
-  animation: error-blink 2s infinite ease-in-out;
-}
-
-/* Grid & Timeline timeline lane track overlays */
+/* ── TIMELINE LANE TRACKS ── */
 .timeline-lane-track {
   background-size: 146px 100%;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
   position: relative;
 }
-
-/* Ruler tick indicator styling */
 .timeline-ruler {
   background-size: 146px 100%;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
 }
 
-/* Horizontal scrolling alignment */
-.sync-scroll-container {
-  scrollbar-width: none; /* Firefox */
-}
+/* ── HORIZONTAL SYNC SCROLL ── */
+.sync-scroll-container { scrollbar-width: none; }
+.sync-scroll-container::-webkit-scrollbar { display: none; }
 
-.sync-scroll-container::-webkit-scrollbar {
-  display: none; /* Safari & Chrome */
-}
-
-/* Interactive custom slider style */
+/* ── RANGE SLIDER ── */
 input[type="range"].custom-slider {
   -webkit-appearance: none;
   appearance: none;
-  background: #1f2235;
+  background: var(--border-color);
   height: 4px;
   border-radius: 2px;
   outline: none;
 }
-
 input[type="range"].custom-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -255,119 +181,64 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
   box-shadow: 0 0 8px rgba(124, 108, 255, 0.5);
   transition: transform 0.1s ease;
 }
+input[type="range"].custom-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-input[type="range"].custom-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-
-/* Draggable Timeline columns style */
-.draggable-ruler-tick {
-  cursor: grab;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.draggable-ruler-tick:active {
-  cursor: grabbing;
-}
-
+/* ── DRAGGABLE RULER ── */
+.draggable-ruler-tick { cursor: grab; transition: background-color 0.2s ease, border-color 0.2s ease; }
+.draggable-ruler-tick:active { cursor: grabbing; }
 .drag-over-column {
   border-left: 2px dashed #7c6cff !important;
   background: rgba(124, 108, 255, 0.08) !important;
 }
 
-/* Glowing Vertical Insertion Divider */
+/* ── INSERT DIVIDER ── */
 .timeline-insert-divider {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 10px;
-  cursor: pointer;
-  z-index: 30;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  position: absolute; top: 0; bottom: 0; width: 10px;
+  cursor: pointer; z-index: 30; transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; opacity: 0; transition: opacity 0.2s ease;
 }
-
 .timeline-insert-divider::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
+  content: ''; position: absolute; top: 0; bottom: 0; width: 2px;
   background: linear-gradient(to bottom, #7c6cff, #ff6c9d);
   box-shadow: 0 0 8px #7c6cff;
 }
-
-.timeline-insert-divider:hover {
-  opacity: 1;
-}
+.timeline-insert-divider:hover { opacity: 1; }
 
 .timeline-insert-button {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  width: 20px; height: 20px; border-radius: 50%;
   background: linear-gradient(to right, #7c6cff, #ff6c9d);
-  border: 1.5px solid #07070a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 14px;
-  font-weight: 800;
+  border: 1.5px solid var(--bg-color);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 14px; font-weight: 800;
   box-shadow: 0 0 10px rgba(124, 108, 255, 0.8);
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+.timeline-insert-button:hover { transform: scale(1.25); }
 
-.timeline-insert-button:hover {
-  transform: scale(1.25);
-}
-
-/* Mixer Faders aesthetic */
+/* ── MIXER FADER ── */
 .mixer-fader {
-  background: #141622;
-  border: 1px solid #1f2235;
-  border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px;
   transition: all 0.2s ease;
 }
-
 .mixer-fader:hover {
-  border-color: #7c6cff/30;
-  background: rgba(20, 22, 34, 0.9);
+  border-color: rgba(124, 108, 255, 0.3);
+  background: var(--panel-bg);
 }
 
-/* Animated wave pulse for beautiful synced audio previewer card */
+/* ── ANIMATIONS ── */
 @keyframes wave-pulse {
-  0% {
-    transform: scaleY(0.2);
-    opacity: 0.4;
-  }
-  100% {
-    transform: scaleY(1.0);
-    opacity: 1;
-  }
+  0%   { transform: scaleY(0.2); opacity: 0.4; }
+  100% { transform: scaleY(1.0); opacity: 1.0; }
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
-
 .animate-fade-in {
   animation: fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
-
