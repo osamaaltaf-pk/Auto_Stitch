@@ -9,13 +9,13 @@
 }
 
 .light-theme {
-  --bg-color: #eceff4;
-  --panel-bg: rgba(255, 255, 255, 0.75);
-  --card-bg: rgba(255, 255, 255, 0.95);
-  --border-color: rgba(31, 34, 53, 0.08);
-  --text-main: #2d3748;
-  --text-muted: #5a6578;
-  --text-bright: #1a202c;
+  --bg-color: #f7f5f0; /* Soothing warm oatmeal/linen canvas - zero blue light strain */
+  --panel-bg: rgba(244, 242, 234, 0.75); /* Translucent warm sand panel backing */
+  --card-bg: rgba(255, 255, 255, 0.85); /* Premium ivory-white card base */
+  --border-color: rgba(90, 80, 70, 0.09); /* Soft warm earth borders */
+  --text-main: #3e382f; /* Premium warm graphite main text */
+  --text-muted: #736b5e; /* Elegant warm taupe muted text */
+  --text-bright: #1c1a16; /* Deep dark charcoal for high emphasis headers */
 }
 
 body {
@@ -26,67 +26,98 @@ body {
 
 /* Specific Light Theme Override Rules for standard text classes */
 .light-theme .text-white {
-  color: #111827 !important;
+  color: #1c1a16 !important; /* Deep dark charcoal */
 }
 .light-theme .text-gray-100 {
-  color: #1f2937 !important;
+  color: #2d2822 !important;
 }
 .light-theme .text-gray-200 {
-  color: #2d3748 !important;
+  color: #3e382f !important; /* Warm graphite */
 }
 .light-theme .text-gray-300 {
-  color: #4a5568 !important;
+  color: #554e43 !important;
 }
 .light-theme .text-gray-400 {
-  color: #5a6578 !important;
+  color: #736b5e !important; /* Warm taupe */
 }
 .light-theme .text-gray-500 {
-  color: #718096 !important;
+  color: #8c8273 !important;
+}
+.light-theme .text-gray-600 {
+  color: #9d9282 !important;
 }
 .light-theme .bg-black\/40 {
-  background-color: rgba(0, 0, 0, 0.04) !important;
+  background-color: rgba(90, 80, 70, 0.04) !important;
 }
 .light-theme .bg-black\/10 {
-  background-color: rgba(0, 0, 0, 0.02) !important;
+  background-color: rgba(90, 80, 70, 0.02) !important;
 }
-.light-theme .bg-[#07070a] {
-  background-color: #f7f9fc !important;
+.light-theme .bg-\[\#07070a\] {
+  background-color: #eceae1 !important; /* Soft warm gray base */
 }
-.light-theme .bg-[#090a0f] {
-  background-color: #ffffff !important;
+.light-theme .bg-\[\#090a0f\] {
+  background-color: #f4f2ea !important; /* Warm sand inputs */
 }
-.light-theme .bg-[#0c0d13]\/85 {
-  background-color: rgba(255, 255, 255, 0.9) !important;
+.light-theme .bg-\[\#0c0d13\]\/85 {
+  background-color: rgba(247, 245, 240, 0.95) !important;
 }
 .light-theme .bg-carbon-card\/50 {
   background-color: rgba(255, 255, 255, 0.5) !important;
 }
 .light-theme .bg-carbon-panel\/20 {
-  background-color: rgba(255, 255, 255, 0.25) !important;
+  background-color: rgba(244, 242, 234, 0.3) !important;
 }
 .light-theme .bg-carbon-panel\/40 {
-  background-color: rgba(255, 255, 255, 0.45) !important;
+  background-color: rgba(244, 242, 234, 0.55) !important;
 }
 .light-theme .border-white\/5 {
-  border-color: rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(90, 80, 70, 0.06) !important;
 }
 .light-theme .border-white\/10 {
-  border-color: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(90, 80, 70, 0.08) !important;
 }
 .light-theme .border-carbon-border\/50 {
-  border-color: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(90, 80, 70, 0.05) !important;
 }
 .light-theme .glass-panel {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(0, 0, 0, 0.06) !important;
+  background: rgba(244, 242, 234, 0.8) !important;
+  border-color: rgba(90, 80, 70, 0.07) !important;
+  box-shadow: 0 4px 20px rgba(90, 80, 70, 0.02) !important;
 }
 .light-theme .glass-card {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(90, 80, 70, 0.07) !important;
+  box-shadow: 0 4px 12px rgba(90, 80, 70, 0.01) !important;
 }
 .light-theme .glass-card:hover {
-  border-color: rgba(124, 108, 255, 0.4) !important;
-  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.03) !important;
+  border-color: rgba(124, 108, 255, 0.45) !important;
+  box-shadow: 0 8px 24px rgba(124, 108, 255, 0.05) !important;
+}
+
+/* Light Theme overrides for timeline tracks, scrollbars, and logs */
+.light-theme .timeline-lane-track {
+  background-image: linear-gradient(to right, rgba(90, 80, 70, 0.04) 1px, transparent 1px) !important;
+}
+.light-theme .timeline-ruler {
+  background-image: linear-gradient(to right, rgba(90, 80, 70, 0.07) 1px, transparent 1px) !important;
+}
+.light-theme ::-webkit-scrollbar-track {
+  background: rgba(244, 242, 234, 0.5) !important;
+}
+.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(124, 108, 255, 0.15) !important;
+}
+.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 108, 255, 0.35) !important;
+}
+.light-theme .text-emerald-400 {
+  color: #047857 !important; /* Soothing deep forest emerald */
+}
+.light-theme .text-red-400 {
+  color: #b91c1c !important; /* Deep cherry red */
+}
+.light-theme .text-gray-300 {
+  color: #3e382f !important; /* Highly readable warm charcoal */
 }
 
 /* Elegant custom scrollbar designed for timeline */
