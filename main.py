@@ -1268,7 +1268,14 @@ async def serve_video(path: str):
 async def serve_index():
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(index_path)
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            }
+        )
     else:
         return HTMLResponse("<h2>AutoStitch Studio UI placeholder. Serve static files index.html to show full SPA editor.</h2>")
 
