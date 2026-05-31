@@ -1,5 +1,5 @@
 -- =========================================================================
---  OMNI AUTOMATOR — SUPABASE DATABASE SCHEMA
+--  AUTOSTITCH STUDIO — SUPABASE DATABASE SCHEMA
 --  Copy and paste this script directly into the Supabase SQL Editor!
 -- =========================================================================
 
@@ -50,7 +50,7 @@ ON CONFLICT (license_key) DO NOTHING;
 --  1. Log in to your Supabase Dashboard, go to Settings -> API.
 --  2. Copy your "Project URL" and "service_role" (secret) API key.
 --
---  3. Log in to your Vercel Dashboard, select your deployed "Omni Automator" app.
+--  3. Log in to your Vercel Dashboard, select your deployed "auto_Stitch_backend" app.
 --  4. Go to Settings -> Environment Variables and add these THREE variables:
 --
 --     * Variable 1: SUPABASE_URL

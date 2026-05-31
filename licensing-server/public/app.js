@@ -1,4 +1,4 @@
-// --- Omni Automator Client Interactions & API Dispatcher ---
+// --- AutoStitch Studio Client Interactions & API Dispatcher ---
 
 document.addEventListener('DOMContentLoaded', () => {
   const selectPlan = document.getElementById('select-plan');

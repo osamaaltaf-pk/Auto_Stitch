@@ -5,7 +5,7 @@ This repository houses the standalone, production-ready licensing server and web
 Designed for 100% serverless hosting on Vercel, it uses serverless Node.js endpoints and a Supabase PostgreSQL database to handle secure key generation, monthly activation, device-locking (motherboard UUID validation), and expiration verification.
 
 ## Features
-* 🔑 **"Omni Automator" Key Generator Portal**: A premium, secure visual dashboard for administrators to generate new monthly licenses, track customer emails, and review active hardware fingerprints.
+* 🔑 **"AutoStitch Studio" Key Generator Portal**: A premium, secure visual dashboard for administrators to generate new monthly licenses, track customer emails, and review active hardware fingerprints.
 * 🔒 **Cryptographic Device Locking**: Pairs each license key uniquely with the user's motherboard UUID to prevent key-sharing and abuse.
 * ⚡ **Serverless Endpoints**: Fully optimized for Vercel functions:
   * `/api/generate-key` — Admin monthly key creation.
