@@ -4,14 +4,14 @@
    ============================================================ */
 
 :root {
-  /* ── DARK THEME (default, matches dashboard.png exactly) ── */
-  --bg-color:     #0b0c14;          /* Main deep cool navy-black canvas */
-  --panel-bg:     #10121e;          /* Left/right sidebar panel - clearly visible navy */
-  --card-bg:      #14172a;          /* Card surfaces inside panels */
-  --border-color: #2a2f5a;          /* Bright indigo-blue borders — clearly visible */
-  --border-subtle:#1c2044;          /* Subtler inner borders */
-  --text-main:    #e8eaf6;          /* Crisp near-white main text */
-  --text-muted:   #9ba5c4;          /* Clearly readable muted text */
+  /* ── DARK THEME — matches dashboard.png deep navy-blue exactly ── */
+  --bg-color:     #070a1c;   /* Deep space navy — R7 G10 B28, clearly blue */
+  --panel-bg:     #0c1028;   /* Sidebar navy — distinctly blue panel */
+  --card-bg:      #101530;   /* Card surfaces — rich midnight blue */
+  --border-color: #252d5c;   /* Vivid indigo borders — clearly visible */
+  --border-subtle:#182048;   /* Inner subtle blue borders */
+  --text-main:    #e8eaf6;   /* Crisp near-white main text */
+  --text-muted:   #8fa0cc;   /* Steel-blue muted text */
   --text-bright:  #ffffff;
 }
 
@@ -27,9 +27,11 @@
   --text-bright:  #1a1814;
 }
 
-/* ── BASE BODY ── */
-body {
-  background-color: var(--bg-color);
+/* ── BASE — force full viewport navy color ── */
+html,
+body,
+#root {
+  background-color: var(--bg-color) !important;
   color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
