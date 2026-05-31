@@ -1529,7 +1529,7 @@ function App() {
         <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
           
           {/* Header Row */}
-          <div className="flex items-center justify-between border-b border-carbon-border/50 pb-6">
+          <div className="flex items-center justify-between border-b border-carbon-border/80 pb-6">
             <div className="flex items-center gap-3.5">
               <button 
                 onClick={() => setCurrentView("start")}
@@ -1699,7 +1699,7 @@ function App() {
         <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
           
           {/* Header Row */}
-          <div className="flex items-center justify-between border-b border-carbon-border/50 pb-6">
+          <div className="flex items-center justify-between border-b border-carbon-border/80 pb-6">
             <div className="flex items-center gap-3.5">
               <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-primary to-purple-800 text-white font-extrabold text-2xl shadow-xl shadow-accent-primary/20">
                 A
@@ -1821,7 +1821,7 @@ function App() {
               
               {/* Card 1: Recent Projects Grid */}
               <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-carbon-border/50 pb-2">
+                <div className="flex items-center justify-between border-b border-carbon-border/80 pb-2">
                   <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">🕒 RECENT PROJECTS ({localProjects.length})</h3>
                   <button 
                     onClick={fetchLocalProjects}
@@ -2392,7 +2392,7 @@ function App() {
         <div className="flex-1 flex flex-col min-w-0 bg-carbon overflow-hidden">
           
           {/* ── UPPER PART: MASTER MEDIA PREVIEWER & AUDIO COMPOSER MIXER ── */}
-          <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/20 p-5 flex flex-col items-center justify-center gap-4 select-text">
+          <div className="shrink-0 border-b border-carbon-border bg-carbon-panel/40 p-5 flex flex-col items-center justify-center gap-4 select-text">
             
             {/* Centered Video Screen Section */}
             <div className="w-[600px] h-[280px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
@@ -2656,7 +2656,7 @@ function App() {
               
               {/* RULER TRACK HEADER */}
               <div className="flex h-10 border-b border-carbon-border bg-carbon-panel/60">
-                <div className="w-20 border-r border-carbon-border flex items-center justify-center font-mono text-xs text-gray-500 font-semibold select-none gap-1.5">
+                <div className="w-20 border-r border-carbon-border flex items-center justify-center font-mono text-xs text-gray-300 font-semibold select-none gap-1.5">
                   <input 
                     type="checkbox"
                     checked={selectedIndices.length === project.video_blocks.length && project.video_blocks.length > 0}
@@ -2698,7 +2698,7 @@ function App() {
                           setDragOverIndex(null);
                         }}
                         style={{ width: '140px', minWidth: '140px' }}
-                        className={`h-full border-r border-carbon-border/30 flex items-center pl-2 font-mono text-[10px] text-gray-500 select-none gap-1.5 draggable-ruler-tick ${dragOverIndex === i && draggedIndex !== i ? 'bg-accent-primary/20 border-l-2 border-accent-primary' : 'hover:bg-carbon-card/30'}`}
+                        className={`h-full border-r border-carbon-border/60 flex items-center pl-2 font-mono text-[10px] text-gray-400 select-none gap-1.5 draggable-ruler-tick ${dragOverIndex === i && draggedIndex !== i ? 'bg-accent-primary/20 border-l-2 border-accent-primary' : 'hover:bg-carbon-card/30'}`}
                         title="Drag to reposition sequence"
                       >
                         <input 
@@ -2858,7 +2858,7 @@ function App() {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 </div>
-                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20">
+                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/40">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2920,7 +2920,7 @@ function App() {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 </div>
-                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/20 gap-1">
+                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/40 gap-1">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2956,7 +2956,7 @@ function App() {
                 })}
 
                 {/* + ADD LAYER MENU ROW */}
-                <div className="flex h-10 border-b border-carbon-border bg-carbon-card/5 select-none items-center justify-start px-4 gap-2">
+                <div className="flex h-10 border-b border-carbon-border bg-carbon-card/15 select-none items-center justify-start px-4 gap-2">
                   <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">Lanes Area</span>
                   <div className="flex gap-2 ml-4">
                     <button
@@ -3084,7 +3084,7 @@ function App() {
                       </div>
 
                       {/* Video Manual Upload and Clear actions */}
-                      <div className="flex flex-col gap-2 border-t border-carbon-border/40 pt-4 mt-2">
+                      <div className="flex flex-col gap-2 border-t border-carbon-border/60 pt-4 mt-2">
                         <span className="text-[10px] font-bold font-mono text-gray-500">MANUAL COMPOSITION</span>
                         <input 
                           type="file" 
@@ -3165,7 +3165,7 @@ function App() {
                   )}
 
                   {/* Slot Removal Action */}
-                  <div className="border-t border-carbon-border/40 pt-4 mt-auto flex flex-col gap-2">
+                  <div className="border-t border-carbon-border/60 pt-4 mt-auto flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => insertBlankSlotAt(selectedBlock.index)}
@@ -3407,7 +3407,7 @@ function SfxController({ index, block, project, onPromptChange, onSaveProject, o
       )}
 
       {/* SFX Prompt TXT Import */}
-      <div className="flex flex-col gap-2 border-t border-carbon-border/40 pt-4 mt-2">
+      <div className="flex flex-col gap-2 border-t border-carbon-border/60 pt-4 mt-2">
         <span className="text-[10px] font-bold font-mono text-gray-500">IMPORT PROMPTS</span>
         <input 
           type="file" 
@@ -3520,7 +3520,7 @@ function VoiceController({ index, block, project, onPromptChange, onVoiceChange,
       )}
 
       {/* Voice Prompt TXT Import */}
-      <div className="flex flex-col gap-2 border-t border-carbon-border/40 pt-4 mt-2">
+      <div className="flex flex-col gap-2 border-t border-carbon-border/60 pt-4 mt-2">
         <span className="text-[10px] font-bold font-mono text-gray-500">IMPORT SCRIPT</span>
         <input 
           type="file" 
