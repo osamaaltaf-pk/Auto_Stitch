@@ -611,8 +611,22 @@ function App() {
   const handleVideoSeek = () => {
     if (videoRef.current) {
       const curr = videoRef.current.currentTime;
-      if (voiceAudioRef.current) voiceAudioRef.current.currentTime = curr;
-      if (sfxAudioRef.current) sfxAudioRef.current.currentTime = curr;
+      const isVideoPlaying = !videoRef.current.paused;
+      
+      if (voiceAudioRef.current) {
+        const diff = Math.abs(voiceAudioRef.current.currentTime - curr);
+        // Only set playhead if paused (scrubbing) or if the sync drift is significant (> 0.4s)
+        // to avoid constant micro-seeks that cause buffer thrashing and "tik-tik" audio crackling.
+        if (!isVideoPlaying || diff > 0.4) {
+          voiceAudioRef.current.currentTime = curr;
+        }
+      }
+      if (sfxAudioRef.current) {
+        const diff = Math.abs(sfxAudioRef.current.currentTime - curr);
+        if (!isVideoPlaying || diff > 0.4) {
+          sfxAudioRef.current.currentTime = curr;
+        }
+      }
     }
   };
 
