@@ -904,7 +904,23 @@ async def list_available_voices():
                 return {"voices": sorted(list(set(default_voices + server_voices)))}
     except Exception as e:
         logger.warning(f"Failed contacting PocketTTS voices API: {e}")
+    
+    # Scanning local Pocket_tts/uploaded_voices folder as fallback
+    try:
+        uploaded_dir = Path(__file__).resolve().parent / "Pocket_tts" / "uploaded_voices"
+        local_custom_voices = []
+        if uploaded_dir.exists():
+            for f in uploaded_dir.glob("*"):
+                if f.suffix.lower() in [".wav", ".mp3", ".flac", ".ogg", ".safetensors"]:
+                    local_custom_voices.append(f.stem)
+            # Combine and remove duplicates cleanly
+            all_voices = sorted(list(set(default_voices + local_custom_voices)))
+            return {"voices": all_voices}
+    except Exception as local_err:
+        logger.error(f"Error scanning local uploaded voices folder: {local_err}")
+        
     return {"voices": default_voices}
+
 
 @app.delete("/api/voices/delete/{voice_name}")
 async def proxy_delete_voice(voice_name: str):

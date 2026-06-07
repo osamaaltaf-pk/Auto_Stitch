@@ -223,7 +223,10 @@ function App() {
 
   // Persist current view changes to localStorage
   useEffect(() => {
-    try { localStorage.setItem('as_current_view', currentView); } catch (e) { }
+    try {
+      localStorage.setItem('as_current_view', currentView);
+      localStorage.setItem('as_active_page', 'dashboard');
+    } catch (e) { }
   }, [currentView]);
 
   // Synchronize view changes triggered by outer landing page navigation links
@@ -2775,12 +2778,8 @@ function App() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              if (window.showLanding) {
-                window.showLanding();
-              } else {
-                setCurrentView("start");
-                fetchLocalProjects();
-              }
+              setCurrentView("start");
+              fetchLocalProjects();
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon hover:text-white text-gray-300 text-xs font-semibold font-sans transition-all active:scale-[0.97]"
             title="Return to Projects Dashboard"
