@@ -23,17 +23,17 @@ class C:
 def banner():
     print(f"""
 {C.PURPLE}{C.BOLD}
-  ╔══════════════════════════════════════════════════════╗
-  ║         Stable Audio 3 — Model Warmup Tool          ║
-  ║         CPU Deployment · Windows                    ║
-  ╚══════════════════════════════════════════════════════╝
+  +------------------------------------------------------+
+  |         Stable Audio 3 - Model Warmup Tool          |
+  |         CPU Deployment - Windows                    |
+  +------------------------------------------------------+
 {C.RESET}""")
 
-def ok(msg):    print(f"  {C.GREEN}✓{C.RESET}  {msg}")
-def info(msg):  print(f"  {C.CYAN}→{C.RESET}  {msg}")
-def warn(msg):  print(f"  {C.YELLOW}⚠{C.RESET}  {msg}")
-def err(msg):   print(f"  {C.RED}✗{C.RESET}  {msg}")
-def step(msg):  print(f"\n{C.BOLD}{C.CYAN}{'─'*54}{C.RESET}\n  {C.BOLD}{msg}{C.RESET}")
+def ok(msg):    print(f"  {C.GREEN}[OK]{C.RESET}  {msg}")
+def info(msg):  print(f"  {C.CYAN}[INFO]{C.RESET}  {msg}")
+def warn(msg):  print(f"  {C.YELLOW}[WARN]{C.RESET}  {msg}")
+def err(msg):   print(f"  {C.RED}[ERROR]{C.RESET}  {msg}")
+def step(msg):  print(f"\n{C.BOLD}{C.CYAN}{'-'*54}{C.RESET}\n  {C.BOLD}{msg}{C.RESET}")
 def dim(msg):   print(f"  {C.DIM}{msg}{C.RESET}")
 
 # ─── HuggingFace Cache Detection ─────────────────────────────────────────────
@@ -142,10 +142,10 @@ def check_hf_login() -> bool:
         dim("  https://huggingface.co/stabilityai/stable-audio-3-small-sfx")
         return False
 
-# ─── Model Download ───────────────────────────────────────────────────────────
+# --- Model Download -----------------------------------------------------------
 def download_model(short_name: str, hf_repo_id: str) -> bool:
     """Download model via stable_audio_3 or huggingface_hub if not cached."""
-    info(f"Downloading {C.BOLD}{short_name}{C.RESET} from {hf_repo_id} …")
+    info(f"Downloading {C.BOLD}{short_name}{C.RESET} from {hf_repo_id} ...")
     try:
         from huggingface_hub import snapshot_download
         path = snapshot_download(
@@ -157,7 +157,7 @@ def download_model(short_name: str, hf_repo_id: str) -> bool:
     except Exception as e:
         err(f"Download failed: {e}")
         if "401" in str(e) or "403" in str(e) or "GatedRepo" in str(e):
-            warn("Access denied — make sure you have:")
+            warn("Access denied - make sure you have:")
             dim("  1. Accepted the license on HuggingFace")
             dim("  2. Run: huggingface-cli login")
         return False
@@ -184,13 +184,13 @@ def ensure_models(selected: list) -> dict:
 
     return results
 
-# ─── Model Pre-load (warmup inference) ───────────────────────────────────────
+# --- Model Pre-load (warmup inference) ---------------------------------------
 def warmup_model(short_name: str) -> bool:
     """
     Load model into RAM and run a tiny test generation (1 second, 2 steps)
     to ensure everything works end-to-end before the server starts.
     """
-    info(f"Loading {C.BOLD}{short_name}{C.RESET} into memory …")
+    info(f"Loading {C.BOLD}{short_name}{C.RESET} into memory ...")
     t0 = time.time()
     try:
         from stable_audio_3 import StableAudioModel
@@ -198,7 +198,7 @@ def warmup_model(short_name: str) -> bool:
         load_time = time.time() - t0
         ok(f"Loaded in {load_time:.1f}s")
 
-        info(f"Running test generation (1s, 2 steps) …")
+        info(f"Running test generation (1s, 2 steps) ...")
         t1 = time.time()
         if short_name == "small-sfx":
             test_prompt = "TrackType: SFX. A short click sound."
@@ -235,11 +235,11 @@ def check_disk_space():
         color = C.GREEN if free_gb > 5 else C.YELLOW if free_gb > 2 else C.RED
         info(f"Free disk space: {color}{free_gb:.1f} GB{C.RESET}  (each model ~2.5GB)")
         if free_gb < 2:
-            warn("Very low disk space — download may fail")
+            warn("Very low disk space - download may fail")
     except Exception:
         pass
 
-# ─── Main ─────────────────────────────────────────────────────────────────────
+# --- Main ---------------------------------------------------------------------
 def main():
     banner()
 
@@ -281,13 +281,13 @@ def main():
     # 5. Test generation (optional)
     if not args.no_test:
         step("Test generation (warmup)")
-        warn("This loads each model into RAM — takes 1–2 min per model")
+        warn("This loads each model into RAM - takes 1-2 min per model")
         print()
         for name, downloaded in results.items():
             if downloaded:
                 warmup_model(name)
             else:
-                err(f"Skipping test for {name} — not available")
+                err(f"Skipping test for {name} - not available")
     else:
         info("Skipping test generation (--no-test)")
 
@@ -296,9 +296,9 @@ def main():
     all_ready = all(results.values())
     for name, ready in results.items():
         if ready:
-            ok(f"{name}  →  ready")
+            ok(f"{name}  ->  ready")
         else:
-            err(f"{name}  →  failed / not available")
+            err(f"{name}  ->  failed / not available")
 
     print()
     if all_ready:
@@ -306,7 +306,7 @@ def main():
         print(f"  {C.CYAN}  start_server.bat{C.RESET}  or  {C.CYAN}python server.py{C.RESET}")
     else:
         print(f"  {C.YELLOW}Some models failed. Check errors above.{C.RESET}")
-        print(f"  {C.DIM}You can still run the server — missing models will be skipped.{C.RESET}")
+        print(f"  {C.DIM}You can still run the server - missing models will be skipped.{C.RESET}")
     print()
 
 if __name__ == "__main__":

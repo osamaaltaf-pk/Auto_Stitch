@@ -40,3 +40,10 @@ license.json
 *.log
 outputs/
 Stable audio LOcal CPU/outputs/
+
+# Model Cache and Temp Files
+model_cache/
+temp_openseeface/
+16
+Stable audio.zip
+production_commit.patch

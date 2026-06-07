@@ -18,13 +18,13 @@ def get_bin_path(name: str) -> Path:
 def get_video_metadata(video_path: Path) -> Dict[str, Any]:
     """
     Runs ffprobe on the given video path to extract metadata:
-    duration, width, height, fps.
+    duration, width, height, fps, has_audio.
     """
     ffprobe_path = get_bin_path("ffprobe")
     cmd = [
         str(ffprobe_path),
         "-v", "error",
-        "-show_entries", "format=duration:stream=width,height,avg_frame_rate",
+        "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate",
         "-of", "json",
         str(video_path)
     ]
@@ -41,25 +41,30 @@ def get_video_metadata(video_path: Path) -> Dict[str, Any]:
         width = 0
         height = 0
         fps = 30.0
+        has_audio = False
         
-        if streams:
-            stream = streams[0]
-            width = int(stream.get("width", 0))
-            height = int(stream.get("height", 0))
-            avg_frame_rate = stream.get("avg_frame_rate", "30/1")
-            if "/" in avg_frame_rate:
-                try:
-                    num, den = avg_frame_rate.split("/")
-                    if float(den) > 0:
-                        fps = float(num) / float(den)
-                except Exception:
-                    fps = 30.0
+        for stream in streams:
+            codec_type = stream.get("codec_type")
+            if codec_type == "video":
+                width = int(stream.get("width", 0))
+                height = int(stream.get("height", 0))
+                avg_frame_rate = stream.get("avg_frame_rate", "30/1")
+                if "/" in avg_frame_rate:
+                    try:
+                        num, den = avg_frame_rate.split("/")
+                        if float(den) > 0:
+                            fps = float(num) / float(den)
+                    except Exception:
+                        fps = 30.0
+            elif codec_type == "audio":
+                has_audio = True
                     
         return {
             "duration_s": duration,
             "width": width,
             "height": height,
-            "fps": fps
+            "fps": fps,
+            "has_audio": has_audio
         }
     except Exception as e:
         logger.error(f"Failed running ffprobe on {video_path}: {e}")
@@ -67,7 +72,8 @@ def get_video_metadata(video_path: Path) -> Dict[str, Any]:
             "duration_s": 0.0,
             "width": 0,
             "height": 0,
-            "fps": 30.0
+            "fps": 30.0,
+            "has_audio": False
         }
 
 def extract_thumbnail(video_path: Path, output_thumbnail_path: Path, time_s: float = 0.0) -> bool:

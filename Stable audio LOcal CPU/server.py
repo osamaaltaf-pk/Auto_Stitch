@@ -25,13 +25,14 @@ CORS(app)
 _models = {}
 _model_lock = threading.Lock()
 _jobs = {}  # job_id -> {"status", "file", "error", "started", "finished"}
+_switch_state = {"status": "idle", "target": None, "error": None}  # tracks async model switch
 
 # ─── Model Loading ───────────────────────────────────────────────────────────────
 def load_model(model_name: str):
     """Load model once and cache it. Thread-safe."""
     with _model_lock:
         if model_name not in _models:
-            print(f"[INFO] Loading model '{model_name}'… (first load may take 1-2 min)")
+            print(f"[INFO] Loading model '{model_name}'... (first load may take 1-2 min)")
             try:
                 from stable_audio_3 import StableAudioModel
                 model = StableAudioModel.from_pretrained(model_name, device="cpu")
@@ -110,7 +111,7 @@ def _generate_worker(job_id: str, params: dict):
         _jobs[job_id]["file"]     = str(out_file)
         _jobs[job_id]["finished"] = time.time()
         elapsed = _jobs[job_id]["finished"] - _jobs[job_id]["started"]
-        print(f"[JOB {job_id}] Done in {elapsed:.1f}s → {out_file}")
+        print(f"[JOB {job_id}] Done in {elapsed:.1f}s -> {out_file}")
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -198,10 +199,81 @@ def api_health():
     return jsonify({"status": "ok", "loaded_models": list(_models.keys())})
 
 
+@app.route("/api/model/switch", methods=["POST"])
+def api_model_switch():
+    """
+    Non-blocking model switch.
+    Unloads other models, starts loading the target model in a background thread,
+    and returns immediately with status='loading'.
+    Poll /api/health and check loaded_models to know when it's ready.
+    """
+    data = request.get_json(force=True)
+    target_model = data.get("model")
+    if not target_model:
+        return jsonify({"error": "model parameter is required"}), 400
+
+    # If already loaded, nothing to do
+    if target_model in _models:
+        print(f"[INFO] Model '{target_model}' is already loaded.")
+        return jsonify({
+            "status": "success",
+            "active_model": target_model,
+            "loaded_models": list(_models.keys())
+        })
+
+    # Unload other models immediately to free RAM
+    with _model_lock:
+        other_models = [m for m in list(_models.keys()) if m != target_model]
+        for m in other_models:
+            print(f"[INFO] Unloading model '{m}' to free up memory...")
+            _models.pop(m)
+
+        import gc, torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    # Mark switch as in-progress
+    _switch_state["status"] = "loading"
+    _switch_state["target"] = target_model
+    _switch_state["error"] = None
+
+    def _load_in_background():
+        print(f"[INFO] Background thread: loading model '{target_model}'...")
+        try:
+            load_model(target_model)
+            _switch_state["status"] = "done"
+            print(f"[INFO] Background thread: model '{target_model}' ready.")
+        except Exception as e:
+            _switch_state["status"] = "error"
+            _switch_state["error"] = str(e)
+            print(f"[ERROR] Background thread: failed to load '{target_model}': {e}")
+
+    t = threading.Thread(target=_load_in_background, daemon=True)
+    t.start()
+
+    return jsonify({
+        "status": "loading",
+        "active_model": target_model,
+        "message": f"Loading {target_model} in background. Poll /api/health until it appears in loaded_models."
+    })
+
+
+@app.route("/api/model/status")
+def api_model_status():
+    """Check the current async model switch status."""
+    return jsonify({
+        "switch_status": _switch_state["status"],
+        "target_model": _switch_state["target"],
+        "error": _switch_state["error"],
+        "loaded_models": list(_models.keys())
+    })
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 60)
-    print("  Stable Audio 3 — CPU Server")
+    print("  Stable Audio 3 - CPU Server")
     print("  Open http://localhost:5000 in your browser")
     print("=" * 60)
     # Pre-warm: comment this out if you want lazy loading

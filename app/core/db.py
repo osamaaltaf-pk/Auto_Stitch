@@ -26,6 +26,16 @@ def init_db():
         manifest_json TEXT NOT NULL
     )
     """)
+
+    # 4. Character Library table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS character_library (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        image_path TEXT NOT NULL,
+        chars_json TEXT NOT NULL
+    )
+    """)
     
     # 2. Generation History table (for SFX and TTS prompts auditing)
     cursor.execute("""
@@ -191,3 +201,40 @@ def get_render_history(limit: int = 50) -> list:
     conn.close()
     
     return [dict(r) for r in rows]
+
+
+def save_character_profile(profile: dict):
+    """Inserts or replaces a character profile in the library."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO character_library (id, name, image_path, chars_json)
+    VALUES (?, ?, ?, ?)
+    """, (profile["id"], profile["name"], profile["image_path"], json.dumps(profile["chars"])))
+    conn.commit()
+    conn.close()
+
+
+def get_character_profiles() -> list:
+    """Retrieves all character profiles in the library."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, image_path, chars_json FROM character_library ORDER BY name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    profiles = []
+    for r in rows:
+        d = dict(r)
+        d["chars"] = json.loads(d.pop("chars_json"))
+        profiles.append(d)
+    return profiles
+
+
+def delete_character_profile(profile_id: str):
+    """Deletes a character profile from the library."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM character_library WHERE id = ?", (profile_id,))
+    conn.commit()
+    conn.close()

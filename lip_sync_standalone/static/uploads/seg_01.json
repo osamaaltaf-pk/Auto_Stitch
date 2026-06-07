@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "soundFile": "D:\\Osama_mvp\\lip_sync_standalone\\static\\uploads\\seg_01.wav",
+    "duration": 4.08
+  },
+  "mouthCues": [
+    { "start": 0.00, "end": 0.19, "value": "X" },
+    { "start": 0.19, "end": 0.31, "value": "B" },
+    { "start": 0.31, "end": 0.45, "value": "F" },
+    { "start": 0.45, "end": 0.52, "value": "B" },
+    { "start": 0.52, "end": 0.60, "value": "A" },
+    { "start": 0.60, "end": 0.79, "value": "E" },
+    { "start": 0.79, "end": 0.86, "value": "C" },
+    { "start": 0.86, "end": 1.21, "value": "B" },
+    { "start": 1.21, "end": 1.63, "value": "X" },
+    { "start": 1.63, "end": 1.69, "value": "B" },
+    { "start": 1.69, "end": 1.88, "value": "C" },
+    { "start": 1.88, "end": 1.95, "value": "B" },
+    { "start": 1.95, "end": 2.30, "value": "C" },
+    { "start": 2.30, "end": 2.38, "value": "A" },
+    { "start": 2.38, "end": 2.49, "value": "B" },
+    { "start": 2.49, "end": 2.56, "value": "F" },
+    { "start": 2.56, "end": 2.63, "value": "B" },
+    { "start": 2.63, "end": 2.72, "value": "A" },
+    { "start": 2.72, "end": 2.76, "value": "C" },
+    { "start": 2.76, "end": 2.80, "value": "B" },
+    { "start": 2.80, "end": 2.89, "value": "A" },
+    { "start": 2.89, "end": 2.96, "value": "C" },
+    { "start": 2.96, "end": 3.10, "value": "H" },
+    { "start": 3.10, "end": 3.17, "value": "G" },
+    { "start": 3.17, "end": 3.45, "value": "F" },
+    { "start": 3.45, "end": 3.80, "value": "B" },
+    { "start": 3.80, "end": 4.08, "value": "X" }
+  ]
+}

@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import logging
 import asyncio
@@ -18,6 +19,21 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("autostitch")
 
+# Load HF_TOKEN from .env if it exists
+hf_token_val = os.environ.get("HF_TOKEN")
+env_path = Path(__file__).resolve().parent / ".env"
+if env_path.exists():
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if "=" in line:
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip("'").strip('"')
+                if k == "HF_TOKEN":
+                    hf_token_val = v
+                    os.environ["HF_TOKEN"] = v
+                    logger.info("Exposed HF_TOKEN from .env file to child processes.")
+
 # Make sure app path is in system path
 sys.path.append(str(Path(__file__).resolve().parent))
 
@@ -34,6 +50,39 @@ app = FastAPI(
 
 # Keep track of background server subprocesses
 background_subprocesses = []
+running_processes = {
+    "tts": None,
+    "stable_audio": None
+}
+
+# Keep track of project names that have been self-healed since startup
+HEALED_PROJECTS = set()
+
+# Sequential queues for TTS and SFX to prevent resource thrashing and manifest race conditions
+tts_queue = asyncio.Queue()
+sfx_queue = asyncio.Queue()
+
+async def tts_queue_worker():
+    logger.info("Starting sequential TTS queue worker...")
+    while True:
+        try:
+            task_func = await tts_queue.get()
+            await task_func()
+        except Exception as e:
+            logger.error(f"Error in TTS queue worker: {e}")
+        finally:
+            tts_queue.task_done()
+
+async def sfx_queue_worker():
+    logger.info("Starting sequential SFX queue worker...")
+    while True:
+        try:
+            task_func = await sfx_queue.get()
+            await task_func()
+        except Exception as e:
+            logger.error(f"Error in SFX queue worker: {e}")
+        finally:
+            sfx_queue.task_done()
 
 def get_system_ram_gb() -> float:
     import ctypes
@@ -63,6 +112,10 @@ async def startup_event():
     logger.info("Initializing local SQLite production database...")
     db.init_db()
     
+    # Start background sequential queue workers
+    asyncio.create_task(tts_queue_worker())
+    asyncio.create_task(sfx_queue_worker())
+    
     # Auto-launch background servers if configured to run locally
     settings = load_settings()
     tts_url = settings.get("tts_server_url", "http://127.0.0.1:8000")
@@ -84,6 +137,7 @@ async def startup_event():
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
                 background_subprocesses.append(proc)
+                running_processes["tts"] = proc
                 logger.info(f"PocketTTS server subprocess started (PID: {proc.pid})")
             except Exception as e:
                 logger.error(f"Failed to start local PocketTTS server: {e}")
@@ -107,6 +161,7 @@ async def startup_event():
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
                     background_subprocesses.append(proc)
+                    running_processes["stable_audio"] = proc
                     logger.info(f"Stable Audio CPU server subprocess started (PID: {proc.pid})")
                 except Exception as e:
                     logger.error(f"Failed to start local Stable Audio CPU server: {e}")
@@ -118,6 +173,21 @@ async def startup_event():
                 "Skipping local Stable Audio launch to prevent system instability. "
                 "Please run on a system with more RAM, or set 'sfx_server_url' to a remote Colab tunnel URL in settings."
             )
+            
+    # 3. Lip-Sync Standalone Server
+    lipsync_script = BASE_DIR / "lip_sync_standalone" / "app.py"
+    if lipsync_script.exists():
+        logger.info("Starting local Lip-Sync standalone server on port 8001...")
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, str(lipsync_script)],
+                cwd=str(BASE_DIR / "lip_sync_standalone"),
+                creationflags=subprocess.CREATE_NEW_CONSOLE
+            )
+            background_subprocesses.append(proc)
+            logger.info(f"Lip-Sync server started (PID: {proc.pid})")
+        except Exception as e:
+            logger.error(f"Failed to start local Lip-Sync server: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -371,7 +441,7 @@ def copy_master_to_custom_dir(project_name: str = None) -> None:
         if src_file.exists():
             import shutil
             name = project_name or "master"
-            dest_file = custom_path / f"{name}_master.mp4"
+            dest_file = custom_path / f"{name}.mp4"
             shutil.copy2(src_file, dest_file)
             logger.info(f"Successfully copied compiled master to custom output directory: {dest_file}")
     except Exception as e:
@@ -412,8 +482,327 @@ class SfxGenerateRequest(BaseModel):
 class RenderRequest(BaseModel):
     project_name: str
     concat: bool = True
+    video_volume: Optional[float] = 1.0
+    voice_volume: Optional[float] = 1.0
+    sfx_volume: Optional[float] = 0.5
 
 # --- API ENDPOINTS ---
+
+class EngineToggleRequest(BaseModel):
+    engine: str # "tts", "stable_audio", "sfx", "music"
+    action: str # "start", "stop"
+
+class CharacterProfileModel(BaseModel):
+    id: str
+    name: str
+    image_path: str
+    chars: List[Dict[str, Any]]
+
+@app.get("/api/engines/status")
+async def get_engines_status():
+    settings = load_settings()
+    
+    # 1. TTS Server Status
+    tts_online = False
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            resp = await client.get(f"{settings['tts_server_url']}/api/health", timeout=1.5)
+            if resp.status_code == 200:
+                tts_online = True
+    except Exception:
+        pass
+        
+    # 2. Stable Audio Server Status (for SFX and MUSIC)
+    sfx_server_online = False
+    loaded_models = []
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            resp = await client.get(f"{settings['sfx_server_url']}/api/health", timeout=1.5)
+            if resp.status_code == 200:
+                sfx_server_online = True
+                loaded_models = resp.json().get("loaded_models", [])
+    except Exception:
+        pass
+        
+    # 3. FFmpeg Status
+    ffmpeg_bin = stitcher.get_ffmpeg_path()
+    ffmpeg_ok = ffmpeg_bin.exists() or Path("ffmpeg").exists()
+    
+    return {
+        "tts": {
+            "online": tts_online,
+            "running": running_processes.get("tts") is not None or tts_online
+        },
+        "sfx": {
+            "online": sfx_server_online and "small-sfx" in loaded_models,
+            "running": sfx_server_online
+        },
+        "music": {
+            "online": sfx_server_online and "small-music" in loaded_models,
+            "running": sfx_server_online
+        },
+        "ffmpeg": {
+            "online": ffmpeg_ok
+        }
+    }
+
+@app.post("/api/engines/toggle")
+async def toggle_engine(req: EngineToggleRequest):
+    settings = load_settings()
+    import subprocess
+    
+    if req.engine == "tts":
+        if req.action == "stop":
+            proc = running_processes.get("tts")
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2.0)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                running_processes["tts"] = None
+            try:
+                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq PocketTTS*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            except Exception:
+                pass
+            return {"status": "ok", "message": "PocketTTS server stopped."}
+            
+        elif req.action == "start":
+            tts_python = BASE_DIR / "Pocket_tts" / "venv" / "Scripts" / "python.exe"
+            tts_script = BASE_DIR / "Pocket_tts" / "server.py"
+            if not tts_python.exists() or not tts_script.exists():
+                raise HTTPException(status_code=400, detail="PocketTTS files not found.")
+            tts_online = False
+            try:
+                async with httpx.AsyncClient(trust_env=False) as client:
+                    resp = await client.get(f"{settings['tts_server_url']}/api/health", timeout=1.0)
+                    if resp.status_code == 200:
+                        tts_online = True
+            except Exception:
+                pass
+            if tts_online:
+                return {"status": "ok", "message": "PocketTTS is already running."}
+            try:
+                proc = subprocess.Popen(
+                    [str(tts_python), str(tts_script)],
+                    cwd=str(BASE_DIR / "Pocket_tts"),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+                running_processes["tts"] = proc
+                return {"status": "ok", "message": "PocketTTS server started."}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to start PocketTTS: {e}")
+
+    elif req.engine == "stable_audio":
+        if req.action == "stop":
+            proc = running_processes.get("stable_audio")
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2.0)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                running_processes["stable_audio"] = None
+            try:
+                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq Stable Audio*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            except Exception:
+                pass
+            return {"status": "ok", "message": "Stable Audio server stopped."}
+            
+        elif req.action == "start":
+            sfx_python = BASE_DIR / "Stable audio LOcal CPU" / "venv" / "Scripts" / "python.exe"
+            sfx_script = BASE_DIR / "Stable audio LOcal CPU" / "server.py"
+            if not sfx_python.exists() or not sfx_script.exists():
+                raise HTTPException(status_code=400, detail="Stable Audio files not found.")
+            sfx_online = False
+            try:
+                async with httpx.AsyncClient(trust_env=False) as client:
+                    resp = await client.get(f"{settings['sfx_server_url']}/api/health", timeout=1.0)
+                    if resp.status_code == 200:
+                        sfx_online = True
+            except Exception:
+                pass
+            if sfx_online:
+                return {"status": "ok", "message": "Stable Audio is already running."}
+            try:
+                proc = subprocess.Popen(
+                    [str(sfx_python), str(sfx_script)],
+                    cwd=str(BASE_DIR / "Stable audio LOcal CPU"),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
+                running_processes["stable_audio"] = proc
+                return {"status": "ok", "message": "Stable Audio server started."}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to start Stable Audio: {e}")
+
+    elif req.engine in ("sfx", "music"):
+        model_name = "small-sfx" if req.engine == "sfx" else "small-music"
+        if req.action == "stop":
+            try:
+                async with httpx.AsyncClient(trust_env=False) as client:
+                    resp = await client.post(f"{settings['sfx_server_url']}/api/model/switch", json={"model": "none"}, timeout=5.0)
+                    if resp.status_code == 200:
+                        return {"status": "ok", "message": f"{req.engine.upper()} model unloaded."}
+            except Exception as e:
+                logger.error(f"Failed to unload model via switch endpoint: {e}")
+            return {"status": "error", "message": "Stable Audio server is not responding."}
+            
+        elif req.action == "start":
+            sfx_online = False
+            local_url = "http://127.0.0.1:5000"
+            
+            # 1. Check if server is already running locally on port 5000
+            try:
+                async with httpx.AsyncClient(trust_env=False) as client:
+                    resp = await client.get(f"{local_url}/api/health", timeout=1.0)
+                    if resp.status_code == 200:
+                        sfx_online = True
+            except Exception:
+                pass
+                
+            # 2. Check if the currently configured URL in settings is online
+            if not sfx_online:
+                try:
+                    async with httpx.AsyncClient(trust_env=False) as client:
+                        resp = await client.get(f"{settings['sfx_server_url']}/api/health", timeout=1.0)
+                        if resp.status_code == 200:
+                            local_url = settings['sfx_server_url']
+                            sfx_online = True
+                except Exception:
+                    pass
+            
+            # 3. If still offline, launch the local Stable Audio CPU server process
+            if not sfx_online:
+                sfx_python = BASE_DIR / "Stable audio LOcal CPU" / "venv" / "Scripts" / "python.exe"
+                sfx_script = BASE_DIR / "Stable audio LOcal CPU" / "server.py"
+                if not sfx_python.exists() or not sfx_script.exists():
+                    raise HTTPException(status_code=400, detail="Stable Audio files not found.")
+                try:
+                    proc = subprocess.Popen(
+                        [str(sfx_python), str(sfx_script)],
+                        cwd=str(BASE_DIR / "Stable audio LOcal CPU"),
+                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                    )
+                    running_processes["stable_audio"] = proc
+                    
+                    # Poll local URL to verify startup (give it up to 10 seconds)
+                    for _ in range(20):
+                        await asyncio.sleep(0.5)
+                        try:
+                            async with httpx.AsyncClient(trust_env=False) as client:
+                                resp = await client.get(f"{local_url}/api/health", timeout=0.5)
+                                if resp.status_code == 200:
+                                    sfx_online = True
+                                    break
+                        except Exception:
+                            pass
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Failed to start Stable Audio server: {e}")
+            
+            if sfx_online:
+                # Update sfx_server_url to the working local URL so generations route correctly
+                if local_url == "http://127.0.0.1:5000" and settings.get("sfx_server_url") != local_url:
+                    settings["sfx_server_url"] = local_url
+                    save_settings(settings)
+                    logger.info("Updated sfx_server_url to http://127.0.0.1:5000 in settings.json")
+                
+                # Fire non-blocking model switch request — server loads weights in a background thread
+                # and returns immediately with status='loading'. We then poll /api/health until
+                # the model appears in loaded_models (CPU loading can take 5-10 min on low RAM).
+                try:
+                    async with httpx.AsyncClient(trust_env=False) as client:
+                        switch_resp = await client.post(
+                            f"{local_url}/api/model/switch",
+                            json={"model": model_name},
+                            timeout=15.0  # just enough for the fire-and-return call
+                        )
+                        if switch_resp.status_code not in (200,):
+                            raise HTTPException(status_code=switch_resp.status_code, detail=f"Model switch rejected: {switch_resp.text}")
+                        
+                        switch_body = switch_resp.json()
+                        # If already loaded, return immediately
+                        if switch_body.get("status") == "success":
+                            return {"status": "ok", "message": f"{req.engine.upper()} model already loaded and ready."}
+                        
+                        # Otherwise poll /api/health until model appears in loaded_models
+                        logger.info(f"Model '{model_name}' is loading in background on Stable Audio server. Polling for up to 10 min...")
+                        MAX_POLL_SECONDS = 600  # 10 minutes for slow CPU load
+                        for _ in range(MAX_POLL_SECONDS * 2):  # check every 0.5s
+                            await asyncio.sleep(0.5)
+                            try:
+                                async with httpx.AsyncClient(trust_env=False) as poll_client:
+                                    h = await poll_client.get(f"{local_url}/api/health", timeout=2.0)
+                                    if h.status_code == 200:
+                                        loaded = h.json().get("loaded_models", [])
+                                        if model_name in loaded:
+                                            logger.info(f"Model '{model_name}' is now loaded and ready!")
+                                            return {"status": "ok", "message": f"{req.engine.upper()} model loaded successfully."}
+                            except Exception:
+                                pass
+                        
+                        raise HTTPException(status_code=504, detail=f"Timed out waiting for {model_name} to load (>10 min). Check Stable Audio console for errors.")
+                        
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Stable Audio server error during model switch: {e}")
+            else:
+                raise HTTPException(status_code=503, detail="Stable Audio server failed to start or respond.")
+
+    raise HTTPException(status_code=400, detail="Invalid engine specified.")
+
+@app.post("/api/lipsync/generate")
+async def proxy_lipsync_generate(req: Request):
+    body = await req.json()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.post("http://127.0.0.1:8001/api/generate/lip-sync", json=body, timeout=120.0)
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lip-sync server not running or error: {str(e)}")
+
+@app.post("/api/lipsync/sample-color")
+async def proxy_lipsync_sample_color(req: Request):
+    body = await req.json()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.post("http://127.0.0.1:8001/api/character/sample-color", json=body, timeout=10.0)
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lip-sync server not running or error: {str(e)}")
+
+@app.get("/api/lipsync/serve-image")
+async def proxy_lipsync_serve_image(path: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"http://127.0.0.1:8001/api/serve-image?path={path}", timeout=10.0)
+            if resp.status_code == 200:
+                from fastapi.responses import Response
+                return Response(content=resp.content, media_type=resp.headers.get("content-type"))
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lip-sync server error: {str(e)}")
+
+@app.get("/api/character-library")
+async def get_characters():
+    return {"characters": db.get_character_profiles()}
+
+@app.post("/api/character-library")
+async def add_update_character(profile: CharacterProfileModel):
+    db.save_character_profile(profile.dict())
+    return {"status": "ok"}
+
+@app.delete("/api/character-library/{profile_id}")
+async def delete_character(profile_id: str):
+    db.delete_character_profile(profile_id)
+    return {"status": "ok"}
+
 
 @app.get("/api/health")
 async def health_check():
@@ -606,6 +995,52 @@ async def get_downloads_folder():
         logger.error(f"Error locating downloads folder: {e}")
     return {"status": "error", "message": "Could not locate Downloads folder"}
 
+def heal_manifest_states(data: Dict[str, Any], is_startup: bool = False) -> tuple[Dict[str, Any], bool]:
+    """
+    Resets blocks that:
+    1. Were left in the 'generating' state back to 'idle' (only if is_startup is True).
+    2. Are marked 'done' or 'provided' but their physical WAV files do not exist on disk.
+    """
+    changed = False
+    
+    # Check voice blocks
+    if "voice_blocks" in data:
+        for block in data["voice_blocks"]:
+            # Rule 1: Reset stuck 'generating' state
+            if is_startup and block.get("status") == "generating":
+                block["status"] = "idle"
+                block["error_msg"] = "Interrupted in previous session (reset to idle)"
+                changed = True
+            # Rule 2: Reset if marked completed but physical file is missing from disk
+            elif block.get("status") in ("done", "provided") and block.get("file_path"):
+                p = Path(block["file_path"])
+                if not p.exists():
+                    logger.info(f"Self-healing: Voice block file {p} is missing on disk. Resetting status to idle.")
+                    block["status"] = "idle"
+                    block["file_path"] = None
+                    block["duration_s"] = 0.0
+                    changed = True
+                
+    # Check sfx blocks
+    if "sfx_blocks" in data:
+        for block in data["sfx_blocks"]:
+            # Rule 1: Reset stuck 'generating' state
+            if is_startup and block.get("status") == "generating":
+                block["status"] = "idle"
+                block["error_msg"] = "Interrupted in previous session (reset to idle)"
+                changed = True
+            # Rule 2: Reset if marked completed but physical file is missing from disk
+            elif block.get("status") == "done" and block.get("file_path"):
+                p = Path(block["file_path"])
+                if not p.exists():
+                    logger.info(f"Self-healing: SFX block file {p} is missing on disk. Resetting status to idle.")
+                    block["status"] = "idle"
+                    block["file_path"] = None
+                    block["duration_s"] = 0.0
+                    changed = True
+                
+    return data, changed
+
 @app.post("/api/project/load")
 async def load_project(req: ProjectLoadRequest):
     project_name = req.project_name.strip()
@@ -616,12 +1051,29 @@ async def load_project(req: ProjectLoadRequest):
     p_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = p_dir / "manifest.json"
     
+    is_startup = project_name not in HEALED_PROJECTS
+    if is_startup:
+        HEALED_PROJECTS.add(project_name)
+        logger.info(f"First load of project '{project_name}' since startup. Enabling startup self-healing.")
+
     # 1. Try loading from local SQLite database first
     db_manifest = db.get_project(project_name)
     if db_manifest:
         logger.info(f"Loaded project manifest '{project_name}' from local SQLite database.")
         db_manifest["project_dir"] = str(p_dir)
-        return db_manifest
+        db_manifest["output_dir"] = str(OUTPUT_DIR)
+        
+        # Self-heal stuck 'generating' blocks
+        healed_manifest, changed = heal_manifest_states(db_manifest, is_startup=is_startup)
+        if changed:
+            logger.info("Self-healing stuck 'generating' blocks in SQLite database project manifest.")
+            db.save_project(project_name, healed_manifest)
+            try:
+                manifest_obj = Manifest.from_dict(healed_manifest)
+                manifest_obj.save()
+            except Exception as e:
+                logger.error(f"Failed to save healed manifest to disk: {e}")
+        return healed_manifest
         
     # 2. Fallback to manifest.json on disk
     if manifest_path.exists():
@@ -630,6 +1082,16 @@ async def load_project(req: ProjectLoadRequest):
                 content = f.read()
             manifest = Manifest.from_json(content)
             manifest.project_dir = str(p_dir)
+            manifest.output_dir = str(OUTPUT_DIR)
+            
+            # Self-heal stuck 'generating' blocks
+            manifest_dict = manifest.to_dict()
+            healed_manifest, changed = heal_manifest_states(manifest_dict, is_startup=is_startup)
+            if changed:
+                logger.info("Self-healing stuck 'generating' blocks in manifest.json file on disk.")
+                manifest = Manifest.from_dict(healed_manifest)
+                manifest.save()
+            
             # Sync to SQLite
             db.save_project(project_name, manifest.to_dict())
             return manifest.to_dict()
@@ -651,6 +1113,8 @@ async def load_project(req: ProjectLoadRequest):
 @app.post("/api/project/save")
 async def save_project_api(data: Dict[str, Any]):
     try:
+        # Force manifest output_dir compliance
+        data["output_dir"] = str(OUTPUT_DIR)
         manifest = Manifest.from_dict(data)
         # Force directory compliance
         p_dir = PROJECTS_DIR / manifest.project_name
@@ -659,7 +1123,7 @@ async def save_project_api(data: Dict[str, Any]):
         # 1. Save to manifest.json on disk
         manifest.save()
         # 2. Save to SQLite local database
-        db.save_project(manifest.project_name, data)
+        db.save_project(manifest.project_name, manifest.to_dict())
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Error saving project manifest: {e}")
@@ -683,7 +1147,7 @@ async def get_local_projects_list():
 @app.post("/api/videos/load")
 async def scan_video_folder(req: VideoScanRequest):
     """
-    Scans a local directory for video clips, extracts durations/thumbnails,
+    Scans a local directory for video clips and images, extracts durations/thumbnails,
     and updates the project's video blocks.
     """
     project_name = req.project_name
@@ -701,37 +1165,62 @@ async def scan_video_folder(req: VideoScanRequest):
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = Manifest.from_json(f.read())
         
-    # Scan MP4 clips
-    mp4_files = sorted(
-        [p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() == ".mp4"],
-        key=lambda x: x.name
+    # Scan MP4/MOV/AVI/MKV/WEBM clips and JPG/JPEG/PNG/WEBP/BMP images
+    video_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+    
+    def natural_sort_key(path):
+        # Zero-pad all numeric segments so comparison is all-string (no int/str mix).
+        # e.g. series1 → ['series', '0000000001', '.mp4']
+        #      series10 → ['series', '0000000010', '.mp4']
+        # This guarantees: series1 < series2 < series10 < series120
+        parts = re.split(r'(\d+)', path.name.lower())
+        return [p.zfill(10) if p.isdigit() else p for p in parts]
+        
+    media_files = sorted(
+        [p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() in (video_extensions | image_extensions)],
+        key=natural_sort_key
     )
     
-    if not mp4_files:
-        return {"status": "ok", "message": "No MP4 videos found in this folder.", "blocks": []}
+    if not media_files:
+        return {"status": "ok", "message": "No media files found in this folder.", "blocks": []}
         
-    logger.info(f"Scanning {len(mp4_files)} clips in {folder_path}...")
+    logger.info(f"Scanning {len(media_files)} clips/images in {folder_path}...")
     
     # Process metadata & thumbnails
     video_blocks = []
-    for idx, f_path in enumerate(mp4_files):
-        meta = ffprobe.get_video_metadata(f_path)
+    for idx, f_path in enumerate(media_files):
+        suffix = f_path.suffix.lower()
+        is_image = suffix in image_extensions
+        media_type = "image" if is_image else "video"
         
         # Unique ID & thumb path
         v_id = f"v_{idx:02d}"
         thumb_name = f"{project_name}_{v_id}.jpg"
         thumb_path = THUMBS_DIR / thumb_name
         
-        # Extract visual frame grab at 0s mark
-        ffprobe.extract_thumbnail(f_path, thumb_path, time_s=0.0)
-        
+        if is_image:
+            # Copy image directly as static thumbnail
+            try:
+                import shutil
+                shutil.copy2(f_path, thumb_path)
+            except Exception as e:
+                logger.error(f"Error copying image thumbnail: {e}")
+            duration_s = 5.0  # Default to 5.0 seconds
+        else:
+            # Extract visual frame grab at 0s mark
+            ffprobe.extract_thumbnail(f_path, thumb_path, time_s=0.0)
+            meta = ffprobe.get_video_metadata(f_path)
+            duration_s = meta["duration_s"] if meta["duration_s"] > 0 else 5.0
+            
         block = VideoBlock(
             id=v_id,
             file_path=str(f_path),
             filename=f_path.name,
-            duration_s=meta["duration_s"] if meta["duration_s"] > 0 else 5.0,
+            duration_s=duration_s,
             thumbnail_path=f"/static/thumbnails/{thumb_name}",
-            order=idx
+            order=idx,
+            media_type=media_type
         )
         video_blocks.append(block)
         
@@ -775,11 +1264,6 @@ async def generate_tts(req: TtsGenerateRequest):
     if not block:
       raise HTTPException(status_code=404, detail="Voice block not found in project")
         
-    block.status = BlockStatus.GENERATING
-    block.prompt = req.text
-    block.voice = req.voice
-    manifest.save()
-    
     # Run async TTS fetcher
     voice_dir = p_dir / "voice"
     voice_dir.mkdir(exist_ok=True)
@@ -787,6 +1271,22 @@ async def generate_tts(req: TtsGenerateRequest):
     
     async def run_tts():
         try:
+            # Load manifest freshly at the start of task execution to avoid concurrent overwrites
+            with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                fresh_manifest = Manifest.from_json(f_fresh.read())
+            
+            fresh_block = next((b for b in fresh_manifest.voice_blocks if b.id == req.block_id), None)
+            if not fresh_block:
+                logger.error(f"Voice block {req.block_id} not found when starting queued task")
+                return
+
+            # Mark block as GENERATING in manifest inside the sequential worker queue
+            fresh_block.status = BlockStatus.GENERATING
+            fresh_block.prompt = req.text
+            fresh_block.voice = req.voice
+            fresh_manifest.save()
+            db.save_project(req.project_name, fresh_manifest.to_dict())
+
             if out_wav.exists():
                 try:
                     out_wav.unlink()
@@ -810,38 +1310,44 @@ async def generate_tts(req: TtsGenerateRequest):
                 if resp.status_code == 200:
                     with open(out_wav, "wb") as w_file:
                         w_file.write(resp.content)
-                    block.status = BlockStatus.DONE
-                    block.file_path = str(out_wav)
+                    fresh_block.status = BlockStatus.DONE
+                    fresh_block.file_path = str(out_wav)
                     # Deduce duration using ffprobe
                     meta = ffprobe.get_video_metadata(out_wav)
-                    block.duration_s = meta["duration_s"]
-                    block.error_msg = None
+                    fresh_block.duration_s = meta["duration_s"]
+                    fresh_block.error_msg = None
                     logger.info(f"TTS Synthesized successfully → {out_wav}")
-                    # Log successful TTS generation to SQLite DB
-                    db.log_generation(req.project_name, block.id, "voice", req.text, str(out_wav), "success")
+                    db.log_generation(req.project_name, fresh_block.id, "voice", req.text, str(out_wav), "success")
                 else:
                     try:
                         detail = resp.json().get("detail", f"HTTP {resp.status_code}")
                     except Exception:
                         detail = f"TTS Server returned status {resp.status_code}: {resp.text[:120]}"
-                    block.status = BlockStatus.ERROR
-                    block.error_msg = detail
+                    fresh_block.status = BlockStatus.ERROR
+                    fresh_block.error_msg = detail
                     logger.error(f"TTS Server failed: {detail}")
-                    # Log failed TTS generation to SQLite DB
-                    db.log_generation(req.project_name, block.id, "voice", req.text, None, "failed")
+                    db.log_generation(req.project_name, fresh_block.id, "voice", req.text, None, "failed")
         except Exception as e:
-            block.status = BlockStatus.ERROR
-            block.error_msg = str(e)
             logger.error(f"Connection failed to PocketTTS server: {e}")
-            # Log failed TTS generation exception to SQLite DB
-            db.log_generation(req.project_name, block.id, "voice", req.text, None, "failed")
-        finally:
-            manifest.save()
-            # Also sync project state back to SQLite on changes
-            db.save_project(req.project_name, manifest.to_dict())
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                    err_manifest = Manifest.from_json(f_fresh.read())
+                err_block = next((b for b in err_manifest.voice_blocks if b.id == req.block_id), None)
+                if err_block:
+                    err_block.status = BlockStatus.ERROR
+                    err_block.error_msg = str(e)
+                    err_manifest.save()
+                    db.save_project(req.project_name, err_manifest.to_dict())
+            except Exception as ex:
+                logger.error(f"Failed saving error to manifest: {ex}")
+            db.log_generation(req.project_name, req.block_id, "voice", req.text, None, "failed")
+            return
             
-    # Trigger generation task in background so we respond immediately with "generating" status
-    asyncio.create_task(run_tts())
+        fresh_manifest.save()
+        db.save_project(req.project_name, fresh_manifest.to_dict())
+            
+    # Put the generation task in the sequential queue so we execute one at a time
+    await tts_queue.put(run_tts)
     return {"status": "generating", "manifest": manifest.to_dict()}
 
 # --- SFX GENERATION ---
@@ -861,16 +1367,27 @@ async def generate_sfx(req: SfxGenerateRequest):
     if not block:
         raise HTTPException(status_code=404, detail="SFX block not found in project")
         
-    block.status = BlockStatus.GENERATING
-    block.prompt = req.prompt
-    manifest.save()
-    
     sfx_dir = p_dir / "sfx"
     sfx_dir.mkdir(exist_ok=True)
     out_wav = sfx_dir / f"sfx_{block.order:02d}.wav"
     
     async def run_sfx():
         try:
+            # Load manifest freshly at the start of task execution to avoid concurrent overwrites
+            with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                fresh_manifest = Manifest.from_json(f_fresh.read())
+            
+            fresh_block = next((b for b in fresh_manifest.sfx_blocks if b.id == req.block_id), None)
+            if not fresh_block:
+                logger.error(f"SFX block {req.block_id} not found when starting queued task")
+                return
+
+            # Mark block as GENERATING in manifest inside the sequential worker queue
+            fresh_block.status = BlockStatus.GENERATING
+            fresh_block.prompt = req.prompt
+            fresh_manifest.save()
+            db.save_project(req.project_name, fresh_manifest.to_dict())
+
             if out_wav.exists():
                 try:
                     out_wav.unlink()
@@ -902,9 +1419,10 @@ async def generate_sfx(req: SfxGenerateRequest):
                         err = resp.json().get("error", f"HTTP {resp.status_code}")
                     except Exception:
                         err = f"SFX Server returned status {resp.status_code}: {resp.text[:120]}"
-                    block.status = BlockStatus.ERROR
-                    block.error_msg = err
-                    manifest.save()
+                    fresh_block.status = BlockStatus.ERROR
+                    fresh_block.error_msg = err
+                    fresh_manifest.save()
+                    db.save_project(req.project_name, fresh_manifest.to_dict())
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
@@ -935,18 +1453,20 @@ async def generate_sfx(req: SfxGenerateRequest):
                             job_done = True
                             break
                         elif job_status == "error":
-                            block.status = BlockStatus.ERROR
-                            block.error_msg = status_data.get("error", "Unknown model error")
-                            manifest.save()
+                            fresh_block.status = BlockStatus.ERROR
+                            fresh_block.error_msg = status_data.get("error", "Unknown model error")
+                            fresh_manifest.save()
+                            db.save_project(req.project_name, fresh_manifest.to_dict())
                             db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                             return
                     else:
                         logger.warning(f"Failed pulling job {job_id} status.")
                         
                 if not job_done:
-                    block.status = BlockStatus.ERROR
-                    block.error_msg = "Model generation timed out"
-                    manifest.save()
+                    fresh_block.status = BlockStatus.ERROR
+                    fresh_block.error_msg = "Model generation timed out"
+                    fresh_manifest.save()
+                    db.save_project(req.project_name, fresh_manifest.to_dict())
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
@@ -959,28 +1479,39 @@ async def generate_sfx(req: SfxGenerateRequest):
                 if dl_resp.status_code == 200:
                     with open(out_wav, "wb") as w_file:
                         w_file.write(dl_resp.content)
-                    block.status = BlockStatus.DONE
-                    block.file_path = str(out_wav)
+                    fresh_block.status = BlockStatus.DONE
+                    fresh_block.file_path = str(out_wav)
                     meta = ffprobe.get_video_metadata(out_wav)
-                    block.duration_s = meta["duration_s"]
-                    block.error_msg = None
+                    fresh_block.duration_s = meta["duration_s"]
+                    fresh_block.error_msg = None
                     logger.info(f"SFX file downloaded successfully → {out_wav}")
                     # Log successful generation
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, str(out_wav), "success")
                 else:
-                    block.status = BlockStatus.ERROR
-                    block.error_msg = "Failed downloading generated audio"
+                    fresh_block.status = BlockStatus.ERROR
+                    fresh_block.error_msg = "Failed downloading generated audio"
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
         except Exception as e:
-            block.status = BlockStatus.ERROR
-            block.error_msg = str(e)
             logger.error(f"Error generating SFX: {e}")
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                    err_manifest = Manifest.from_json(f_fresh.read())
+                err_block = next((b for b in err_manifest.sfx_blocks if b.id == req.block_id), None)
+                if err_block:
+                    err_block.status = BlockStatus.ERROR
+                    err_block.error_msg = str(e)
+                    err_manifest.save()
+                    db.save_project(req.project_name, err_manifest.to_dict())
+            except Exception as ex:
+                logger.error(f"Failed saving SFX error to manifest: {ex}")
             db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
-        finally:
-            manifest.save()
-            db.save_project(req.project_name, manifest.to_dict())
+            return
             
-    asyncio.create_task(run_sfx())
+        fresh_manifest.save()
+        db.save_project(req.project_name, fresh_manifest.to_dict())
+            
+    # Put the generation task in the sequential queue so we execute one at a time
+    await sfx_queue.put(run_sfx)
     return {"status": "generating", "manifest": manifest.to_dict()}
 
 # --- RENDERING ENGINE ---
@@ -1017,7 +1548,10 @@ async def trigger_render(req: RenderRequest, background_tasks: BackgroundTasks):
             output_path = await stitcher.render_all(
                 manifest=manifest,
                 concat=req.concat,
-                on_clip_done=on_clip_progress
+                on_clip_done=on_clip_progress,
+                video_volume=req.video_volume if req.video_volume is not None else 1.0,
+                voice_volume=req.voice_volume if req.voice_volume is not None else 1.0,
+                sfx_volume=req.sfx_volume if req.sfx_volume is not None else 0.5
             )
             active_renders[project_name]["status"] = "done"
             active_renders[project_name]["progress"] = 100.0
@@ -1094,17 +1628,32 @@ async def upload_custom_video(project_name: str, index: int, file: UploadFile = 
     with open(out_file_path, "wb") as f_out:
         f_out.write(content)
         
-    meta = ffprobe.get_video_metadata(out_file_path)
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+    is_image = file_extension in image_extensions
+    media_type = "image" if is_image else "video"
+    
     v_id = manifest.video_blocks[index].id
     thumb_name = f"{project_name}_{v_id}_custom.jpg"
     thumb_path = THUMBS_DIR / thumb_name
-    ffprobe.extract_thumbnail(out_file_path, thumb_path, time_s=0.0)
     
+    if is_image:
+        try:
+            import shutil
+            shutil.copy2(out_file_path, thumb_path)
+        except Exception as e:
+            logger.error(f"Error copying image thumbnail: {e}")
+        duration_s = 5.0
+    else:
+        ffprobe.extract_thumbnail(out_file_path, thumb_path, time_s=0.0)
+        meta = ffprobe.get_video_metadata(out_file_path)
+        duration_s = meta["duration_s"] if meta["duration_s"] > 0 else 5.0
+        
     block = manifest.video_blocks[index]
     block.file_path = str(out_file_path)
     block.filename = file.filename
-    block.duration_s = meta["duration_s"] if meta["duration_s"] > 0 else 5.0
+    block.duration_s = duration_s
     block.thumbnail_path = f"/static/thumbnails/{thumb_name}"
+    block.media_type = media_type
     
     manifest.save()
     db.save_project(project_name, manifest.to_dict())
@@ -1284,9 +1833,21 @@ async def serve_master_video(request: Request, t: str = ""):
 @app.get("/api/video/serve")
 async def serve_video(path: str):
     import os
+    import mimetypes
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"Video file not found: {path}")
-    return FileResponse(path)
+    
+    mime_type, _ = mimetypes.guess_type(path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+        
+    return FileResponse(
+        path=path,
+        media_type=mime_type,
+        headers={
+            "Accept-Ranges": "bytes"
+        }
+    )
 
 @app.get("/")
 async def serve_index():

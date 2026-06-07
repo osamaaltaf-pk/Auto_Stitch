@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoStitch Lip-Sync Lab</title>
+  <meta name="description" content="Interactive 2D lip-sync animation studio. Upload characters, map mouths, and generate procedural lip-sync videos.">
+  <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+
+  <header>
+    <div style="display:flex; align-items:center; gap:1rem;">
+      <h1>👄 Lip-Sync Lab</h1>
+      <div class="subtitle">Procedural 2D Lip-Sync Animation Studio</div>
+    </div>
+    <div style="font-family:monospace; font-size:0.75rem; color:var(--accent-secondary); background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); padding:0.4rem 0.8rem; border-radius:8px;">
+      PocketTTS · Port 8000 · Ready
+    </div>
+  </header>
+
+  <main>
+    <!-- ══════════════ LEFT: Workspace ══════════════ -->
+    <div class="left-panel">
+      <div class="card workspace-card">
+
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+          <div>
+            <h2>1. Character Workspace</h2>
+            <div class="subtitle">· Click to place mouth · Drag to reposition · Corner handles to resize</div>
+          </div>
+          <div class="upload-btn-wrapper" style="width:auto;">
+            <button class="btn btn-secondary" id="upload-btn" style="white-space:nowrap; padding:0.5rem 1rem; font-size:0.8rem;">📁 Upload Image</button>
+            <input type="file" id="image-file" accept="image/*" />
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="image-workspace" id="workspace">
+          <div class="placeholder-text" id="workspace-placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" style="width:48px;height:48px;margin-bottom:0.5rem;opacity:0.3;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
+            <span>No character image loaded</span>
+            <span style="font-size:0.7rem;">Select a file above to begin mapping</span>
+          </div>
+
+          <div id="image-container" style="display:none;">
+            <img id="char-img" src="" draggable="false" />
+            <div id="marker-overlay" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto;">
+              <div class="mouth-marker"      id="marker-char1" style="display:none;"></div>
+              <div class="mouth-marker char2" id="marker-char2" style="display:none;"></div>
+              <div class="mouth-ghost-cursor" id="mouth-ghost"  style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic tab bar — rendered by JS renderCharTabs() -->
+        <div id="char-tab-bar" style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center; flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ RIGHT: Config + Script + Output ══════════════ -->
+    <div class="right-panel">
+
+      <!-- Mouth Style + Colors (shown only when a character is active) -->
+      <div class="card" style="flex-shrink:0;">
+        <h2>2. Mouth Style &amp; Colors</h2>
+
+        <!-- Empty state -->
+        <div id="char-settings-empty" style="display:flex; flex-direction:column; align-items:center; gap:0.6rem; padding:1rem 0; color:var(--text-dim);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2" style="width:36px;height:36px;opacity:0.3;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+          </svg>
+          <span style="font-size:0.8rem;">No character added yet</span>
+          <span style="font-size:0.7rem;">Click <strong>＋ Add Character</strong> above to begin</span>
+        </div>
+
+        <!-- Active character settings -->
+        <div id="char-settings-panel" style="display:none; flex-direction:column; gap:0.85rem;">
+
+          <div class="presets-grid" id="presets-container">
+            <div class="preset-card active" id="preset-rounded" onclick="selectPreset('rounded')">
+              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="20" ry="8" fill="#111"/><path d="M14 15 Q30 5 46 15 Z" fill="#fff"/><path d="M18 22 Q30 14 42 22 Q30 30 18 22Z" fill="#f56e7d"/></svg>
+              <span class="title">Rounded Comic</span>
+            </div>
+            <div class="preset-card" id="preset-capsule" onclick="selectPreset('capsule')">
+              <svg viewBox="0 0 60 30" width="56" height="28"><rect x="2" y="2" width="56" height="26" rx="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><rect x="8" y="6" width="44" height="18" rx="6" fill="#111"/><rect x="10" y="6" width="40" height="7" fill="#fff"/><rect x="10" y="17" width="40" height="7" fill="#fff"/></svg>
+              <span class="title">Anime Capsule</span>
+            </div>
+            <div class="preset-card" id="preset-flat" onclick="selectPreset('flat')">
+              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="21" ry="5" fill="#111"/></svg>
+              <span class="title">Flat / Squeeze</span>
+            </div>
+            <div class="preset-card" id="preset-smile" onclick="selectPreset('smile')">
+              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="25" ry="11" fill="#fff" stroke="#222" stroke-width="1.5"/><line x1="5" y1="15" x2="55" y2="15" stroke="#222" stroke-width="2"/><line x1="17" y1="5" x2="17" y2="25" stroke="#222" stroke-width="1.2"/><line x1="30" y1="4" x2="30" y2="26" stroke="#222" stroke-width="1.2"/><line x1="43" y1="5" x2="43" y2="25" stroke="#222" stroke-width="1.2"/></svg>
+              <span class="title">Comic Smile</span>
+            </div>
+            <div class="preset-card" id="preset-u-shaped" onclick="selectPreset('u-shaped')">
+              <svg viewBox="0 0 60 30" width="56" height="28"><path d="M 2 2 A 28 28 0 0 0 58 2 Z" fill="#FFCC99" stroke="#222" stroke-width="2"/><path d="M 8 2 A 22 22 0 0 0 52 2 Z" fill="#111"/><rect x="18" y="2" width="24" height="4" fill="#fff"/><path d="M 22 18 Q 30 25 38 18 Z" fill="#f56e7d"/></svg>
+              <span class="title">U-Shaped</span>
+            </div>
+          </div>
+
+          <div class="color-row">
+            <div class="form-group flex-1">
+              <label>Skin Tone</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="color-skin" value="#FFCC99" onchange="updateColors()" />
+                <span id="skin-hex">#FFCC99</span>
+                <button class="color-pipette-btn" id="pipette-skin" title="Pick from image" onclick="startColorPicker('skin')">🎯</button>
+              </div>
+            </div>
+            <div class="form-group flex-1">
+              <label>Lip / Outline</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="color-outline" value="#000000" onchange="updateColors()" />
+                <span id="outline-hex">#000000</span>
+                <button class="color-pipette-btn" id="pipette-outline" title="Pick from image" onclick="startColorPicker('outline')">🎯</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div class="form-group">
+              <label>Width Scale</label>
+              <div class="slider-container">
+                <input type="range" id="mouth-width" class="custom-slider" min="1" max="60" step="0.5" value="16" oninput="updateSliderVal('mouth-width')" />
+                <span class="slider-val" id="mouth-width-val">16%</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Height Scale</label>
+              <div class="slider-container">
+                <input type="range" id="mouth-height" class="custom-slider" min="1" max="40" step="0.5" value="10" oninput="updateSliderVal('mouth-height')" />
+                <span class="slider-val" id="mouth-height-val">10%</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-secondary" style="padding:0.4rem; font-size:0.75rem;" onclick="triggerColorAutoSample()">
+            🎨 Auto-Sample Colors from Mouth Region
+          </button>
+
+          <!-- Hidden sync inputs -->
+          <input type="hidden" id="mouth-rotation"      value="0" />
+          <input type="hidden" id="mouth-rotation-val"  value="0°" />
+          <input type="hidden" id="mouth-perspective"   value="1" />
+          <input type="hidden" id="mouth-perspective-val" value="1.0" />
+        </div>
+      </div>
+
+      <!-- Script -->
+      <div class="card" style="flex-shrink:0;">
+        <h2>3. Dialogue Script &amp; Audio</h2>
+        <div class="form-group">
+          <label>Script (use [Character 1] / [Character 2] tags)</label>
+          <textarea id="script-input" rows="3">[Character 1] Hello! Welcome to the new AutoStitch Lip-Sync Lab. [Character 2] Wow, my mouth is programmatically generated and matches my character!</textarea>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(1)">Dialogue Sample</button>
+          <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(2)">Monologue Sample</button>
+        </div>
+        <div class="form-group" style="margin-top:0.4rem; flex-direction:row; align-items:center; gap:0.5rem; justify-content:flex-start;">
+          <input type="checkbox" id="safe-mode-checkbox" style="width:auto; cursor:pointer;" />
+          <label for="safe-mode-checkbox" style="text-transform:none; font-size:0.75rem; cursor:pointer; user-select:none; margin:0; display:flex; align-items:center; gap:0.3rem;">
+            🛡️ Safe Mode (Downscale to 1280px for low-RAM)
+          </label>
+        </div>
+        <button class="btn" id="generate-btn" onclick="startGeneration()">⚡ Generate Lip-Sync Animation</button>
+      </div>
+
+      <!-- Output Video -->
+      <div class="card" style="flex:1; min-height:180px;">
+        <h2>4. Generated Output</h2>
+        <div class="video-container">
+          <video id="output-video" controls style="display:none;"></video>
+          <div class="placeholder-text" id="video-placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin-bottom:0.5rem;opacity:0.3;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z"/>
+            </svg>
+            <span>Run generation above to play video</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div class="card" style="flex-shrink:0; max-height:130px;">
+        <h2>5. Console</h2>
+        <div class="logger-card" id="logs-container">
+          <div class="log-entry info">Console started. Upload a character image to begin...</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ══════════════ FLOATING MOUTH CONTROL POPUP ══════════════ -->
+  <div id="mouth-popup" class="mouth-popup" style="display:none;">
+
+    <!-- Drag handle header -->
+    <div class="popup-header" id="popup-drag-handle">
+      <span class="popup-drag-icon">⠿</span>
+      <span id="popup-char-label">Char 1 · Mouth Controls</span>
+      <button class="popup-close" onclick="closeMouthPopup()" title="Close">✕</button>
+    </div>
+
+    <!-- Rotation -->
+    <div class="popup-section">
+      <div class="popup-label">🔄 Tilt Rotation</div>
+      <div class="popup-slider-row">
+        <input type="range" id="popup-rotation" class="custom-slider popup-slider" min="-180" max="180" value="0" oninput="updatePopupRotation()" />
+        <span class="slider-val" id="popup-rotation-val">0°</span>
+      </div>
+    </div>
+
+    <!-- Perspective -->
+    <div class="popup-section">
+      <div class="popup-label">↔ Perspective X-Scale</div>
+      <div class="popup-slider-row">
+        <input type="range" id="popup-perspective" class="custom-slider popup-slider" min="-1" max="1" step="0.02" value="1" oninput="updatePopupPerspective()" />
+        <span class="slider-val" id="popup-perspective-val">1.00</span>
+      </div>
+    </div>
+
+    <!-- Face Angle -->
+    <div class="popup-section">
+      <div class="popup-label">🎭 Face Angle</div>
+      <div class="angle-presets">
+        <button class="angle-preset-btn" data-angle="-90" onclick="setFaceAngle(-90)">◁ 90°</button>
+        <button class="angle-preset-btn" data-angle="-45" onclick="setFaceAngle(-45)">◁ 45°</button>
+        <button class="angle-preset-btn active" data-angle="0" onclick="setFaceAngle(0)">● Front</button>
+        <button class="angle-preset-btn" data-angle="45" onclick="setFaceAngle(45)">45° ▷</button>
+        <button class="angle-preset-btn" data-angle="90" onclick="setFaceAngle(90)">90° ▷</button>
+      </div>
+      <div class="popup-slider-row">
+        <input type="range" id="popup-face-angle" class="custom-slider popup-slider" min="-90" max="90" step="5" value="0" oninput="updateFaceAngle()" />
+        <span class="slider-val" id="popup-face-angle-val">0°</span>
+      </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="popup-colors">
+      <div class="popup-color-item">
+        <div class="popup-label">Skin</div>
+        <div class="popup-color-row">
+          <input type="color" id="popup-color-skin" value="#FFCC99" onchange="updatePopupColors()" />
+          <button class="color-pipette-btn" onclick="startColorPicker('skin')" title="Pick from image">🎯</button>
+        </div>
+      </div>
+      <div class="popup-color-item">
+        <div class="popup-label">Lip</div>
+        <div class="popup-color-row">
+          <input type="color" id="popup-color-outline" value="#000000" onchange="updatePopupColors()" />
+          <button class="color-pipette-btn" onclick="startColorPicker('outline')" title="Pick from image">🎯</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:0.4rem; margin-top:0.5rem;">
+      <button class="popup-btn" onclick="triggerColorAutoSample()">🎨 Auto</button>
+      <button class="popup-btn popup-btn-accent" onclick="closeMouthPopup()">✓ Done</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
