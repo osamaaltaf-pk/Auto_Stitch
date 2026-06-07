@@ -1323,26 +1323,36 @@ async def generate_tts(req: TtsGenerateRequest):
                     timeout=120.0
                 )
                 
+                # Load manifest freshly again to get user modifications that occurred during the API call
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                    fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                fresh_block2 = next((b for b in fresh_manifest2.voice_blocks if b.id == req.block_id), None)
+                
                 if resp.status_code == 200:
                     with open(out_wav, "wb") as w_file:
                         w_file.write(resp.content)
-                    fresh_block.status = BlockStatus.DONE
-                    fresh_block.file_path = str(out_wav)
-                    # Deduce duration using ffprobe
-                    meta = ffprobe.get_video_metadata(out_wav)
-                    fresh_block.duration_s = meta["duration_s"]
-                    fresh_block.error_msg = None
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.DONE
+                        fresh_block2.file_path = str(out_wav)
+                        # Deduce duration using ffprobe
+                        meta = ffprobe.get_video_metadata(out_wav)
+                        fresh_block2.duration_s = meta["duration_s"]
+                        fresh_block2.error_msg = None
                     logger.info(f"TTS Synthesized successfully → {out_wav}")
-                    db.log_generation(req.project_name, fresh_block.id, "voice", req.text, str(out_wav), "success")
+                    db.log_generation(req.project_name, req.block_id, "voice", req.text, str(out_wav), "success")
                 else:
                     try:
                         detail = resp.json().get("detail", f"HTTP {resp.status_code}")
                     except Exception:
                         detail = f"TTS Server returned status {resp.status_code}: {resp.text[:120]}"
-                    fresh_block.status = BlockStatus.ERROR
-                    fresh_block.error_msg = detail
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = detail
                     logger.error(f"TTS Server failed: {detail}")
-                    db.log_generation(req.project_name, fresh_block.id, "voice", req.text, None, "failed")
+                    db.log_generation(req.project_name, req.block_id, "voice", req.text, None, "failed")
+                
+                fresh_manifest2.save()
+                db.save_project(req.project_name, fresh_manifest2.to_dict())
         except Exception as e:
             logger.error(f"Connection failed to PocketTTS server: {e}")
             try:
@@ -1358,9 +1368,6 @@ async def generate_tts(req: TtsGenerateRequest):
                 logger.error(f"Failed saving error to manifest: {ex}")
             db.log_generation(req.project_name, req.block_id, "voice", req.text, None, "failed")
             return
-            
-        fresh_manifest.save()
-        db.save_project(req.project_name, fresh_manifest.to_dict())
             
     # Put the generation task in the sequential queue so we execute one at a time
     await tts_queue.put(run_tts)
@@ -1435,10 +1442,15 @@ async def generate_sfx(req: SfxGenerateRequest):
                         err = resp.json().get("error", f"HTTP {resp.status_code}")
                     except Exception:
                         err = f"SFX Server returned status {resp.status_code}: {resp.text[:120]}"
-                    fresh_block.status = BlockStatus.ERROR
-                    fresh_block.error_msg = err
-                    fresh_manifest.save()
-                    db.save_project(req.project_name, fresh_manifest.to_dict())
+                    
+                    with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                        fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                    fresh_block2 = next((b for b in fresh_manifest2.sfx_blocks if b.id == req.block_id), None)
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = err
+                    fresh_manifest2.save()
+                    db.save_project(req.project_name, fresh_manifest2.to_dict())
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
@@ -1469,20 +1481,29 @@ async def generate_sfx(req: SfxGenerateRequest):
                             job_done = True
                             break
                         elif job_status == "error":
-                            fresh_block.status = BlockStatus.ERROR
-                            fresh_block.error_msg = status_data.get("error", "Unknown model error")
-                            fresh_manifest.save()
-                            db.save_project(req.project_name, fresh_manifest.to_dict())
+                            err_msg = status_data.get("error", "Unknown model error")
+                            with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                                fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                            fresh_block2 = next((b for b in fresh_manifest2.sfx_blocks if b.id == req.block_id), None)
+                            if fresh_block2:
+                                fresh_block2.status = BlockStatus.ERROR
+                                fresh_block2.error_msg = err_msg
+                            fresh_manifest2.save()
+                            db.save_project(req.project_name, fresh_manifest2.to_dict())
                             db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                             return
                     else:
                         logger.warning(f"Failed pulling job {job_id} status.")
                         
                 if not job_done:
-                    fresh_block.status = BlockStatus.ERROR
-                    fresh_block.error_msg = "Model generation timed out"
-                    fresh_manifest.save()
-                    db.save_project(req.project_name, fresh_manifest.to_dict())
+                    with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                        fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                    fresh_block2 = next((b for b in fresh_manifest2.sfx_blocks if b.id == req.block_id), None)
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = "Model generation timed out"
+                    fresh_manifest2.save()
+                    db.save_project(req.project_name, fresh_manifest2.to_dict())
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
                     return
                     
@@ -1492,21 +1513,30 @@ async def generate_sfx(req: SfxGenerateRequest):
                     headers={"bypass-tunnel-reminder": "true"},
                     timeout=60.0
                 )
+                
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                    fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                fresh_block2 = next((b for b in fresh_manifest2.sfx_blocks if b.id == req.block_id), None)
+                
                 if dl_resp.status_code == 200:
                     with open(out_wav, "wb") as w_file:
                         w_file.write(dl_resp.content)
-                    fresh_block.status = BlockStatus.DONE
-                    fresh_block.file_path = str(out_wav)
-                    meta = ffprobe.get_video_metadata(out_wav)
-                    fresh_block.duration_s = meta["duration_s"]
-                    fresh_block.error_msg = None
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.DONE
+                        fresh_block2.file_path = str(out_wav)
+                        meta = ffprobe.get_video_metadata(out_wav)
+                        fresh_block2.duration_s = meta["duration_s"]
+                        fresh_block2.error_msg = None
                     logger.info(f"SFX file downloaded successfully → {out_wav}")
-                    # Log successful generation
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, str(out_wav), "success")
                 else:
-                    fresh_block.status = BlockStatus.ERROR
-                    fresh_block.error_msg = "Failed downloading generated audio"
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = "Failed downloading generated audio"
                     db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
+                
+                fresh_manifest2.save()
+                db.save_project(req.project_name, fresh_manifest2.to_dict())
         except Exception as e:
             logger.error(f"Error generating SFX: {e}")
             try:
@@ -1522,9 +1552,6 @@ async def generate_sfx(req: SfxGenerateRequest):
                 logger.error(f"Failed saving SFX error to manifest: {ex}")
             db.log_generation(req.project_name, req.block_id, "sfx", req.prompt, None, "failed")
             return
-            
-        fresh_manifest.save()
-        db.save_project(req.project_name, fresh_manifest.to_dict())
             
     # Put the generation task in the sequential queue so we execute one at a time
     await sfx_queue.put(run_sfx)
