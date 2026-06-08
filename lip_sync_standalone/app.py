@@ -1028,11 +1028,6 @@ def load_custom_mouth_sprite(char_name: str, viseme: str, face_angle: float, tar
         
     try:
         img = Image.open(sprite_file).convert("RGBA")
-        # Trim transparent borders to ensure the actual mouth pixels occupy the full target_w, target_h
-        bbox = img.getbbox()
-        if bbox:
-            img = img.crop(bbox)
-        
         # Mirror check: if target face_angle and closest_angle are opposite signs
         if (face_angle < -10 and closest_angle > 10) or (face_angle > 10 and closest_angle < -10):
             logger.info(f"Mirroring custom mouth sprite {viseme} from angle {closest_angle}° for face_angle {face_angle}°")
