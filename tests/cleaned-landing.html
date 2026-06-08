@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoStitch Studio — AI-Powered Video Composer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --void: #050508; --deep: #0a0a12; --surface: #0f0f1a; --panel: #14141f;
+  --border: rgba(255,255,255,0.07); --border-bright: rgba(255,255,255,0.14);
+  --indigo: #5b4fff; --violet: #8b5cf6; --electric: #7c3aed;
+  --gold: #d4a853; --gold-light: #f0c875; --teal: #2dd4bf;
+  --text: #e8e8f0; --muted: #7070a0; --dim: #40405a;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--void); color: var(--text); font-family: "Syne", sans-serif; overflow-x: hidden; cursor: none; }
+
+/* CURSOR */
+.cursor { position:fixed; width:12px; height:12px; background:var(--gold); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:width .2s,height .2s; mix-blend-mode:difference; }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1px solid rgba(212,168,83,0.4); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); transition:width .3s,height .3s; }
+
+/* NOISE */
+body::before { content:""; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:1000; opacity:0.3; }
+
+/* NAV */
+nav { position:fixed; top:0; left:0; right:0; z-index:500; display:flex; align-items:center; justify-content:space-between; padding:18px 60px; background:linear-gradient(180deg,rgba(5,5,8,0.97) 0%,transparent 100%); backdrop-filter:blur(12px); border-bottom:1px solid transparent; transition:border-color .3s; }
+nav.scrolled { border-bottom-color:var(--border); }
+.nav-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.logo-mark { width:34px; height:34px; background:linear-gradient(135deg,var(--indigo),var(--violet)); border-radius:9px; display:flex; align-items:center; justify-content:center; font-family:"DM Mono",monospace; font-size:13px; font-weight:500; color:#fff; letter-spacing:-1px; }
+.logo-text { font-size:14px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#fff; }
+.logo-ver { font-family:"DM Mono",monospace; font-size:10px; color:var(--gold); background:rgba(212,168,83,0.1); border:1px solid rgba(212,168,83,0.25); padding:2px 7px; border-radius:20px; }
+.nav-links { display:flex; align-items:center; gap:32px; list-style:none; }
+.nav-links a { color:var(--muted); text-decoration:none; font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; transition:color .2s; cursor:none; }
+.nav-links a:hover { color:var(--text); }
+.nav-cta { background:linear-gradient(135deg,var(--indigo),var(--electric)) !important; color:#fff !important; padding:9px 22px; border-radius:6px; }
+
+/* HERO */
+.hero { min-height:100vh; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 40px 60px; overflow:hidden; }
+.hero-grid { position:absolute; inset:0; background-image:linear-gradient(rgba(91,79,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(91,79,255,0.04) 1px,transparent 1px); background-size:60px 60px; animation:gridShift 20s linear infinite; }
+@keyframes gridShift { 0%{transform:translateY(0)} 100%{transform:translateY(60px)} }
+.orb { position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; }
+.orb-1 { width:600px; height:600px; background:radial-gradient(circle,rgba(91,79,255,0.15) 0%,transparent 70%); top:-150px; left:50%; transform:translateX(-50%); animation:fl1 8s ease-in-out infinite; }
+.orb-2 { width:400px; height:400px; background:radial-gradient(circle,rgba(212,168,83,0.08) 0%,transparent 70%); bottom:100px; right:-100px; animation:fl2 10s ease-in-out infinite; }
+.orb-3 { width:300px; height:300px; background:radial-gradient(circle,rgba(45,212,191,0.07) 0%,transparent 70%); bottom:200px; left:-50px; animation:fl3 12s ease-in-out infinite; }
+@keyframes fl1 { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-30px)} }
+@keyframes fl2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+@keyframes fl3 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(25px)} }
+.badge { display:inline-flex; align-items:center; gap:8px; background:rgba(91,79,255,0.1); border:1px solid rgba(91,79,255,0.3); padding:6px 18px; border-radius:100px; font-family:"DM Mono",monospace; font-size:11px; color:#a08fff; letter-spacing:0.1em; margin-bottom:36px; animation:fadeUp .8s ease both; }
+.badge-dot { width:6px; height:6px; background:var(--teal); border-radius:50%; animation:pulse 2s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+.hero-title { font-family:"Cormorant Garamond",serif; font-size:clamp(60px,8vw,116px); font-weight:300; line-height:0.92; letter-spacing:-0.02em; margin-bottom:10px; animation:fadeUp .8s ease .1s both; }
+.hero-title .gold { color:var(--gold-light); font-style:italic; }
+.hero-title .dimw { color:var(--dim); }
+.hero-sub { font-family:"Cormorant Garamond",serif; font-size:clamp(28px,3.5vw,48px); font-weight:300; font-style:italic; color:var(--muted); margin-bottom:36px; animation:fadeUp .8s ease .2s both; }
+.hero-desc { max-width:520px; font-size:15px; color:var(--muted); line-height:1.8; margin-bottom:48px; animation:fadeUp .8s ease .3s both; }
+.hero-actions { display:flex; align-items:center; gap:14px; margin-bottom:60px; animation:fadeUp .8s ease .4s both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+.btn-primary { display:inline-flex; align-items:center; gap:10px; background:linear-gradient(135deg,var(--indigo),var(--electric)); color:#fff; padding:15px 36px; border-radius:8px; font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; text-decoration:none; border:none; cursor:none; transition:transform .2s,box-shadow .2s,filter .2s; box-shadow:0 0 40px rgba(91,79,255,0.3); }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 60px rgba(91,79,255,0.5); filter:brightness(1.1); }
+.btn-ghost { display:inline-flex; align-items:center; gap:10px; background:transparent; color:var(--muted); padding:15px 28px; border-radius:8px; font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; text-decoration:none; border:1px solid var(--border-bright); cursor:none; transition:color .2s,border-color .2s; }
+.btn-ghost:hover { color:var(--text); border-color:rgba(255,255,255,0.3); }
+
+/* MOCKUP */
+.hero-mockup { width:100%; max-width:1060px; animation:fadeUp .8s ease .5s both; position:relative; }
+.mockup-frame { background:var(--surface); border:1px solid var(--border-bright); border-radius:14px; overflow:hidden; box-shadow:0 0 0 1px rgba(91,79,255,0.15),0 40px 120px rgba(0,0,0,0.85),0 0 80px rgba(91,79,255,0.08); }
+.mockup-bar { background:#1a1a24; padding:11px 18px; display:flex; align-items:center; gap:7px; border-bottom:1px solid var(--border); }
+.dot { width:11px; height:11px; border-radius:50%; }
+.dot.r{background:#ff5f57;} .dot.y{background:#febc2e;} .dot.g{background:#28c840;}
+.bar-title { flex:1; text-align:center; font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); margin-left:-66px; }
+.mockup-img { width:100%; display:block; }
+.mockup-glow { position:absolute; bottom:-40px; left:50%; transform:translateX(-50%); width:70%; height:50px; background:radial-gradient(ellipse,rgba(91,79,255,0.25) 0%,transparent 70%); filter:blur(20px); }
+
+/* SCREENSHOT TABS */
+.ss-tabs { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:24px; animation:fadeUp .8s ease .6s both; }
+.ss-tab { font-family:"DM Mono",monospace; font-size:10px; padding:6px 16px; border-radius:20px; border:1px solid var(--border-bright); color:var(--muted); cursor:none; transition:all .2s; background:transparent; }
+.ss-tab.active { background:rgba(91,79,255,0.15); border-color:rgba(91,79,255,0.4); color:#a08fff; }
+.ss-tab:hover { color:var(--text); }
+
+/* STATS */
+.stats-bar { padding:32px 60px; display:flex; align-items:center; justify-content:center; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:var(--deep); position:relative; overflow:hidden; }
+.stats-bar::before { content:""; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--indigo),transparent); }
+.stat-item { flex:1; text-align:center; padding:20px 40px; border-right:1px solid var(--border); }
+.stat-item:last-child { border-right:none; }
+.stat-num { font-family:"Cormorant Garamond",serif; font-size:52px; font-weight:300; color:#fff; line-height:1; display:block; }
+.stat-num span { color:var(--gold-light); }
+.stat-label { font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); letter-spacing:0.15em; text-transform:uppercase; margin-top:4px; display:block; }
+
+/* SECTION BASE */
+.section-label { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:16px; display:flex; align-items:center; gap:12px; }
+.section-label::before { content:""; width:28px; height:1px; background:var(--gold); }
+.section-title { font-family:"Cormorant Garamond",serif; font-size:clamp(42px,5vw,70px); font-weight:300; line-height:1; letter-spacing:-0.02em; }
+.section-title em { color:var(--gold-light); font-style:italic; }
+
+/* PIPELINE */
+.pipeline { background:var(--void); padding:110px 60px; }
+.pipeline-inner { max-width:1200px; margin:0 auto; }
+.pipeline-header { display:grid; grid-template-columns:1fr 1fr; gap:60px; margin-bottom:70px; align-items:end; }
+.pipeline-desc { color:var(--muted); font-size:15px; line-height:1.8; }
+.pipeline-steps { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.step-card { background:var(--surface); padding:36px 26px; transition:background .3s; }
+.step-card:hover { background:var(--panel); }
+.step-num { font-family:"DM Mono",monospace; font-size:10px; color:var(--electric); letter-spacing:0.1em; margin-bottom:18px; display:block; }
+.step-icon { width:46px; height:46px; background:rgba(91,79,255,0.1); border:1px solid rgba(91,79,255,0.2); border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:20px; font-size:20px; }
+.step-title { font-size:14px; font-weight:700; letter-spacing:0.06em; margin-bottom:10px; text-transform:uppercase; }
+.step-desc { font-family:"DM Mono",monospace; font-size:11px; color:var(--muted); line-height:1.7; }
+
+/* FEATURES */
+.features { background:var(--deep); padding:110px 60px; }
+.features-inner { max-width:1200px; margin:0 auto; }
+.features-header { max-width:560px; margin-bottom:70px; }
+.features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.feat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:36px 28px; transition:border-color .3s,transform .3s; position:relative; overflow:hidden; }
+.feat-card::before { content:""; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(91,79,255,0.5),transparent); opacity:0; transition:opacity .3s; }
+.feat-card:hover { border-color:rgba(91,79,255,0.3); transform:translateY(-3px); }
+.feat-card:hover::before { opacity:1; }
+.feat-card.gold-card { background:linear-gradient(135deg,rgba(212,168,83,0.06),var(--surface)); border-color:rgba(212,168,83,0.2); grid-column:span 2; }
+.feat-card.gold-card::before { background:linear-gradient(90deg,transparent,rgba(212,168,83,0.4),transparent); }
+.feat-card.gold-card:hover { border-color:rgba(212,168,83,0.35); }
+.feat-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:24px; background:rgba(91,79,255,0.08); border:1px solid rgba(91,79,255,0.15); }
+.gold-card .feat-icon { background:rgba(212,168,83,0.08); border-color:rgba(212,168,83,0.2); }
+.feat-title { font-size:14px; font-weight:700; letter-spacing:0.05em; margin-bottom:12px; text-transform:uppercase; }
+.feat-desc { font-size:13px; color:var(--muted); line-height:1.7; }
+.feat-tag { display:inline-block; margin-top:18px; font-family:"DM Mono",monospace; font-size:10px; padding:3px 10px; border-radius:4px; background:rgba(91,79,255,0.1); color:#a08fff; border:1px solid rgba(91,79,255,0.2); }
+.gold-card .feat-tag { background:rgba(212,168,83,0.1); color:var(--gold-light); border-color:rgba(212,168,83,0.3); }
+.gold-card-inner { display:grid; grid-template-columns:1fr 1fr; gap:36px; }
+
+/* DASHBOARD SHOWCASE */
+.showcase { background:var(--void); padding:110px 60px; overflow:hidden; }
+.showcase-inner { max-width:1200px; margin:0 auto; }
+.showcase-header { display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:end; margin-bottom:60px; }
+.showcase-pills { display:flex; flex-direction:column; gap:10px; align-self:end; }
+.s-pill { display:flex; align-items:center; gap:12px; padding:10px 18px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-family:"DM Mono",monospace; font-size:11px; color:var(--muted); }
+.s-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.theme-switcher { display:flex; gap:2px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px; margin-bottom:20px; }
+.theme-btn { flex:1; padding:7px 14px; border-radius:6px; border:none; font-family:"DM Mono",monospace; font-size:10px; letter-spacing:0.08em; cursor:none; transition:all .2s; background:transparent; color:var(--muted); }
+.theme-btn.active { background:var(--panel); color:var(--text); }
+.dash-frame { border:1px solid var(--border-bright); border-radius:12px; overflow:hidden; box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 60px rgba(91,79,255,0.08); }
+.dash-bar { background:var(--panel); padding:10px 18px; display:flex; align-items:center; gap:7px; border-bottom:1px solid var(--border); }
+.dash-img { width:100%; display:block; transition:opacity .4s; }
+
+/* PRICING */
+.pricing { padding:110px 60px; background:var(--deep); }
+.pricing-inner { max-width:960px; margin:0 auto; }
+.pricing-header { text-align:center; margin-bottom:70px; }
+.pricing-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; align-items:start; }
+.price-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:36px 28px; transition:border-color .3s; }
+.price-card.featured { background:linear-gradient(135deg,rgba(91,79,255,0.08),var(--surface)); border-color:rgba(91,79,255,0.4); position:relative; overflow:hidden; transform:scale(1.03); }
+.price-card.featured::before { content:""; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--indigo),var(--violet),var(--teal)); }
+.price-badge { display:inline-block; font-family:"DM Mono",monospace; font-size:9px; padding:3px 10px; background:rgba(91,79,255,0.2); color:#a08fff; border-radius:20px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:20px; border:1px solid rgba(91,79,255,0.3); }
+.price-name { font-size:12px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+.price-amount { font-family:"Cormorant Garamond",serif; font-size:58px; font-weight:300; line-height:1; color:#fff; margin-bottom:4px; }
+.price-amount sup { font-size:22px; vertical-align:top; margin-top:8px; }
+.price-period { font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); margin-bottom:28px; }
+.price-divider { height:1px; background:var(--border); margin-bottom:28px; }
+.price-features { list-style:none; display:flex; flex-direction:column; gap:12px; margin-bottom:32px; }
+.price-features li { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--muted); font-family:"DM Mono",monospace; }
+.price-features li::before { content:"✓"; color:var(--teal); font-size:10px; flex-shrink:0; }
+.price-features li.off { opacity:0.35; }
+.price-features li.off::before { content:"—"; color:var(--dim); }
+.btn-price { width:100%; padding:13px; border-radius:7px; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; cursor:none; border:none; transition:all .2s; }
+.btn-price.primary { background:linear-gradient(135deg,var(--indigo),var(--electric)); color:#fff; box-shadow:0 8px 30px rgba(91,79,255,0.3); }
+.btn-price.primary:hover { filter:brightness(1.1); transform:translateY(-2px); }
+.btn-price.ghost { background:transparent; color:var(--muted); border:1px solid var(--border-bright); }
+.btn-price.ghost:hover { color:var(--text); border-color:rgba(255,255,255,0.3); }
+
+/* SPECS */
+.specs-section { padding:110px 60px; background:var(--void); }
+.specs-inner { max-width:1200px; margin:0 auto; }
+.specs-grid { display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:start; margin-top:60px; }
+.spec-group { margin-bottom:36px; }
+.spec-group-title { font-family:"DM Mono",monospace; font-size:10px; color:var(--gold); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:18px; display:flex; align-items:center; gap:10px; }
+.spec-group-title::after { content:""; flex:1; height:1px; background:var(--border); }
+.spec-item { display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-bottom:1px solid var(--border); }
+.spec-item:last-child { border-bottom:none; }
+.spec-key { color:var(--muted); font-family:"DM Mono",monospace; font-size:11px; }
+.spec-val { color:var(--text); font-weight:600; font-size:12px; }
+.spec-val.green { color:var(--teal); } .spec-val.gold { color:var(--gold-light); }
+.quote-block { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--indigo); border-radius:0 12px 12px 0; padding:32px 28px; margin-bottom:16px; }
+.quote-text { font-family:"Cormorant Garamond",serif; font-size:20px; font-style:italic; font-weight:300; line-height:1.6; color:var(--text); margin-bottom:20px; }
+.quote-author { display:flex; align-items:center; gap:10px; }
+.qa { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--indigo),var(--violet)); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
+.qn { font-size:13px; font-weight:600; }
+.qr { font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* CREATOR */
+.creator-section { padding:70px 60px; background:var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.creator-inner { max-width:960px; margin:0 auto; display:grid; grid-template-columns:auto 1fr; gap:44px; align-items:center; }
+.c-avatar { width:76px; height:76px; border-radius:50%; background:linear-gradient(135deg,var(--indigo),var(--violet)); display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:700; color:#fff; border:2px solid rgba(91,79,255,0.4); flex-shrink:0; }
+.c-name { font-family:"Cormorant Garamond",serif; font-size:30px; font-weight:300; margin-bottom:4px; }
+.c-role { font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); letter-spacing:0.1em; margin-bottom:14px; }
+.c-bio { font-size:13px; color:var(--muted); line-height:1.7; max-width:580px; margin-bottom:20px; }
+.c-links { display:flex; gap:10px; }
+.c-link { display:inline-flex; align-items:center; gap:7px; padding:7px 18px; border-radius:6px; border:1px solid var(--border-bright); color:var(--muted); text-decoration:none; font-size:11px; font-weight:600; letter-spacing:0.07em; text-transform:uppercase; transition:all .2s; cursor:none; }
+.c-link:hover { color:var(--text); border-color:rgba(255,255,255,0.3); }
+.c-link.wa { background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.2); color:#22c55e; }
+.c-link.fv { background:rgba(45,212,191,0.08); border-color:rgba(45,212,191,0.2); color:var(--teal); }
+
+/* FINAL CTA */
+.final-cta { padding:140px 60px; text-align:center; background:var(--deep); position:relative; overflow:hidden; }
+.final-cta::before { content:""; position:absolute; inset:0; background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(91,79,255,0.1) 0%,transparent 70%); }
+.final-cta-title { font-family:"Cormorant Garamond",serif; font-size:clamp(54px,7vw,96px); font-weight:300; line-height:0.95; letter-spacing:-0.02em; margin-bottom:28px; position:relative; }
+.final-cta-title em { color:var(--gold-light); }
+.final-cta-sub { font-family:"DM Mono",monospace; font-size:12px; color:var(--muted); margin-bottom:44px; letter-spacing:0.08em; position:relative; }
+.cta-buttons { display:flex; align-items:center; justify-content:center; gap:14px; position:relative; }
+
+/* FOOTER */
+footer { padding:56px 60px; border-top:1px solid var(--border); background:var(--void); display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:36px; }
+.footer-tagline { font-family:"DM Mono",monospace; font-size:11px; color:var(--muted); line-height:1.6; margin-top:10px; }
+.footer-col-title { font-family:"DM Mono",monospace; font-size:10px; color:var(--gold); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:18px; }
+.footer-links { list-style:none; display:flex; flex-direction:column; gap:9px; }
+.footer-links a { color:var(--muted); text-decoration:none; font-size:13px; transition:color .2s; }
+.footer-links a:hover { color:var(--text); }
+.footer-bottom { padding:22px 60px; border-top:1px solid var(--border); background:var(--void); display:flex; align-items:center; justify-content:space-between; font-family:"DM Mono",monospace; font-size:10px; color:var(--dim); }
+
+/* PROJECTS PAGE */
+.projects-page { display:none; min-height:100vh; background:var(--void); padding:100px 60px 60px; }
+.projects-page.active { display:block; }
+.landing-page { display:block; }
+.landing-page.hidden { display:none; }
+.page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:48px; }
+.page-title { font-family:"Cormorant Garamond",serif; font-size:48px; font-weight:300; }
+.back-btn { display:inline-flex; align-items:center; gap:8px; color:var(--muted); text-decoration:none; font-family:"DM Mono",monospace; font-size:11px; letter-spacing:0.1em; cursor:none; transition:color .2s; }
+.back-btn:hover { color:var(--text); }
+.projects-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px; }
+.proj-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; transition:border-color .3s,transform .3s; cursor:none; }
+.proj-card:hover { border-color:rgba(91,79,255,0.4); transform:translateY(-3px); }
+.proj-icon { width:44px; height:44px; border-radius:10px; background:rgba(91,79,255,0.1); border:1px solid rgba(91,79,255,0.2); display:flex; align-items:center; justify-content:center; font-size:18px; margin-bottom:20px; }
+.proj-name { font-size:15px; font-weight:700; margin-bottom:6px; }
+.proj-meta { font-family:"DM Mono",monospace; font-size:10px; color:var(--muted); line-height:1.6; }
+.proj-meta span { display:block; }
+.proj-status { display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-family:"DM Mono",monospace; font-size:9px; padding:3px 10px; border-radius:20px; }
+.proj-status.done { background:rgba(34,197,94,0.1); color:#22c55e; border:1px solid rgba(34,197,94,0.2); }
+.proj-status.prog { background:rgba(91,79,255,0.1); color:#a08fff; border:1px solid rgba(91,79,255,0.2); }
+.proj-status.draft { background:rgba(212,168,83,0.1); color:var(--gold-light); border:1px solid rgba(212,168,83,0.2); }
+.proj-arrow { display:flex; align-items:center; justify-content:space-between; margin-top:20px; }
+.proj-open { font-family:"DM Mono",monospace; font-size:10px; color:var(--indigo); letter-spacing:0.08em; }
+
+/* DASHBOARD PAGE */
+.dashboard-page { display:none; min-height:100vh; background:var(--void); padding:100px 60px 60px; }
+.dashboard-page.active { display:block; }
+.db-frame { border:1px solid var(--border-bright); border-radius:12px; overflow:hidden; box-shadow:0 40px 100px rgba(0,0,0,0.7); }
+.db-img { width:100%; display:block; }
+
+/* REVEAL */
+.reveal { opacity:0; transform:translateY(36px); transition:opacity .7s ease,transform .7s ease; }
+.reveal.visible { opacity:1; transform:translateY(0); }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:var(--void); }
+::-webkit-scrollbar-thumb { background:var(--dim); border-radius:2px; }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV (always visible) -->
+<nav id="mainNav">
+  <a class="nav-logo" href="#" onclick="showLanding();return false;">
+    <div class="logo-mark">AS</div>
+    <span class="logo-text">AutoStitch</span>
+    <span class="logo-ver">v1.0</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#pipeline" onclick="showLanding();setTimeout(()=>document.getElementById('pipeline').scrollIntoView({behavior:'smooth'}),50);return false;">Pipeline</a></li>
+    <li><a href="#features" onclick="showLanding();setTimeout(()=>document.getElementById('features').scrollIntoView({behavior:'smooth'}),50);return false;">Features</a></li>
+    <li><a href="#showcase" onclick="showLanding();setTimeout(()=>document.getElementById('showcase').scrollIntoView({behavior:'smooth'}),50);return false;">Timeline</a></li>
+    <li><a href="#pricing" onclick="showLanding();setTimeout(()=>document.getElementById('pricing').scrollIntoView({behavior:'smooth'}),50);return false;">Pricing</a></li>
+    <li><a href="#" onclick="showDashboard();return false;" class="nav-cta">Open Studio</a></li>
+  </ul>
+</nav>
+
+<!-- ===== LANDING PAGE ===== -->
+<div class="landing-page" id="landingPage">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="badge"><span class="badge-dot"></span>AI-Powered &nbsp;·&nbsp; 100% Offline &nbsp;·&nbsp; Windows Native</div>
+  <h1 class="hero-title">
+    <span class="dimw">Compose</span> Video<br>
+    <span class="gold">Like a Director.</span>
+  </h1>
+  <p class="hero-sub">Three lanes. Infinite possibilities.</p>
+  <p class="hero-desc">AutoStitch Studio gives video creators a professional three-lane timeline — video, AI sound effects, AI voiceover — all running locally on your machine. No cloud. No subscriptions. No limits.</p>
+  <div class="hero-actions">
+    <a href="#" onclick="showDashboard();return false;" class="btn-primary">↓ Open Studio Dashboard</a>
+    <a href="#" onclick="showProjects();return false;" class="btn-ghost">View Projects →</a>
+  </div>
+  <div class="hero-mockup">
+    <div class="mockup-frame">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="bar-title">AutoStitch Studio — v1 STUDIO · Short_01</div>
+      </div>
+      <img class="mockup-img" id="heroImg" src="/static/dark.png" alt="AutoStitch Studio Interface"/>
+    </div>
+    <div class="mockup-glow"></div>
+  </div>
+  <div class="ss-tabs">
+    <button class="ss-tab" onclick="switchHeroImg('dark')">Dark Theme</button>
+    <button class="ss-tab active" onclick="switchHeroImg('light')">Light Theme</button>
+    <button class="ss-tab" onclick="switchHeroImg('home')">Home Screen</button>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar reveal">
+  <div class="stat-item"><span class="stat-num">3<span>×</span></span><span class="stat-label">Parallel AI Lanes</span></div>
+  <div class="stat-item"><span class="stat-num">100<span>%</span></span><span class="stat-label">Offline. Your Data</span></div>
+  <div class="stat-item"><span class="stat-num">0<span>$</span></span><span class="stat-label">Cloud API Costs</span></div>
+  <div class="stat-item"><span class="stat-num">∞</span><span class="stat-label">Renders. No Limits</span></div>
+</div>
+
+<!-- PIPELINE -->
+<section class="pipeline" id="pipeline">
+  <div class="pipeline-inner">
+    <div class="pipeline-header reveal">
+      <div>
+        <div class="section-label">The Workflow</div>
+        <h2 class="section-title">Four-step<br><em>production pipeline.</em></h2>
+      </div>
+      <p class="pipeline-desc">From raw clips to a polished final export — AutoStitch handles every step locally. Your footage never leaves your machine. AI models run on your GPU, on your schedule.</p>
+    </div>
+    <div class="pipeline-steps reveal">
+      <div class="step-card">
+        <span class="step-num">01</span>
+        <div class="step-icon">🎬</div>
+        <div class="step-title">Scan Media</div>
+        <p class="step-desc">Load a local folder. All .mp4 clips auto-populate Lane 1, sorted and ready for composition.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">02</span>
+        <div class="step-icon">🎵</div>
+        <div class="step-title">Convert SFX</div>
+        <p class="step-desc">Write prompt descriptions for each clip. Stable Audio synthesizes cinematic .wav effects locally.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">03</span>
+        <div class="step-icon">🎤</div>
+        <div class="step-title">Narrate Voice</div>
+        <p class="step-desc">Type scripts or clone voices with PocketTTS. Generate natural speech for every scene in seconds.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">04</span>
+        <div class="step-icon">🚀</div>
+        <div class="step-title">Master Render</div>
+        <p class="step-desc">Preview in sync, then FFmpeg stitches video + SFX + voice into per-clip or concatenated master files.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="features-inner">
+    <div class="features-header reveal">
+      <div class="section-label">Capabilities</div>
+      <h2 class="section-title">Built for<br><em>creators who ship.</em></h2>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card reveal">
+        <div class="feat-icon">⚡</div>
+        <div class="feat-title">Local AI Engines</div>
+        <p class="feat-desc">Stable Audio for SFX. PocketTTS for voiceover. Both run entirely on your GPU — no API keys, no quotas, no wait.</p>
+        <span class="feat-tag">CUDA 12.x / CPU Fallback</span>
+      </div>
+      <div class="feat-card gold-card reveal">
+        <div class="gold-card-inner">
+          <div>
+            <div class="feat-icon">🎞</div>
+            <div class="feat-title">Three-Lane Timeline</div>
+            <p class="feat-desc">Video Lane 1 for clips. SFX Lane 2 for sound effects. Voice Lane 3 for narration. Each lane is fully editable — drag, reorder, split, merge, or delete any block at any time.</p>
+          </div>
+          <div>
+            <div style="background:var(--void);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+              <div style="padding:8px 12px;background:var(--panel);font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);display:flex;gap:12px;">
+                <span style="color:var(--indigo);">▬ VIDEO</span>
+                <span style="color:var(--teal);">▬ SFX</span>
+                <span style="color:var(--gold);">▬ VOICE</span>
+              </div>
+              <div style="display:grid;grid-template-columns:56px 1fr;border-top:1px solid var(--border);">
+                <div style="background:var(--panel);padding:8px;text-align:center;font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);border-right:1px solid var(--border);">VIDEO1</div>
+                <div style="display:flex;gap:2px;padding:6px;">
+                  <div style="flex:1;background:rgba(91,79,255,0.25);border:1px solid rgba(91,79,255,0.4);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(91,79,255,0.25);border:1px solid rgba(91,79,255,0.4);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(91,79,255,0.25);border:1px solid rgba(91,79,255,0.4);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(91,79,255,0.25);border:1px solid rgba(91,79,255,0.4);border-radius:3px;height:26px;"></div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:56px 1fr;border-top:1px solid var(--border);">
+                <div style="background:var(--panel);padding:8px;text-align:center;font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);border-right:1px solid var(--border);">SFX1</div>
+                <div style="display:flex;gap:2px;padding:6px;">
+                  <div style="flex:1;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.3);border-radius:3px;height:26px;"></div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:56px 1fr;border-top:1px solid var(--border);">
+                <div style="background:var(--panel);padding:8px;text-align:center;font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);border-right:1px solid var(--border);">VOICE1</div>
+                <div style="display:flex;gap:2px;padding:6px;">
+                  <div style="flex:1;background:rgba(212,168,83,0.12);border:1px solid rgba(212,168,83,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(212,168,83,0.12);border:1px solid rgba(212,168,83,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(212,168,83,0.12);border:1px solid rgba(212,168,83,0.3);border-radius:3px;height:26px;"></div>
+                  <div style="flex:1;background:rgba(212,168,83,0.12);border:1px solid rgba(212,168,83,0.3);border-radius:3px;height:26px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="feat-tag">Drag · Reorder · Split · Merge</span>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🔒</div>
+        <div class="feat-title">Hardware-Locked Licensing</div>
+        <p class="feat-desc">Secure activation with a dedicated Vercel backend. Each license is bound to your machine's hardware fingerprint.</p>
+        <span class="feat-tag">Vercel Backend · Key Dashboard</span>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🎛</div>
+        <div class="feat-title">FFmpeg Render Pipeline</div>
+        <p class="feat-desc">Battle-tested FFmpeg under the hood. Render per-clip or concatenate everything into one master video with full audio mixing.</p>
+        <span class="feat-tag">Per-Clip or Master Output</span>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🖥</div>
+        <div class="feat-title">Windows Native App</div>
+        <p class="feat-desc">Runs locally on Windows 10/11 via Python + NiceGUI. Opens at localhost:8080. One-time warmup.bat setup, then run.bat forever.</p>
+        <span class="feat-tag">Python 3.11 · NiceGUI</span>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🌐</div>
+        <div class="feat-title">v2 Cloud Coming</div>
+        <p class="feat-desc">Next release integrates Veo 3.1, ElevenLabs, and Imagen 4 for cloud-assisted generation alongside local models.</p>
+        <span class="feat-tag">Roadmap · v2.0</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD SHOWCASE -->
+<section class="showcase" id="showcase">
+  <div class="showcase-inner">
+    <div class="showcase-header reveal">
+      <div>
+        <div class="section-label">Studio Interface</div>
+        <h2 class="section-title">Your workspace.<br><em>Both themes.</em></h2>
+      </div>
+      <div class="showcase-pills">
+        <div class="theme-switcher">
+          <button class="theme-btn active" id="darkBtn" onclick="switchTheme('dark')">◑ Dark Mode</button>
+          <button class="theme-btn" id="lightBtn" onclick="switchTheme('light')">○ Light Mode</button>
+        </div>
+        <div class="s-pill"><div class="s-dot" style="background:var(--teal);"></div>TTS Engine: Loaded &amp; Ready</div>
+        <div class="s-pill"><div class="s-dot" style="background:#ff4444;"></div>SFX Engine: Offline (GPU optional)</div>
+        <div class="s-pill"><div class="s-dot" style="background:var(--teal);"></div>FFmpeg: OK — Ready to Render</div>
+      </div>
+    </div>
+    <div class="dash-frame reveal">
+      <div class="dash-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:-44px;">AutoStitch Studio — v1 STUDIO · Short_01</div>
+      </div>
+      <img class="dash-img" id="dashImg" src="/static/dark.png" alt="AutoStitch Dashboard Dark Theme"/>
+    </div>
+    <!-- Detail screenshots -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;" class="reveal">
+      <div class="dash-frame" style="box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Timeline — Full Lane View</div></div>
+        <img class="dash-img" src="/static/dark.png" alt="Timeline View"/>
+      </div>
+      <div class="dash-frame" style="box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Studio Interface — Dark Theme</div></div>
+        <img class="dash-img" src="/static/dark.png" alt="Studio Dark"/>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-header reveal">
+      <div class="section-label" style="justify-content:center;">Licensing</div>
+      <h2 class="section-title" style="text-align:center;">Simple,<br><em>honest pricing.</em></h2>
+      <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:16px;font-family:'DM Mono',monospace;">One payment. Hardware-locked. Yours forever.</p>
+    </div>
+    <div class="pricing-grid reveal">
+      <div class="price-card">
+        <div class="price-name">Indie</div>
+        <div class="price-amount"><sup>$</sup>10</div>
+        <div class="price-period">one-time · 1 user</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li>Full AutoStitch Studio v1</li>
+          <li>Stable Audio SFX Engine</li>
+          <li>PocketTTS Voice Engine</li>
+          <li>Unlimited renders</li>
+          <li>1 hardware seat</li>
+          <li class="off">Multi-seat license</li>
+          <li class="off">Priority support</li>
+        </ul>
+        <button class="btn-price ghost">Get Started</button>
+      </div>
+      <div class="price-card featured">
+        <div class="price-badge">Most Popular</div>
+        <div class="price-name">Studio Pro</div>
+        <div class="price-amount"><sup>$</sup>40</div>
+        <div class="price-period">one-time · up to 5 users</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li>Everything in Indie</li>
+          <li>5 hardware seats</li>
+          <li>Priority email support</li>
+          <li>Source access (personal)</li>
+          <li>Free v2 upgrade</li>
+          <li class="off">Team dashboard</li>
+          <li class="off">White-label rights</li>
+        </ul>
+        <button class="btn-price primary">Get Studio Pro</button>
+      </div>
+      <div class="price-card">
+        <div class="price-name">Agency</div>
+        <div class="price-amount" style="font-size:44px;">Custom</div>
+        <div class="price-period">team license · unlimited</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li>Unlimited seats</li>
+          <li>White-label rights</li>
+          <li>Team key dashboard</li>
+          <li>Dedicated support</li>
+          <li>Custom integrations</li>
+          <li>SLA guarantee</li>
+          <li>v2 cloud early access</li>
+        </ul>
+        <button class="btn-price ghost">Contact Sales</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECS & SOCIAL PROOF -->
+<section class="specs-section">
+  <div class="specs-inner">
+    <div class="reveal">
+      <div class="section-label">Technical Excellence</div>
+      <h2 class="section-title">System<br><em>specifications.</em></h2>
+    </div>
+    <div class="specs-grid">
+      <div class="reveal">
+        <div class="spec-group">
+          <div class="spec-group-title">System Requirements</div>
+          <div class="spec-item"><span class="spec-key">OS</span><span class="spec-val">Windows 10 / 11 (x64)</span></div>
+          <div class="spec-item"><span class="spec-key">Python</span><span class="spec-val gold">3.11+</span></div>
+          <div class="spec-item"><span class="spec-key">GPU</span><span class="spec-val">NVIDIA CUDA 12.x (Recommended)</span></div>
+          <div class="spec-item"><span class="spec-key">CPU Fallback</span><span class="spec-val green">Available</span></div>
+          <div class="spec-item"><span class="spec-key">Storage</span><span class="spec-val">~20GB (model weights)</span></div>
+          <div class="spec-item"><span class="spec-key">Interface</span><span class="spec-val">localhost:8080</span></div>
+        </div>
+        <div class="spec-group">
+          <div class="spec-group-title">AI Engines</div>
+          <div class="spec-item"><span class="spec-key">SFX Engine</span><span class="spec-val gold">Stable Audio (Local)</span></div>
+          <div class="spec-item"><span class="spec-key">TTS Engine</span><span class="spec-val gold">PocketTTS (Local)</span></div>
+          <div class="spec-item"><span class="spec-key">Video Engine</span><span class="spec-val">FFmpeg (Bundled)</span></div>
+          <div class="spec-item"><span class="spec-key">UI Framework</span><span class="spec-val">NiceGUI</span></div>
+          <div class="spec-item"><span class="spec-key">Licensing Backend</span><span class="spec-val">Vercel (Hardware-Locked)</span></div>
+        </div>
+      </div>
+      <div class="reveal">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:10px;">Community<span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>
+        <div class="quote-block">
+          <p class="quote-text">"Exactly what I needed for YouTube Shorts at scale. Local AI, no recurring fees, and the timeline is surprisingly intuitive once you get going."</p>
+          <div class="quote-author"><div class="qa">MK</div><div><div class="qn">Mohammed K.</div><div class="qr">YouTube Creator · 340K Subscribers</div></div></div>
+        </div>
+        <div class="quote-block" style="border-left-color:var(--gold);">
+          <p class="quote-text">"The render pipeline is rock solid. The SFX generation is genuinely good — stopped buying stock sounds completely."</p>
+          <div class="quote-author"><div class="qa" style="background:linear-gradient(135deg,var(--gold),#b8860b);">SA</div><div><div class="qn">Sarah A.</div><div class="qr">Video Editor · Freelance</div></div></div>
+        </div>
+        <div class="quote-block" style="border-left-color:var(--teal);">
+          <p class="quote-text">"Finally an offline AI video tool that doesn't require a PhD to install. warmup.bat + installer.bat — running in under 20 minutes."</p>
+          <div class="quote-author"><div class="qa" style="background:linear-gradient(135deg,var(--teal),#0d9488);">JL</div><div><div class="qn">James L.</div><div class="qr">Content Strategist · Agency</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CREATOR -->
+<div class="creator-section">
+  <div class="creator-inner reveal">
+    <div class="c-avatar">OA</div>
+    <div>
+      <div class="c-name">Osama Altaf</div>
+      <div class="c-role">System Creator · Professional Fullstack Architect &amp; AI Specialist</div>
+      <p class="c-bio">Building enterprise-level automation tools, custom local AI integrations, and desktop applications. AutoStitch Studio is my vision for making professional AI video composition accessible to every creator — fully offline, fully yours.</p>
+      <div class="c-links">
+        <a href="#" class="c-link wa">💬 WhatsApp</a>
+        <a href="#" class="c-link">in LinkedIn</a>
+        <a href="#" class="c-link fv">⚡ Fiverr Profile</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <h2 class="final-cta-title reveal">Your stories.<br><em>Your machine.</em></h2>
+  <p class="final-cta-sub reveal">AutoStitch Studio v1.0 — Start composing today.</p>
+  <div class="cta-buttons reveal">
+    <a href="#" onclick="showDashboard();return false;" class="btn-primary" style="font-size:13px;padding:17px 46px;">↓ Open Studio Dashboard</a>
+    <a href="https://github.com/osamaaltaf-pk/auto_Stitch_backend" target="_blank" class="btn-ghost">View on GitHub →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div class="logo-mark">AS</div>
+      <span style="font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#fff;">AutoStitch Studio</span>
+    </div>
+    <p class="footer-tagline">AI-Powered Video Composer<br>100% Offline · Windows Native · v1.0.0</p>
+  </div>
+  <div>
+    <div class="footer-col-title">Product</div>
+    <ul class="footer-links">
+      <li><a href="#pipeline" onclick="showLanding();setTimeout(()=>document.getElementById('pipeline').scrollIntoView({behavior:'smooth'}),50);return false;">How It Works</a></li>
+      <li><a href="#features" onclick="showLanding();setTimeout(()=>document.getElementById('features').scrollIntoView({behavior:'smooth'}),50);return false;">Features</a></li>
+      <li><a href="#pricing" onclick="showLanding();setTimeout(()=>document.getElementById('pricing').scrollIntoView({behavior:'smooth'}),50);return false;">Pricing</a></li>
+      <li><a href="#" onclick="showDashboard();return false;">Open Studio</a></li>
+    </ul>
+  </div>
+  <div>
+    <div class="footer-col-title">Developers</div>
+    <ul class="footer-links">
+      <li><a href="#">Documentation</a></li>
+      <li><a href="https://github.com/osamaaltaf-pk/auto_Stitch_backend" target="_blank">GitHub Backend</a></li>
+      <li><a href="#">Architecture</a></li>
+      <li><a href="#">API Reference</a></li>
+    </ul>
+  </div>
+  <div>
+    <div class="footer-col-title">Connect</div>
+    <ul class="footer-links">
+      <li><a href="#">WhatsApp</a></li>
+      <li><a href="#">LinkedIn</a></li>
+      <li><a href="#">Fiverr</a></li>
+      <li><a href="#">Support</a></li>
+    </ul>
+  </div>
+</footer>
+<div class="footer-bottom">
+  <span>© 2025 AutoStitch Studio · Osama Altaf · All rights reserved.</span>
+  <span style="display:flex;align-items:center;gap:8px;"><span style="width:6px;height:6px;background:var(--teal);border-radius:50%;animation:pulse 2s ease infinite;display:inline-block;"></span>v1.0.0 · MVP Release</span>
+</div>
+
+</div><!-- end landing-page -->
+
+<!-- ===== PROJECTS PAGE ===== -->
+<div class="projects-page" id="projectsPage">
+  <div class="page-header">
+    <div>
+      <div class="section-label">Workspace</div>
+      <h1 class="page-title">Your <em style="color:var(--gold-light);font-style:italic;font-family:'Cormorant Garamond',serif;">Projects</em></h1>
+    </div>
+    <a href="#" onclick="showLanding();return false;" class="back-btn">← Back to Home</a>
+  </div>
+  <div class="projects-grid">
+    <div class="proj-card">
+      <div class="proj-icon">📁</div>
+      <div class="proj-name">Short_01</div>
+      <div class="proj-meta">
+        <span>Created: 5/31/2026 07:29 AM</span>
+        <span>Saved: 5/31/2026 11:54 PM</span>
+        <span>Clips: 6 · Duration: 31.2s</span>
+      </div>
+      <div class="proj-status done">● Rendered</div>
+      <div class="proj-arrow"><span class="proj-open">Open Project →</span></div>
+    </div>
+    <div class="proj-card">
+      <div class="proj-icon">🎬</div>
+      <div class="proj-name">Promo_Video_v1</div>
+      <div class="proj-meta">
+        <span>Created: 5/28/2026 02:14 PM</span>
+        <span>Saved: 5/29/2026 09:40 AM</span>
+        <span>Clips: 12 · Duration: 62.4s</span>
+      </div>
+      <div class="proj-status prog">● In Progress</div>
+      <div class="proj-arrow"><span class="proj-open">Open Project →</span></div>
+    </div>
+    <div class="proj-card">
+      <div class="proj-icon">✨</div>
+      <div class="proj-name">Meta_Shorts_Pack</div>
+      <div class="proj-meta">
+        <span>Created: 5/25/2026 10:00 AM</span>
+        <span>Saved: 5/26/2026 04:22 PM</span>
+        <span>Clips: 8 · Duration: 41.6s</span>
+      </div>
+      <div class="proj-status done">● Rendered</div>
+      <div class="proj-arrow"><span class="proj-open">Open Project →</span></div>
+    </div>
+    <div class="proj-card">
+      <div class="proj-icon">🎤</div>
+      <div class="proj-name">Voiceover_Test_01</div>
+      <div class="proj-meta">
+        <span>Created: 5/20/2026 08:55 AM</span>
+        <span>Saved: 5/20/2026 11:30 AM</span>
+        <span>Clips: 4 · Duration: 20.8s</span>
+      </div>
+      <div class="proj-status draft">● Draft</div>
+      <div class="proj-arrow"><span class="proj-open">Open Project →</span></div>
+    </div>
+    <div class="proj-card">
+      <div class="proj-icon">🎵</div>
+      <div class="proj-name">SFX_Experiment_02</div>
+      <div class="proj-meta">
+        <span>Created: 5/15/2026 03:40 PM</span>
+        <span>Saved: 5/16/2026 07:12 AM</span>
+        <span>Clips: 6 · Duration: 31.2s</span>
+      </div>
+      <div class="proj-status prog">● In Progress</div>
+      <div class="proj-arrow"><span class="proj-open">Open Project →</span></div>
+    </div>
+    <div class="proj-card" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:200px;cursor:none;" onclick="showLanding()">
+      <div style="font-size:28px;margin-bottom:12px;opacity:0.4;">+</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;">Create New Project</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD PAGE ===== -->
+<div class="dashboard-page" id="dashboardPage">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+    <div>
+      <div class="section-label">Studio Interface</div>
+      <h1 class="page-title" style="font-family:'Cormorant Garamond',serif;font-size:44px;font-weight:300;">AutoStitch <em style="color:var(--gold-light);font-style:italic;">Dashboard</em></h1>
+    </div>
+    <a href="#" onclick="showLanding();return false;" class="back-btn">← Back to Home</a>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
+    <div class="dash-frame">
+      <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Home Screen — Dark Theme</div></div>
+      <img class="dash-img" src="/static/dark.png" alt="Home Screen"/>
+    </div>
+    <div class="dash-frame">
+      <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Studio — Dark Theme</div></div>
+      <img class="dash-img" src="/static/dark.png" alt="Studio Dark"/>
+    </div>
+  </div>
+  <div class="dash-frame">
+    <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Timeline — Full Lane View</div></div>
+    <img class="dash-img" src="/static/dark.png" alt="Timeline"/>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;">
+    <div class="dash-frame">
+      <div class="dash-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div style="flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:-44px;">Studio — Detail View</div></div>
+      <img class="dash-img" src="/static/dark.png" alt="Detail"/>
+    </div>
+    <div class="dash-frame" style="display:flex;align-items:center;justify-content:center;padding:60px;background:var(--surface);border-radius:12px;flex-direction:column;gap:20px;text-align:center;">
+      <div style="font-size:40px;">🚀</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;">Ready to compose?</div>
+      <p style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.7;max-width:280px;">Run run.bat on your Windows machine to open AutoStitch Studio at localhost:8080</p>
+      <a href="#pricing" onclick="showLanding();setTimeout(()=>document.getElementById('pricing').scrollIntoView({behavior:'smooth'}),50);return false;" class="btn-primary" style="font-size:11px;">Get License →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// DATA for hero image switching
+const heroImgs = {
+  dark: '/static/dark.png',
+  light: '/static/light.png',
+  home: '/static/dark.png'
+};
+const dashImgs = {
+  dark: '/static/dark.png',
+  light: '/static/light.png'
+};
+
+function switchHeroImg(key) {
+  document.getElementById('heroImg').src = heroImgs[key];
+  document.querySelectorAll('.ss-tab').forEach((t,i) => t.classList.remove('active'));
+  const map = ['dark','light','home'];
+  document.querySelectorAll('.ss-tab')[map.indexOf(key)].classList.add('active');
+}
+function switchTheme(key) {
+  document.getElementById('dashImg').src = dashImgs[key];
+  document.getElementById('darkBtn').classList.toggle('active', key==='dark');
+  document.getElementById('lightBtn').classList.toggle('active', key==='light');
+}
+
+// PAGE NAVIGATION
+function showLanding() {
+  document.getElementById('landingPage').classList.remove('hidden');
+  document.getElementById('projectsPage').classList.remove('active');
+  document.getElementById('dashboardPage').classList.remove('active');
+  window.scrollTo(0,0);
+}
+function showProjects() {
+  document.getElementById('landingPage').classList.add('hidden');
+  document.getElementById('projectsPage').classList.add('active');
+  document.getElementById('dashboardPage').classList.remove('active');
+  window.scrollTo(0,0);
+}
+function showDashboard() {
+  document.getElementById('landingPage').classList.add('hidden');
+  document.getElementById('projectsPage').classList.remove('active');
+  document.getElementById('dashboardPage').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// CURSOR
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+(function animCursor(){
+  cursor.style.left=mx+'px'; cursor.style.top=my+'px';
+  rx+=(mx-rx)*0.12; ry+=(my-ry)*0.12;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(animCursor);
+})();
+document.querySelectorAll('a,button,.proj-card,.feat-card,.step-card,.lb').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ cursor.style.width='20px'; cursor.style.height='20px'; ring.style.width='52px'; ring.style.height='52px'; });
+  el.addEventListener('mouseleave',()=>{ cursor.style.width='12px'; cursor.style.height='12px'; ring.style.width='36px'; ring.style.height='36px'; });
+});
+
+// SCROLL NAV
+const nav = document.getElementById('mainNav');
+window.addEventListener('scroll',()=>nav.classList.toggle('scrolled',window.scrollY>40));
+
+// REVEAL
+const observer = new IntersectionObserver(entries=>entries.forEach((e,i)=>{
+  if(e.isIntersecting){ setTimeout(()=>e.target.classList.add('visible'),i*60); observer.unobserve(e.target); }
+}),{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+</script>
+</body>
+</html>

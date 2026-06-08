@@ -1,0 +1,11 @@
+with open('static/app.js', 'r', encoding='utf-8') as f:
+    lines = f.readlines()
+
+for i, line in enumerate(lines):
+    if '/api/generate/tts' in line or '/api/generate/sfx' in line or 'generateVoice' in line or 'generateSfx' in line:
+        print(f"{i+1}: {line.strip()}")
+        # Context
+        start = max(0, i-5)
+        end = min(len(lines), i+15)
+        for j in range(start, end):
+            print(f"  {j+1}: {lines[j].strip()}")

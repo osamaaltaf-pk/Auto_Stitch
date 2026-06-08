@@ -1,0 +1,430 @@
+﻿commit d25fdc436883411ea863f52ecbe2c275bf025a24
+Author: osamaaltaf-pk <osamaaltaf.pk@gmail.com>
+Date:   Sun May 31 08:28:13 2026 +0500
+
+    design: reorganize Start Page to a balanced 12-column split grid with a gorgeous horizontal pipeline step guide, and introduce a soft, glare-free light mode theme switcher
+
+diff --git a/static/app.js b/static/app.js
+index 50a0def..32e9973 100644
+--- a/static/app.js
++++ b/static/app.js
+@@ -173,6 +173,9 @@ function App() {
+   const [currentView, setCurrentView] = useState("start"); // "start" | "editor"
+   const [localProjects, setLocalProjects] = useState([]);
+   const [newProjectName, setNewProjectName] = useState("");
++  const [theme, setTheme] = useState(() => {
++    try { return localStorage.getItem('as_theme') || 'dark'; } catch { return 'dark'; }
++  });
+ 
+   // Advanced Preview and Mixer States
+   const [previewMode, setPreviewMode] = useState("composer"); // "composer" | "master"
+@@ -448,6 +451,18 @@ function App() {
+     return () => clearInterval(interval);
+   }, []);
+ 
++  // Synchronize dynamic dark/light theme triggers
++  useEffect(() => {
++    const root = document.documentElement;
++    if (theme === 'light') {
++      root.classList.add('light-theme');
++      document.body.classList.add('light-theme');
++    } else {
++      root.classList.remove('light-theme');
++      document.body.classList.remove('light-theme');
++    }
++  }, [theme]);
++
+   const handleSelectProject = async (name) => {
+     await loadProject(name);
+     setCurrentView("editor");
+@@ -1673,14 +1688,9 @@ function App() {
+             </div>
+ 
+           </div>
+-        </div>
+-      </div>
+-    );
+-  }
+-
+-  if (currentView === "start") {
++     if (currentView === "start") {
+     return (
+-      <div className="h-full w-full bg-[#07070a] flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans">
++      <div className="h-full w-full bg-carbon flex flex-col items-center justify-start p-8 text-gray-200 select-text overflow-y-auto bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(124,108,255,0.12),rgba(255,255,255,0))] font-sans animate-fade-in">
+         <div className="w-full max-w-6xl flex flex-col gap-8 py-4">
+           
+           {/* Header Row */}
+@@ -1697,23 +1707,47 @@ function App() {
+               </div>
+             </div>
+ 
+-            {/* License details */}
+-            <div className="flex items-center gap-3 bg-carbon-card border border-carbon-border/80 px-4.5 py-2.5 rounded-2xl backdrop-blur-md shadow-lg shadow-black/30">
+-              <span className="w-2.5 h-2.5 rounded-full bg-accent-tertiary animate-pulse shadow-[0_0_8px_#6cffcc]"></span>
+-              <div className="flex flex-col">
+-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">ACTIVE USER</span>
+-                <span className="text-xs font-mono font-bold text-gray-300 mt-1">{licenseStatus.gmail || "osamaaltaf.pk@gmail.com"}</span>
++            <div className="flex items-center gap-3">
++              {/* Soft Theme toggler button */}
++              <button 
++                onClick={() => {
++                  const nextTheme = theme === 'dark' ? 'light' : 'dark';
++                  setTheme(nextTheme);
++                  try { localStorage.setItem('as_theme', nextTheme); } catch {}
++                  addLog(`Toggled UI theme to: ${nextTheme.toUpperCase()}`, "success");
++                }}
++                className="p-3 rounded-2xl border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-gray-400 hover:text-white transition-all duration-300 active:scale-[0.96] shadow-lg flex items-center justify-center"
++                title={theme === 'dark' ? "Switch to Soft Light Theme" : "Switch to Dark Theme"}
++              >
++                {theme === 'dark' ? (
++                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-amber-400">
++                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
++                  </svg>
++                ) : (
++                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-indigo-500">
++                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
++                  </svg>
++                )}
++              </button>
++
++              {/* License details */}
++              <div className="flex items-center gap-3 bg-carbon-card border border-carbon-border/80 px-4.5 py-2.5 rounded-2xl backdrop-blur-md shadow-lg shadow-black/30">
++                <span className="w-2.5 h-2.5 rounded-full bg-accent-tertiary animate-pulse shadow-[0_0_8px_#6cffcc]"></span>
++                <div className="flex flex-col">
++                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">ACTIVE USER</span>
++                  <span className="text-xs font-mono font-bold text-gray-300 mt-1">{licenseStatus.gmail || "osamaaltaf.pk@gmail.com"}</span>
++                </div>
+               </div>
+             </div>
+           </div>
+ 
+-          {/* Main Grid Content */}
+-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
++          {/* Majestic Balanced Grid Layout */}
++          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+             
+-            {/* Left Column: Actions */}
+-            <div className="flex flex-col gap-6">
++            {/* Left Column (Span 4): Configuration & Actions */}
++            <div className="lg:col-span-4 flex flex-col gap-6">
+               
+-              {/* Card: New Project */}
++              {/* Card: Create New Project */}
+               <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4">
+                 <div className="flex items-center gap-2.5">
+                   <div className="p-2 rounded-xl bg-accent-primary/10 text-accent-primary">
+@@ -1731,78 +1765,18 @@ function App() {
+                       value={newProjectName}
+                       onChange={(e) => setNewProjectName(e.target.value)}
+                       required
+-                      className="w-full bg-[#07070a] border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
++                      className="w-full bg-[#07070a] border border-carbon-border focus:border-accent-primary/50 text-white rounded-xl px-4 py-3.5 text-xs outline-none transition-all duration-300 focus:shadow-[0_0_15px_rgba(124,108,255,0.05)]"
+                     />
+                   </div>
+                   <button 
+                     type="submit"
+-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-accent-primary to-indigo-600 hover:from-accent-primary hover:to-indigo-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] mt-1"
++                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-primary to-indigo-600 hover:from-accent-primary hover:to-indigo-500 text-white font-bold text-xs tracking-wider shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] mt-1"
+                   >
+                     <span>Create Project ≡ƒÜÇ</span>
+                   </button>
+                 </form>
+               </div>
+ 
+-              {/* Card: Quick Creative Onboarding Guide */}
+-              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3">
+-                <div className="flex items-center gap-2.5">
+-                  <div className="p-2 rounded-xl bg-accent-secondary/10 text-accent-secondary">
+-                    <Icon name="sparkles" className="w-4 h-4" />
+-                  </div>
+-                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">QUICK CREATIVE GUIDE</h3>
+-                </div>
+-                <ul className="text-xs text-gray-400 flex flex-col gap-2.5 leading-relaxed font-sans mt-1">
+-                  <li className="flex gap-2">
+-                    <span className="text-accent-secondary font-bold shrink-0">≡ƒÄ¼ Step 1:</span>
+-                    <span>Create a project, then click <b>Browse Folder ≡ƒôé</b> in the left panel to scan and load your video clip folder.</span>
+-                  </li>
+-                  <li className="flex gap-2">
+-                    <span className="text-accent-secondary font-bold shrink-0">≡ƒÄ╡ Step 2:</span>
+-                    <span>Write sound effect descriptions into the <b>SFX track slots</b> (Lane 2) and hit generate.</span>
+-                  </li>
+-                  <li className="flex gap-2">
+-                    <span className="text-accent-secondary font-bold shrink-0">≡ƒÄÖ∩╕Å Step 3:</span>
+-                    <span>Write voiceover scripts in <b>Voice track slots</b> (Lane 3), select standard or custom cloned voices, and generate instantly!</span>
+-                  </li>
+-                  <li className="flex gap-2">
+-                    <span className="text-accent-secondary font-bold shrink-0">≡ƒÜÇ Step 4:</span>
+-                    <span>Preview synchronized playbacks in real-time, then click the top-right <b>RENDER Γû╢</b> button to export the final master MP4!</span>
+-                  </li>
+-                </ul>
+-                <button 
+-                  onClick={() => setCurrentView("guide")}
+-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-accent-secondary/35 bg-accent-secondary/5 hover:bg-accent-secondary/10 text-accent-secondary text-xs font-bold font-sans transition-all active:scale-[0.98] mt-2.5"
+-                >
+-                  <span>≡ƒôû Open Interactive Guide</span>
+-                </button>
+-              </div>
+-
+-              {/* Card: Stock Media Showcase */}
+-              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3.5">
+-                <div className="flex items-center gap-2.5">
+-                  <div className="p-2 rounded-xl bg-accent-tertiary/10 text-accent-tertiary">
+-                    <Icon name="video" className="w-4 h-4" />
+-                  </div>
+-                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE STOCK SHOWCASE</h3>
+-                </div>
+-                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+-                  AutoStitch Studio integrates high-fidelity video looping and visual canvas elements. Preview our pre-loaded cinematic stock graphic:
+-                </p>
+-                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-black/40 relative">
+-                  <video 
+-                    src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c022773507846992594a90f2d658b99d&profile_id=139&oauth2_token_id=57447761" 
+-                    autoPlay 
+-                    loop 
+-                    muted 
+-                    playsInline 
+-                    className="w-full h-full object-cover opacity-85" 
+-                  />
+-                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
+-                    STOCK LOOP ΓÇó ACTIVE
+-                  </div>
+-                </div>
+-              </div>
+-
+               {/* Card: System Developer Credit */}
+               <div className="glass-card p-6 rounded-2xl border border-carbon-border flex flex-col gap-4 bg-[linear-gradient(135deg,rgba(20,22,34,0.4),rgba(124,108,255,0.03))]">
+                 <div className="flex items-center gap-3">
+@@ -1819,17 +1793,17 @@ function App() {
+                   Professional Fullstack Architect & AI Specialist. Hit me up on Fiverr or WhatsApp for enterprise-level automation tools, custom local AI integrations, and desktop apps.
+                 </p>
+                 
+-                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
++                <div className="grid grid-cols-2 gap-2.5 text-[10px] font-bold">
+                   <a href="https://wa.me/923187661096" target="_blank" rel="noopener noreferrer" 
+-                     className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all font-mono">
++                     className="flex items-center justify-center gap-1.5 py-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all font-mono">
+                     <span>≡ƒÆ¼ WhatsApp</span>
+                   </a>
+                   <a href="https://www.linkedin.com/in/osamaaltafpk" target="_blank" rel="noopener noreferrer" 
+-                     className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 transition-all font-mono">
++                     className="flex items-center justify-center gap-1.5 py-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 transition-all font-mono">
+                     <span>≡ƒæö LinkedIn</span>
+                   </a>
+                   <a href="https://www.fiverr.com/neural_networks" target="_blank" rel="noopener noreferrer" 
+-                     className="col-span-2 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-accent-tertiary/20 bg-accent-tertiary/5 hover:bg-accent-tertiary/10 text-accent-tertiary transition-all font-mono">
++                     className="col-span-2 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-accent-tertiary/20 bg-accent-tertiary/5 hover:bg-accent-tertiary/10 text-accent-tertiary transition-all font-mono">
+                     <span>≡ƒ¢Æ Fiverr Profile</span>
+                   </a>
+                 </div>
+@@ -1837,58 +1811,138 @@ function App() {
+ 
+             </div>
+ 
+-            {/* Right Column (Spans 2): Recent Projects List */}
+-            <div className="col-span-1 md:col-span-2 flex flex-col gap-4">
+-              <div className="flex items-center justify-between border-b border-carbon-border/50 pb-2">
+-                <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">≡ƒòÆ RECENT PROJECTS ({localProjects.length})</h3>
+-                <button 
+-                  onClick={fetchLocalProjects}
+-                  className="px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-accent-primary text-[10px] font-mono font-bold hover:border-accent-primary transition-all active:scale-[0.98]"
+-                >
+-                  SYNC DATABASE ≡ƒöä
+-                </button>
+-              </div>
++            {/* Right Column (Span 8): Recent Folders & Interactive Pipeline Map */}
++            <div className="lg:col-span-8 flex flex-col gap-6">
++              
++              {/* Card 1: Recent Projects Grid */}
++              <div className="flex flex-col gap-4">
++                <div className="flex items-center justify-between border-b border-carbon-border/50 pb-2">
++                  <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider">≡ƒòÆ RECENT PROJECTS ({localProjects.length})</h3>
++                  <button 
++                    onClick={fetchLocalProjects}
++                    className="px-3 py-1.5 rounded-lg border border-carbon-border bg-carbon-card/50 hover:bg-carbon text-accent-primary text-[10px] font-mono font-bold hover:border-accent-primary transition-all active:scale-[0.98]"
++                  >
++                    SYNC DATABASE ≡ƒöä
++                  </button>
++                </div>
+ 
+-              {localProjects.length === 0 ? (
+-                <div className="glass-card p-12 rounded-2xl border border-carbon-border/50 bg-carbon-panel/20 flex flex-col items-center justify-center gap-4 text-center">
+-                  <div className="w-12 h-12 rounded-full bg-carbon-border/50 flex items-center justify-center text-gray-600">
+-                    ≡ƒôé
+-                  </div>
+-                  <div>
+-                    <h4 className="font-bold text-sm text-gray-300">No Projects Found</h4>
+-                    <p className="text-xs text-gray-500 max-w-[280px] leading-relaxed mt-1">
+-                      You haven't initialized any composition projects yet. Enter a name on the left to start!
+-                    </p>
++                {localProjects.length === 0 ? (
++                  <div className="glass-card p-12 rounded-2xl border border-carbon-border/50 bg-carbon-panel/20 flex flex-col items-center justify-center gap-4 text-center">
++                    <div className="w-12 h-12 rounded-full bg-carbon-border/50 flex items-center justify-center text-gray-600">
++                      ≡ƒôé
++                    </div>
++                    <div>
++                      <h4 className="font-bold text-sm text-gray-300">No Projects Found</h4>
++                      <p className="text-xs text-gray-500 max-w-[280px] leading-relaxed mt-1">
++                        You haven't initialized any composition projects yet. Enter a name on the left to start!
++                      </p>
++                    </div>
+                   </div>
+-                </div>
+-              ) : (
+-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto pr-2">
+-                  {localProjects.map(p => (
+-                    <div 
+-                      key={p.project_name}
+-                      onClick={() => handleSelectProject(p.project_name)}
+-                      className="glass-card p-5 rounded-2xl border border-carbon-border/80 hover:border-accent-primary/60 bg-carbon-panel/30 hover:bg-[linear-gradient(135deg,rgba(13,14,20,0.6),rgba(124,108,255,0.04))] flex items-center justify-between cursor-pointer group transition-all"
+-                    >
+-                      <div className="flex items-center gap-4 min-w-0">
+-                        <div className="w-11 h-11 rounded-xl bg-accent-primary/5 group-hover:bg-accent-primary/10 flex items-center justify-center text-xl text-accent-primary border border-accent-primary/15 group-hover:scale-105 transition-all">
+-                          ≡ƒôé
+-                        </div>
+-                        <div className="min-w-0">
+-                          <h4 className="font-bold text-sm text-white truncate leading-tight group-hover:text-accent-primary transition-colors">{p.project_name}</h4>
+-                          <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 font-mono mt-1 leading-none">
+-                            <span>CREATED: {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+-                            <span className="text-accent-primary/50 group-hover:text-accent-primary/80 transition-colors">SAVED: {new Date(p.updated_at).toLocaleDateString()} {new Date(p.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
++                ) : (
++                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[320px] overflow-y-auto pr-2">
++                    {localProjects.map(p => (
++                      <div 
++                        key={p.project_name}
++                        onClick={() => handleSelectProject(p.project_name)}
++                        className="glass-card p-5 rounded-2xl border border-carbon-border/80 hover:border-accent-primary/60 bg-carbon-panel/30 hover:bg-[linear-gradient(135deg,rgba(13,14,20,0.6),rgba(124,108,255,0.04))] flex items-center justify-between cursor-pointer group transition-all"
++                      >
++                        <div className="flex items-center gap-4 min-w-0">
++                          <div className="w-11 h-11 rounded-xl bg-accent-primary/5 group-hover:bg-accent-primary/10 flex items-center justify-center text-xl text-accent-primary border border-accent-primary/15 group-hover:scale-105 transition-all">
++                            ≡ƒôé
++                          </div>
++                          <div className="min-w-0">
++                            <h4 className="font-bold text-sm text-white truncate leading-tight group-hover:text-accent-primary transition-colors">{p.project_name}</h4>
++                            <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 font-mono mt-1 leading-none">
++                              <span>CREATED: {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
++                              <span className="text-accent-primary/50 group-hover:text-accent-primary/80 transition-colors">SAVED: {new Date(p.updated_at).toLocaleDateString()} {new Date(p.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
++                            </div>
+                           </div>
+                         </div>
++                        
++                        <div className="w-8 h-8 rounded-full border border-carbon-border flex items-center justify-center text-gray-500 group-hover:text-accent-primary group-hover:border-accent-primary group-hover:translate-x-0.5 transition-all shrink-0">
++                          ΓåÆ
++                        </div>
+                       </div>
+-                      
+-                      <div className="w-8 h-8 rounded-full border border-carbon-border flex items-center justify-center text-gray-500 group-hover:text-accent-primary group-hover:border-accent-primary group-hover:translate-x-0.5 transition-all shrink-0">
+-                        ΓåÆ
+-                      </div>
++                    ))}
++                  </div>
++                )}
++              </div>
++
++              {/* Card 2: Gorgeous Horizontal Production Pipeline Step Guide */}
++              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-4 mt-2">
++                <div className="flex items-center justify-between">
++                  <div className="flex items-center gap-2.5">
++                    <div className="p-2 rounded-xl bg-accent-secondary/10 text-accent-secondary">
++                      <Icon name="sparkles" className="w-4 h-4" />
+                     </div>
+-                  ))}
++                    <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE PRODUCTION PIPELINE</h3>
++                  </div>
++                  <button 
++                    onClick={() => setCurrentView("guide")}
++                    className="flex items-center gap-1.5 bg-accent-secondary/15 hover:bg-accent-secondary/30 text-accent-secondary text-[10px] font-bold px-3 py-1.5 rounded-lg border border-accent-secondary/20 transition-all active:scale-[0.98]"
++                  >
++                    <span>≡ƒôû Open Interactive Guide</span>
++                  </button>
+                 </div>
+-              )}
++                
++                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-1">
++                  {/* Step 1 */}
++                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
++                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">01</div>
++                    <div className="text-lg">≡ƒÄ¼</div>
++                    <h4 className="font-bold text-xs text-white leading-tight">Scan Media</h4>
++                    <p className="text-[10px] text-gray-500 leading-snug">Load a local folder of clips directly into visual Lane 1.</p>
++                  </div>
++                  {/* Step 2 */}
++                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
++                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">02</div>
++                    <div className="text-lg">≡ƒÄ╡</div>
++                    <h4 className="font-bold text-xs text-white leading-tight">Convert SFX</h4>
++                    <p className="text-[10px] text-gray-500 leading-snug">Write prompt descriptions and synthesize Lane 2 audio.</p>
++                  </div>
++                  {/* Step 3 */}
++                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
++                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">03</div>
++                    <div className="text-lg">≡ƒÄÖ∩╕Å</div>
++                    <h4 className="font-bold text-xs text-white leading-tight">Narrate Voice</h4>
++                    <p className="text-[10px] text-gray-500 leading-snug">Compose scripts, select cloned voices and synthesize Lane 3.</p>
++                  </div>
++                  {/* Step 4 */}
++                  <div className="p-4 rounded-xl border border-carbon-border bg-black/10 flex flex-col gap-2 relative">
++                    <div className="absolute top-2.5 right-3 text-[10px] font-mono text-accent-secondary font-bold">04</div>
++                    <div className="text-lg">≡ƒÜÇ</div>
++                    <h4 className="font-bold text-xs text-white leading-tight">Master Render</h4>
++                    <p className="text-[10px] text-gray-500 leading-snug">Preview in sync, then render the master video using FFmpeg.</p>
++                  </div>
++                </div>
++              </div>
++
++              {/* Card 3: Creative Loops Stock Media Showcase */}
++              <div className="glass-card p-6 rounded-2xl border border-carbon-border bg-carbon-panel/40 flex flex-col gap-3.5 mt-2">
++                <div className="flex items-center gap-2.5">
++                  <div className="p-2 rounded-xl bg-accent-tertiary/10 text-accent-tertiary">
++                    <Icon name="video" className="w-4 h-4" />
++                  </div>
++                  <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">CREATIVE STOCK SHOWCASE</h3>
++                </div>
++                <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
++                  AutoStitch Studio integrates high-fidelity video looping and visual canvas elements. Preview our pre-loaded cinematic stock graphic:
++                </p>
++                <div className="w-full h-36 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-black/40 relative">
++                  <video 
++                    src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c022773507846992594a90f2d658b99d&profile_id=139&oauth2_token_id=57447761" 
++                    autoPlay 
++                    loop 
++                    muted 
++                    playsInline 
++                    className="w-full h-full object-cover opacity-85" 
++                  />
++                  <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-accent-tertiary uppercase tracking-widest">
++                    STOCK LOOP ΓÇó ACTIVE
++                  </div>
++                </div>
++              </div>
++
+             </div>
+ 
+           </div>
+@@ -1984,6 +2038,27 @@ function App() {
+             <Icon name="settings" className="w-4 h-4" />
+           </button>
+ 
++          {/* Soft Theme Toggler Button */}
++          <button 
++            onClick={() => {
++              const nextTheme = theme === 'dark' ? 'light' : 'dark';
++              setTheme(nextTheme);
++              try { localStorage.setItem('as_theme', nextTheme); } catch {}
++            }}
++            className="p-2 border border-carbon-border hover:bg-carbon-card/50 text-gray-400 hover:text-white rounded-lg transition-all flex items-center justify-center"
++            title={theme === 'dark' ? "Switch to Soft Light Theme" : "Switch to Dark Theme"}
++          >
++            {theme === 'dark' ? (
++              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-amber-400">
++                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
++              </svg>
++            ) : (
++              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-indigo-500">
++                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
++              </svg>
++            )}
++          </button>
++
+           <button 
+             onClick={() => setIsSidebarOpen(prev => !prev)}
+             className={`p-2 border rounded-lg transition-all ${isSidebarOpen ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' : 'border-carbon-border text-gray-400 hover:text-white hover:bg-carbon-card/50'}`}

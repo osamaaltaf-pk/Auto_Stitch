@@ -1,0 +1,61 @@
+[Line 1472] Opened <div>. Stack depth is now 1
+[Line 1474] Opened <div>. Stack depth is now 2
+[Line 1474] Closed </div> (matches <div> from line 1474). Stack depth is now 1
+[Line 1475] Opened <div>. Stack depth is now 2
+[Line 1475] Closed </div> (matches <div> from line 1475). Stack depth is now 1
+[Line 1477] Opened <div>. Stack depth is now 2
+[Line 1483] Closed </div> (matches <div> from line 1479). Stack depth is now 2
+[Line 1490] Closed </div> (matches <div> from line 1485). Stack depth is now 2
+[Line 1556] Closed </form> (matches <form> from line 1493). Stack depth is now 2
+[Line 1560] Closed </p> (matches <p> from line 1558). Stack depth is now 2
+[Line 1561] Closed </div> (matches <div> from line 1477). Stack depth is now 1
+[Line 1562] Closed </div> (matches <div> from line 1472). Stack depth is now 0
+[Line 1568] Opened <div>. Stack depth is now 1
+[Line 1569] Opened <div>. Stack depth is now 2
+[Line 1596] Closed </div> (matches <div> from line 1572). Stack depth is now 2
+[Line 1730] Closed </div> (matches <div> from line 1599). Stack depth is now 2
+[Line 1731] Closed </div> (matches <div> from line 1569). Stack depth is now 1
+[Line 1732] Closed </div> (matches <div> from line 1568). Stack depth is now 0
+[Line 1774] Opened <div>. Stack depth is now 1
+[Line 1776] Opened <div>. Stack depth is now 2
+[Line 1793] Closed </div> (matches <div> from line 1777). Stack depth is now 2
+[Line 1818] Closed </div> (matches <div> from line 1794). Stack depth is now 2
+[Line 1819] Closed </div> (matches <div> from line 1776). Stack depth is now 1
+[Line 1822] Opened <div>. Stack depth is now 2
+[Line 1827] Closed </div> (matches <div> from line 1823). Stack depth is now 2
+[Line 1886] Closed </div> (matches <div> from line 1830). Stack depth is now 2
+[Line 1906] Closed </div> (matches <div> from line 1889). Stack depth is now 2
+[Line 1910] Closed </div> (matches <div> from line 1908). Stack depth is now 2
+[Line 1917] Closed </div> (matches <div> from line 1914). Stack depth is now 2
+[Line 1980] Closed </div> (matches <div> from line 1920). Stack depth is now 2
+[Line 2034] Closed </div> (matches <div> from line 1982). Stack depth is now 2
+[Line 2037] Closed </div> (matches <div> from line 1822). Stack depth is now 1
+[Line 2038] Closed </div> (matches <div> from line 1774). Stack depth is now 0
+[Line 2043] Opened <div>. Stack depth is now 1
+[Line 2046] Opened <nav>. Stack depth is now 2
+[Line 2071] Closed </div> (matches <div> from line 2047). Stack depth is now 2
+[Line 2112] Closed </div> (matches <div> from line 2074). Stack depth is now 2
+[Line 2198] Closed </div> (matches <div> from line 2115). Stack depth is now 2
+[Line 2199] Closed </nav> (matches <nav> from line 2046). Stack depth is now 1
+[Line 2202] Opened <div>. Stack depth is now 2
+[Line 2212] Closed </button> (matches <button> from line 2206). Stack depth is now 2
+[Line 2221] Closed </button> (matches <button> from line 2215). Stack depth is now 2
+[Line 3356] Closed </div> (matches <div> from line 2226). Stack depth is now 2
+[Line 3460] Closed </div> (matches <div> from line 3360). Stack depth is now 2
+[Line 3463] Closed </div> (matches <div> from line 2202). Stack depth is now 1
+[Line 3492] Opened <div>. Stack depth is now 2
+[Line 3505] Closed </div> (matches <div> from line 3493). Stack depth is now 2
+[Line 3517] Closed </div> (matches <div> from line 3507). Stack depth is now 2
+[Line 3543] Closed </div> (matches <div> from line 3519). Stack depth is now 2
+[Line 3553] Closed </div> (matches <div> from line 3545). Stack depth is now 2
+[Line 3571] Closed </button> (matches <button> from line 3555). Stack depth is now 2
+[Line 3584] Closed </div> (matches <div> from line 3574). Stack depth is now 2
+[Line 3613] Closed </div> (matches <div> from line 3588). Stack depth is now 2
+[Line 3614] Closed </div> (matches <div> from line 3492). Stack depth is now 1
+[Line 3636] Opened <div>. Stack depth is now 2
+[Line 3649] Closed </div> (matches <div> from line 3637). Stack depth is now 2
+[Line 3666] Closed </div> (matches <div> from line 3651). Stack depth is now 2
+[Line 3684] Closed </button> (matches <button> from line 3668). Stack depth is now 2
+[Line 3697] Closed </div> (matches <div> from line 3687). Stack depth is now 2
+[Line 3726] Closed </div> (matches <div> from line 3701). Stack depth is now 2
+[Line 3727] Closed </div> (matches <div> from line 3636). Stack depth is now 1

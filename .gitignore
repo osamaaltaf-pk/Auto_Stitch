@@ -1,0 +1,89 @@
+# Virtual environments (each engine has its own venv)
+venv/
+.venv/
+pocket_tts/venv/
+stable_audio_local_cpu/venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Large binaries — placed in bin/ manually after cloning
+bin/ffmpeg.exe
+bin/ffprobe.exe
+
+# Generated at runtime — not source code
+autostitch.db
+output/
+projects/
+static/thumbnails/
+static/tts_audio/
+static/sfx_audio/
+stable_audio_local_cpu/outputs/
+pocket_tts/uploaded_voices/*.safetensors
+
+# Secrets & license — user-specific, never commit
+license.json
+activate.py
+.env
+*.env
+
+# Test artifacts
+tests/test_out.mp4
+tests/*.mp4
+tests/trace_out*.txt
+tests/diff.txt
+tests/cleaned-landing.html
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Large binaries — placed in bin/ manually after cloning
+bin/ffmpeg.exe
+bin/ffprobe.exe
+
+# User data — generated at runtime, not source code
+autostitch.db
+output/
+projects/
+
+# Secrets & license — user-specific, never commit
+license.json
+activate.py
+.env
+*.env
+
+# AI model outputs (large audio files)
+stable_audio_local_cpu/outputs/
+pocket_tts/uploaded_voices/*.safetensors
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
