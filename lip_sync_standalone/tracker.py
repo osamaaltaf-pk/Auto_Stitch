@@ -502,6 +502,7 @@ class Tracker():
         options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         options.log_severity_level = 3
         self.model_type = model_type
+        self.landmark_count = 68 if model_type != -1 else 32
         self.models = [
             "lm_model0_opt.onnx",
             "lm_model1_opt.onnx",

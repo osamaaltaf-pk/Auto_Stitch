@@ -6,6 +6,24 @@
   <title>AutoStitch Lip-Sync Lab</title>
   <meta name="description" content="Interactive 2D lip-sync animation studio. Upload characters, map mouths, and generate procedural lip-sync videos.">
   <link rel="stylesheet" href="/static/index.css">
+  <style>
+    .active-density {
+      background: var(--accent-primary) !important;
+      color: #fff !important;
+      border-color: var(--accent-primary) !important;
+    }
+    .active-smoothing {
+      background: var(--accent-primary) !important;
+      color: #fff !important;
+      border-color: var(--accent-primary) !important;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
+    .btn-sm {
+      padding: 0.3rem 0.5rem !important;
+      font-size: 0.7rem !important;
+      line-height: 1 !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -14,185 +32,367 @@
       <h1>👄 Lip-Sync Lab</h1>
       <div class="subtitle">Procedural 2D Lip-Sync Animation Studio</div>
     </div>
+    
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="mode-static" onclick="switchMode('static')">🎨 Character Lab</button>
+      <button class="mode-tab" id="mode-annotation" onclick="switchMode('annotation')">📹 Video Annotation Lab</button>
+    </div>
+    
     <div style="font-family:monospace; font-size:0.75rem; color:var(--accent-secondary); background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); padding:0.4rem 0.8rem; border-radius:8px;">
       PocketTTS · Port 8000 · Ready
     </div>
   </header>
 
   <main>
-    <!-- ══════════════ LEFT: Workspace ══════════════ -->
-    <div class="left-panel">
-      <div class="card workspace-card">
-
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
-          <div>
-            <h2>1. Character Workspace</h2>
-            <div class="subtitle">· Click to place mouth · Drag to reposition · Corner handles to resize</div>
+    <!-- static-lab-container wraps original LEFT and RIGHT panels -->
+    <div id="static-lab-container" style="display:flex; flex:1; width:100%; height:100%; gap:1.25rem;">
+      <!-- ══════════════ LEFT: Workspace ══════════════ -->
+      <div class="left-panel">
+        <div class="card workspace-card">
+  
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div>
+              <h2>1. Character Workspace</h2>
+              <div class="subtitle">· Click to place mouth · Drag to reposition · Corner handles to resize</div>
+            </div>
+            <div class="upload-btn-wrapper" style="width:auto;">
+              <button class="btn btn-secondary" id="upload-btn" style="white-space:nowrap; padding:0.5rem 1rem; font-size:0.8rem;">📁 Upload Image/Video</button>
+              <input type="file" id="image-file" accept="image/*,video/*" />
+            </div>
           </div>
-          <div class="upload-btn-wrapper" style="width:auto;">
-            <button class="btn btn-secondary" id="upload-btn" style="white-space:nowrap; padding:0.5rem 1rem; font-size:0.8rem;">📁 Upload Image</button>
-            <input type="file" id="image-file" accept="image/*" />
+  
+          <!-- Canvas -->
+          <div class="image-workspace" id="workspace">
+            <div class="placeholder-text" id="workspace-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" style="width:48px;height:48px;margin-bottom:0.5rem;opacity:0.3;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+              </svg>
+              <span>No character image loaded</span>
+              <span style="font-size:0.7rem;">Select a file above to begin mapping</span>
+            </div>
+  
+            <div id="image-container" style="display:none;">
+              <img id="char-img" src="" draggable="false" />
+              <div id="marker-overlay" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto;">
+                <div class="mouth-marker"      id="marker-char1" style="display:none;"></div>
+                <div class="mouth-marker char2" id="marker-char2" style="display:none;"></div>
+                <div class="mouth-ghost-cursor" id="mouth-ghost"  style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- Dynamic tab bar — rendered by JS renderCharTabs() -->
+          <div id="char-tab-bar" style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+  
+      <!-- ══════════════ RIGHT: Config + Script + Output ══════════════ -->
+      <div class="right-panel">
+  
+        <!-- Mouth Style + Colors (shown only when a character is active) -->
+        <div class="card" style="flex-shrink:0;">
+          <h2>2. Mouth Style &amp; Colors</h2>
+  
+          <!-- Empty state -->
+          <div id="char-settings-empty" style="display:flex; flex-direction:column; align-items:center; gap:0.6rem; padding:1rem 0; color:var(--text-dim);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2" style="width:36px;height:36px;opacity:0.3;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+            </svg>
+            <span style="font-size:0.8rem;">No character added yet</span>
+            <span style="font-size:0.7rem;">Click <strong>＋ Add Character</strong> above to begin</span>
+          </div>
+  
+          <!-- Active character settings -->
+          <div id="char-settings-panel" style="display:none; flex-direction:column; gap:0.85rem;">
+  
+            <div class="presets-grid" id="presets-container">
+              <div class="preset-card active" id="preset-rounded" onclick="selectPreset('rounded')">
+                <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="20" ry="8" fill="#111"/><path d="M14 15 Q30 5 46 15 Z" fill="#fff"/><path d="M18 22 Q30 14 42 22 Q30 30 18 22Z" fill="#f56e7d"/></svg>
+                <span class="title">Rounded Comic</span>
+              </div>
+              <div class="preset-card" id="preset-capsule" onclick="selectPreset('capsule')">
+                <svg viewBox="0 0 60 30" width="56" height="28"><rect x="2" y="2" width="56" height="26" rx="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><rect x="8" y="6" width="44" height="18" rx="6" fill="#111"/><rect x="10" y="6" width="40" height="7" fill="#fff"/><rect x="10" y="17" width="40" height="7" fill="#fff"/></svg>
+                <span class="title">Anime Capsule</span>
+              </div>
+              <div class="preset-card" id="preset-flat" onclick="selectPreset('flat')">
+                <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="21" ry="5" fill="#111"/></svg>
+                <span class="title">Flat / Squeeze</span>
+              </div>
+              <div class="preset-card" id="preset-smile" onclick="selectPreset('smile')">
+                <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="25" ry="11" fill="#fff" stroke="#222" stroke-width="1.5"/><line x1="5" y1="15" x2="55" y2="15" stroke="#222" stroke-width="2"/><line x1="17" y1="5" x2="17" y2="25" stroke="#222" stroke-width="1.2"/><line x1="30" y1="4" x2="30" y2="26" stroke="#222" stroke-width="1.2"/><line x1="43" y1="5" x2="43" y2="25" stroke="#222" stroke-width="1.2"/></svg>
+                <span class="title">Comic Smile</span>
+              </div>
+              <div class="preset-card" id="preset-u-shaped" onclick="selectPreset('u-shaped')">
+                <svg viewBox="0 0 60 30" width="56" height="28"><path d="M 2 2 A 28 28 0 0 0 58 2 Z" fill="#FFCC99" stroke="#222" stroke-width="2"/><path d="M 8 2 A 22 22 0 0 0 52 2 Z" fill="#111"/><rect x="18" y="2" width="24" height="4" fill="#fff"/><path d="M 22 18 Q 30 25 38 18 Z" fill="#f56e7d"/></svg>
+                <span class="title">U-Shaped</span>
+              </div>
+            </div>
+  
+            <div class="color-row">
+              <div class="form-group flex-1">
+                <label>Skin Tone</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="color-skin" value="#FFCC99" onchange="updateColors()" />
+                  <span id="skin-hex">#FFCC99</span>
+                  <button class="color-pipette-btn" id="pipette-skin" title="Pick from image" onclick="startColorPicker('skin')">🎯</button>
+                </div>
+              </div>
+              <div class="form-group flex-1">
+                <label>Lip / Outline</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="color-outline" value="#000000" onchange="updateColors()" />
+                  <span id="outline-hex">#000000</span>
+                  <button class="color-pipette-btn" id="pipette-outline" title="Pick from image" onclick="startColorPicker('outline')">🎯</button>
+                </div>
+              </div>
+            </div>
+  
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div class="form-group">
+                <label>Width Scale</label>
+                <div class="slider-container">
+                  <input type="range" id="mouth-width" class="custom-slider" min="1" max="60" step="0.5" value="16" oninput="updateSliderVal('mouth-width')" />
+                  <span class="slider-val" id="mouth-width-val">16%</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Height Scale</label>
+                <div class="slider-container">
+                  <input type="range" id="mouth-height" class="custom-slider" min="1" max="40" step="0.5" value="10" oninput="updateSliderVal('mouth-height')" />
+                  <span class="slider-val" id="mouth-height-val">10%</span>
+                </div>
+              </div>
+            </div>
+  
+            <button class="btn btn-secondary" style="padding:0.4rem; font-size:0.75rem;" onclick="triggerColorAutoSample()">
+              🎨 Auto-Sample Colors from Mouth Region
+            </button>
+  
+            <!-- Hidden sync inputs -->
+            <input type="hidden" id="mouth-rotation"      value="0" />
+            <input type="hidden" id="mouth-rotation-val"  value="0°" />
+            <input type="hidden" id="mouth-perspective"   value="1" />
+            <input type="hidden" id="mouth-perspective-val" value="1.0" />
           </div>
         </div>
-
-        <!-- Canvas -->
-        <div class="image-workspace" id="workspace">
-          <div class="placeholder-text" id="workspace-placeholder">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" style="width:48px;height:48px;margin-bottom:0.5rem;opacity:0.3;">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-            </svg>
-            <span>No character image loaded</span>
-            <span style="font-size:0.7rem;">Select a file above to begin mapping</span>
+  
+        <!-- Script -->
+        <div class="card" style="flex-shrink:0;">
+          <h2>3. Dialogue Script &amp; Audio</h2>
+          <div class="form-group">
+            <label>Script (use [Character 1] / [Character 2] tags)</label>
+            <textarea id="script-input" rows="3">[Character 1] Hello! Welcome to the new AutoStitch Lip-Sync Lab. [Character 2] Wow, my mouth is programmatically generated and matches my character!</textarea>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(1)">Dialogue Sample</button>
+            <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(2)">Monologue Sample</button>
+          </div>
+          <div class="form-group" style="margin-top:0.4rem; flex-direction:row; align-items:center; gap:0.5rem; justify-content:flex-start;">
+            <input type="checkbox" id="safe-mode-checkbox" style="width:auto; cursor:pointer;" />
+            <label for="safe-mode-checkbox" style="text-transform:none; font-size:0.75rem; cursor:pointer; user-select:none; margin:0; display:flex; align-items:center; gap:0.3rem;">
+              🛡️ Safe Mode (Downscale to 1280px for low-RAM)
+            </label>
+          </div>
+          <div class="form-group" style="margin-top:0.2rem; flex-direction:row; align-items:center; gap:0.5rem; justify-content:flex-start;">
+            <input type="checkbox" id="render-all-smoothing-chk" style="width:auto; cursor:pointer;" />
+            <label for="render-all-smoothing-chk" style="text-transform:none; font-size:0.75rem; cursor:pointer; user-select:none; margin:0; display:flex; align-items:center; gap:0.3rem;">
+              🔄 Render 4 smoothing versions for preview/comparison
+            </label>
+          </div>
+          <button class="btn" id="generate-btn" onclick="startGeneration()">⚡ Generate Lip-Sync Animation</button>
+        </div>
+  
+        <!-- Output Video -->
+        <div class="card" style="flex:1; min-height:180px; display:flex; flex-direction:column;">
+          <h2>4. Generated Output</h2>
+          
+          <!-- Smoothing comparison selector -->
+          <div id="smoothing-selector-container" style="display:none; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem; padding:0.5rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-md);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">Compare Smoothing Options:</span>
+              <button class="btn" id="confirm-smoothing-btn" onclick="confirmSmoothingChoice()" style="font-size:0.7rem; padding:0.25rem 0.6rem; background:var(--accent-primary); line-height:1; height:auto; width:auto; border-radius:4px;">💾 Confirm &amp; Save Choice</button>
+            </div>
+            <div style="display:flex; gap:0.3rem;">
+              <button class="btn btn-secondary btn-sm active-smoothing" id="smooth-btn-1" onclick="selectSmoothing(1)" style="flex:1; font-size:0.7rem; padding:0.3rem;">1 (Raw)</button>
+              <button class="btn btn-secondary btn-sm" id="smooth-btn-2" onclick="selectSmoothing(2)" style="flex:1; font-size:0.7rem; padding:0.3rem;">2 (Light)</button>
+              <button class="btn btn-secondary btn-sm" id="smooth-btn-3" onclick="selectSmoothing(3)" style="flex:1; font-size:0.7rem; padding:0.3rem;">3 (Medium)</button>
+              <button class="btn btn-secondary btn-sm" id="smooth-btn-4" onclick="selectSmoothing(4)" style="flex:1; font-size:0.7rem; padding:0.3rem;">4 (Strong)</button>
+            </div>
           </div>
 
-          <div id="image-container" style="display:none;">
-            <img id="char-img" src="" draggable="false" />
-            <div id="marker-overlay" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto;">
-              <div class="mouth-marker"      id="marker-char1" style="display:none;"></div>
-              <div class="mouth-marker char2" id="marker-char2" style="display:none;"></div>
-              <div class="mouth-ghost-cursor" id="mouth-ghost"  style="display:none;"></div>
+          <div class="video-container" style="flex:1;">
+            <video id="output-video" controls style="display:none; width:100%; height:100%; border-radius:var(--radius-sm);"></video>
+            <div class="placeholder-text" id="video-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin-bottom:0.5rem;opacity:0.3;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z"/>
+              </svg>
+              <span>Run generation above to play video</span>
             </div>
           </div>
         </div>
-
-        <!-- Dynamic tab bar — rendered by JS renderCharTabs() -->
-        <div id="char-tab-bar" style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center; flex-wrap:wrap;"></div>
+  
+        <!-- Logs -->
+        <div class="card" style="flex-shrink:0; max-height:130px;">
+          <h2>5. Console</h2>
+          <div class="logger-card" id="logs-container">
+            <div class="log-entry info">Console started. Upload a character image to begin...</div>
+          </div>
+        </div>
+  
       </div>
     </div>
 
-    <!-- ══════════════ RIGHT: Config + Script + Output ══════════════ -->
-    <div class="right-panel">
-
-      <!-- Mouth Style + Colors (shown only when a character is active) -->
-      <div class="card" style="flex-shrink:0;">
-        <h2>2. Mouth Style &amp; Colors</h2>
-
-        <!-- Empty state -->
-        <div id="char-settings-empty" style="display:flex; flex-direction:column; align-items:center; gap:0.6rem; padding:1rem 0; color:var(--text-dim);">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2" style="width:36px;height:36px;opacity:0.3;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
-          </svg>
-          <span style="font-size:0.8rem;">No character added yet</span>
-          <span style="font-size:0.7rem;">Click <strong>＋ Add Character</strong> above to begin</span>
+    <!-- annotation-lab-container for 20-Point Annotation Workspace -->
+    <div id="annotation-lab-container" style="display:none; flex:1; width:100%; height:100%; gap:1.25rem;">
+      <!-- LEFT: Canvas Editor & Timeline Strip -->
+      <div class="left-panel">
+        <div class="card workspace-card">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-shrink:0; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <h2>1. Video Frame Landmark Editor</h2>
+              <div class="subtitle">&middot; Select a frame &middot; Drag markers to correct positions &middot; Run save &amp; propagate</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+              <!-- Zoom slider for workspace -->
+              <div style="display:flex; align-items:center; gap:0.35rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:0.4rem; padding:0.25rem 0.6rem;">
+                <span style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap; user-select:none;">🔍 Zoom Editor</span>
+                <input type="range" id="anno-zoom-slider" min="1" max="4" step="0.1" value="1" oninput="changeWorkspaceZoom(this.value)" style="width:70px; cursor:pointer;" />
+                <span id="anno-zoom-val" style="font-size:0.72rem; color:var(--text-muted); width:30px; text-align:right;">100%</span>
+              </div>
+              <!-- FPS selector for frame-folder sequences -->
+              <div style="display:flex; align-items:center; gap:0.35rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:0.4rem; padding:0.25rem 0.6rem;">
+                <label for="sequence-fps-input" style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap;">Seq FPS</label>
+                <select id="sequence-fps-input" style="background:transparent; border:none; color:var(--text-primary); font-size:0.78rem; cursor:pointer;">
+                  <option value="">Auto</option>
+                  <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                  <option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+                  <option value="12">12</option><option value="15">15</option><option value="18">18</option><option value="20">20</option>
+                  <option value="24">24</option><option value="25" selected>25</option><option value="30">30</option>
+                </select>
+              </div>
+              <div class="upload-btn-wrapper" style="width:auto;">
+                <button class="btn btn-secondary" id="load-video-btn" style="white-space:nowrap; padding:0.5rem 1rem; font-size:0.8rem;">&#127916; Load Video</button>
+                <input type="file" id="video-file-input" accept="video/*" />
+              </div>
+              <div class="upload-btn-wrapper" style="width:auto;">
+                <button class="btn btn-secondary" id="load-folder-btn" style="white-space:nowrap; padding:0.5rem 1rem; font-size:0.8rem;">&#128194; Load Folder</button>
+                <input type="file" id="folder-file-input" webkitdirectory directory multiple />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Video Editor Canvas Area -->
+          <div class="image-workspace" id="anno-workspace">
+            <div class="placeholder-text" id="anno-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2" style="width:48px;height:48px;margin-bottom:0.5rem;opacity:0.3;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+              <span>No media loaded for tracking</span>
+              <span style="font-size:0.7rem;">Load a video file or a folder of frame images to begin</span>
+            </div>
+            
+            <div id="anno-viewport" style="display:none; width:100%; height:100%; overflow:auto; position:relative;">
+              <div id="anno-scroll-content" style="min-width:100%; min-height:100%; display:flex; position:relative; padding:40px; box-sizing:border-box;">
+                <div id="anno-image-container" style="position:relative; margin:auto; flex-shrink:0; box-shadow:0 4px 24px rgba(0,0,0,0.5); border-radius:4px;">
+                  <img id="anno-frame-img" src="" draggable="false" style="max-width:none; max-height:none; display:block;" />
+                  <div id="anno-marker-overlay" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto;">
+                    <!-- draggable markers dynamically placed -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Visual Frame Strip Timeline at Bottom -->
+          <div id="timeline-container" style="display:none; flex-shrink:0; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.5rem; display:flex; flex-direction:column; gap:0.4rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-muted);">
+              <span>Timeline Frame Strip</span>
+              <span id="timeline-info" style="font-family:monospace;">Frame 0 / 0</span>
+            </div>
+            <div id="frame-strip" style="display:flex; gap:3px; overflow-x:auto; padding:4px 0; max-height:60px; scrollbar-width:thin; -ms-overflow-style:none;">
+              <!-- Frame tabs added dynamically -->
+            </div>
+          </div>
         </div>
-
-        <!-- Active character settings -->
-        <div id="char-settings-panel" style="display:none; flex-direction:column; gap:0.85rem;">
-
-          <div class="presets-grid" id="presets-container">
-            <div class="preset-card active" id="preset-rounded" onclick="selectPreset('rounded')">
-              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="20" ry="8" fill="#111"/><path d="M14 15 Q30 5 46 15 Z" fill="#fff"/><path d="M18 22 Q30 14 42 22 Q30 30 18 22Z" fill="#f56e7d"/></svg>
-              <span class="title">Rounded Comic</span>
-            </div>
-            <div class="preset-card" id="preset-capsule" onclick="selectPreset('capsule')">
-              <svg viewBox="0 0 60 30" width="56" height="28"><rect x="2" y="2" width="56" height="26" rx="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><rect x="8" y="6" width="44" height="18" rx="6" fill="#111"/><rect x="10" y="6" width="40" height="7" fill="#fff"/><rect x="10" y="17" width="40" height="7" fill="#fff"/></svg>
-              <span class="title">Anime Capsule</span>
-            </div>
-            <div class="preset-card" id="preset-flat" onclick="selectPreset('flat')">
-              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="10" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="21" ry="5" fill="#111"/></svg>
-              <span class="title">Flat / Squeeze</span>
-            </div>
-            <div class="preset-card" id="preset-smile" onclick="selectPreset('smile')">
-              <svg viewBox="0 0 60 30" width="56" height="28"><ellipse cx="30" cy="15" rx="28" ry="13" fill="#FFCC99" stroke="#222" stroke-width="2"/><ellipse cx="30" cy="15" rx="25" ry="11" fill="#fff" stroke="#222" stroke-width="1.5"/><line x1="5" y1="15" x2="55" y2="15" stroke="#222" stroke-width="2"/><line x1="17" y1="5" x2="17" y2="25" stroke="#222" stroke-width="1.2"/><line x1="30" y1="4" x2="30" y2="26" stroke="#222" stroke-width="1.2"/><line x1="43" y1="5" x2="43" y2="25" stroke="#222" stroke-width="1.2"/></svg>
-              <span class="title">Comic Smile</span>
-            </div>
-            <div class="preset-card" id="preset-u-shaped" onclick="selectPreset('u-shaped')">
-              <svg viewBox="0 0 60 30" width="56" height="28"><path d="M 2 2 A 28 28 0 0 0 58 2 Z" fill="#FFCC99" stroke="#222" stroke-width="2"/><path d="M 8 2 A 22 22 0 0 0 52 2 Z" fill="#111"/><rect x="18" y="2" width="24" height="4" fill="#fff"/><path d="M 22 18 Q 30 25 38 18 Z" fill="#f56e7d"/></svg>
-              <span class="title">U-Shaped</span>
-            </div>
-          </div>
-
-          <div class="color-row">
-            <div class="form-group flex-1">
-              <label>Skin Tone</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="color-skin" value="#FFCC99" onchange="updateColors()" />
-                <span id="skin-hex">#FFCC99</span>
-                <button class="color-pipette-btn" id="pipette-skin" title="Pick from image" onclick="startColorPicker('skin')">🎯</button>
-              </div>
-            </div>
-            <div class="form-group flex-1">
-              <label>Lip / Outline</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="color-outline" value="#000000" onchange="updateColors()" />
-                <span id="outline-hex">#000000</span>
-                <button class="color-pipette-btn" id="pipette-outline" title="Pick from image" onclick="startColorPicker('outline')">🎯</button>
+      </div>
+      
+      <!-- MIDDLE: Landmark Point Selector (Column 2) -->
+      <div class="middle-panel">
+        <!-- Point Selector Checklist -->
+        <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <h2>2. Landmark Point Selector</h2>
+          <div id="anno-char-tabs" style="display:none; gap:0.4rem; margin-top:0.5rem; flex-wrap:wrap;"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top: 0.5rem; flex-wrap:wrap; gap:0.4rem;">
+            <span style="font-size:0.75rem; color:var(--text-muted);" id="anno-editing-char-subtitle">Editing: Character 1</span>
+            <div style="display:flex; align-items:center; gap:0.45rem;">
+              <label style="display:inline-flex; align-items:center; gap:0.25rem; font-size:0.7rem; margin:0; cursor:pointer; color:var(--text-muted); user-select:none;">
+                <input type="checkbox" id="chk-toggle-lines" checked onchange="renderLandmarks()" style="width:auto; cursor:pointer;" /> Line Toggle
+              </label>
+              <button class="btn btn-secondary btn-sm" id="btn-open-guides" onclick="openReferenceGuideModal()" style="font-size:0.7rem; padding:0.25rem 0.5rem; height:auto; width:auto; border-radius:4px; display:inline-flex; align-items:center; gap:2px; border-color:var(--accent-primary); color:var(--accent-primary-hover);">📖 Open Guides</button>
+              <div style="display:flex; gap:0.2rem;">
+                <button class="btn btn-secondary active-density" id="density-btn-6" onclick="setMouthDensity(6)" style="font-size:0.7rem; padding:0.25rem 0.4rem; line-height:1; height:auto; width:auto; border-radius:4px;">6 Pts</button>
+                <button class="btn btn-secondary" id="density-btn-12" onclick="setMouthDensity(12)" style="font-size:0.7rem; padding:0.25rem 0.4rem; line-height:1; height:auto; width:auto; border-radius:4px;">12 Pts</button>
               </div>
             </div>
           </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div class="subtitle" style="margin-top:0.4rem;">· Toggle visibility · BODY_HEURISTIC points denoted with dashed outline</div>
+          <div id="points-list-container" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:0.5rem; padding-right:4px;">
+            <!-- 31 checklist points added dynamically -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- RIGHT: Actions & Logs (Column 3) -->
+      <div class="right-panel">
+        <!-- Actions Card -->
+        <div class="card" style="flex-shrink:0; gap:0.6rem;">
+          <h2>3. Workspace Actions</h2>
+          
+          <!-- Dataset Exporter Config (Decluttered Inline Grid) -->
+          <div class="inputs-grid-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.1rem;">
             <div class="form-group">
-              <label>Width Scale</label>
-              <div class="slider-container">
-                <input type="range" id="mouth-width" class="custom-slider" min="1" max="60" step="0.5" value="16" oninput="updateSliderVal('mouth-width')" />
-                <span class="slider-val" id="mouth-width-val">16%</span>
-              </div>
+              <label style="font-size:0.65rem;">Character Name</label>
+              <input type="text" id="dataset-char-name" value="celeste" placeholder="e.g. celeste" style="padding:0.4rem 0.6rem; font-size:0.78rem;" />
             </div>
             <div class="form-group">
-              <label>Height Scale</label>
-              <div class="slider-container">
-                <input type="range" id="mouth-height" class="custom-slider" min="1" max="40" step="0.5" value="10" oninput="updateSliderVal('mouth-height')" />
-                <span class="slider-val" id="mouth-height-val">10%</span>
-              </div>
+              <label style="font-size:0.65rem;">Session / Dataset ID</label>
+              <input type="text" id="dataset-session-id" value="session_01" placeholder="e.g. session_01" style="padding:0.4rem 0.6rem; font-size:0.78rem;" />
             </div>
           </div>
 
-          <button class="btn btn-secondary" style="padding:0.4rem; font-size:0.75rem;" onclick="triggerColorAutoSample()">
-            🎨 Auto-Sample Colors from Mouth Region
-          </button>
+          <div style="display:flex; flex-direction:column; gap:0.45rem;">
+            <!-- Row 1: Tracking & Save side-by-side -->
+            <div style="display:grid; grid-template-columns:1.1fr 1fr; gap:0.4rem;">
+              <button class="btn" id="run-tracking-btn" onclick="runVideoTracking()" style="background:var(--accent-primary); font-size:0.75rem; padding:0.45rem 0.75rem;" disabled>⚡ Run OpenSeeFace Tracking</button>
+              <button class="btn btn-secondary" id="save-prop-btn" onclick="saveAndPropagate()" style="font-size:0.75rem; padding:0.45rem 0.75rem;" disabled>💾 Save &amp; Propagate Flow</button>
+            </div>
+            
+            <!-- Row 2: Load & Export side-by-side -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+              <button class="btn btn-secondary" id="load-dataset-btn" onclick="loadDataset()" style="font-size:0.75rem; padding:0.45rem 0.75rem; border-color:#8b5cf6; color:#a78bfa;">📂 Load Saved Dataset</button>
+              <button class="btn btn-secondary" id="export-dataset-btn" onclick="exportDataset()" style="font-size:0.75rem; padding:0.45rem 0.75rem; border-color:var(--accent-secondary); color:var(--accent-secondary);" disabled>📁 Export Dataset</button>
+            </div>
+            
+            <!-- Force Overwrite checkbox -->
+            <div style="display:flex; align-items:center; gap:0.4rem; justify-content:center; margin-top:0.1rem;">
+              <input type="checkbox" id="force-propagate-chk" style="width:auto; cursor:pointer;" />
+              <label for="force-propagate-chk" style="font-size:0.68rem; color:var(--text-muted); cursor:pointer; user-select:none; margin:0; text-transform:none;">Force overwrite green tracked frames</label>
+            </div>
 
-          <!-- Hidden sync inputs -->
-          <input type="hidden" id="mouth-rotation"      value="0" />
-          <input type="hidden" id="mouth-rotation-val"  value="0°" />
-          <input type="hidden" id="mouth-perspective"   value="1" />
-          <input type="hidden" id="mouth-perspective-val" value="1.0" />
+            <!-- Row 3: Render Video (Prominent main action) -->
+            <button class="btn" id="render-anno-video-btn" onclick="renderVideoFromAnnotations()" style="background:linear-gradient(135deg, #ec4899 0%, #db2777 100%); font-size:0.8rem; box-shadow: 0 4px 18px rgba(236, 72, 153, 0.25); padding:0.55rem;" disabled>🎬 Render Lip-Sync Video (with Annotations)</button>
+          </div>
         </div>
-      </div>
-
-      <!-- Script -->
-      <div class="card" style="flex-shrink:0;">
-        <h2>3. Dialogue Script &amp; Audio</h2>
-        <div class="form-group">
-          <label>Script (use [Character 1] / [Character 2] tags)</label>
-          <textarea id="script-input" rows="3">[Character 1] Hello! Welcome to the new AutoStitch Lip-Sync Lab. [Character 2] Wow, my mouth is programmatically generated and matches my character!</textarea>
-        </div>
-        <div style="display:flex; gap:0.5rem;">
-          <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(1)">Dialogue Sample</button>
-          <button class="btn btn-secondary" style="flex:1; font-size:0.75rem;" onclick="loadSampleScript(2)">Monologue Sample</button>
-        </div>
-        <div class="form-group" style="margin-top:0.4rem; flex-direction:row; align-items:center; gap:0.5rem; justify-content:flex-start;">
-          <input type="checkbox" id="safe-mode-checkbox" style="width:auto; cursor:pointer;" />
-          <label for="safe-mode-checkbox" style="text-transform:none; font-size:0.75rem; cursor:pointer; user-select:none; margin:0; display:flex; align-items:center; gap:0.3rem;">
-            🛡️ Safe Mode (Downscale to 1280px for low-RAM)
-          </label>
-        </div>
-        <button class="btn" id="generate-btn" onclick="startGeneration()">⚡ Generate Lip-Sync Animation</button>
-      </div>
-
-      <!-- Output Video -->
-      <div class="card" style="flex:1; min-height:180px;">
-        <h2>4. Generated Output</h2>
-        <div class="video-container">
-          <video id="output-video" controls style="display:none;"></video>
-          <div class="placeholder-text" id="video-placeholder">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin-bottom:0.5rem;opacity:0.3;">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z"/>
-            </svg>
-            <span>Run generation above to play video</span>
+        
+        <!-- Console logs for annotation mode -->
+        <div class="card" style="height: 250px; display:flex; flex-direction:column; overflow:hidden;">
+          <h2>4. Console Logs</h2>
+          <div class="logger-card" id="anno-logs-container" style="flex:1; overflow-y:auto; max-height:none;">
+            <div class="log-entry info">Lab ready. Load a video file to begin landmark annotation.</div>
           </div>
         </div>
       </div>
-
-      <!-- Logs -->
-      <div class="card" style="flex-shrink:0; max-height:130px;">
-        <h2>5. Console</h2>
-        <div class="logger-card" id="logs-container">
-          <div class="log-entry info">Console started. Upload a character image to begin...</div>
-        </div>
-      </div>
-
     </div>
   </main>
 
@@ -263,6 +463,53 @@
       <button class="popup-btn popup-btn-accent" onclick="closeMouthPopup()">✓ Done</button>
     </div>
   </div>
+
+  <!-- Landmark Reference Guide Modal Overlay -->
+  <div id="guide-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>📖 Landmark Placement Reference Guides</h3>
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto; margin-right:1rem;">
+          <span style="font-size:0.75rem; color:var(--text-muted); user-select:none;">🔍 Zoom:</span>
+          <input type="range" id="guide-zoom-slider" min="1" max="2.5" step="0.1" value="1" oninput="zoomGuide(this.value)" style="width:100px; cursor:pointer;" />
+          <span id="guide-zoom-val" style="font-size:0.75rem; color:var(--text-muted); width:35px; text-align:right;">100%</span>
+        </div>
+        <button class="modal-close" onclick="closeReferenceGuideModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" id="tab-btn-neutral" onclick="selectGuideTab('neutral', this)">Neutral Mouth</button>
+          <button class="modal-tab-btn" id="tab-btn-smile" onclick="selectGuideTab('smile', this)">Smile Shape</button>
+          <button class="modal-tab-btn" id="tab-btn-open" onclick="selectGuideTab('open', this)">Open Oval</button>
+          <button class="modal-tab-btn" id="tab-btn-flat" onclick="selectGuideTab('flat', this)">Flat / Line</button>
+          <button class="modal-tab-btn" id="tab-btn-u_shape" onclick="selectGuideTab('u_shape', this)">U-Shape</button>
+          <button class="modal-tab-btn" id="tab-btn-asymmetric" onclick="selectGuideTab('asymmetric', this)">Asymmetric Smirk</button>
+          <button class="modal-tab-btn" id="tab-btn-mouth_6" onclick="selectGuideTab('mouth_6', this)">6-Point Mouth</button>
+        </div>
+        <div class="modal-content">
+          <div class="guide-svg-wrapper">
+            <iframe id="guide-svg-iframe" src="/static/guides/guide_neutral.svg"></iframe>
+          </div>
+          <div class="guide-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#10b981;"></span>
+              <span><strong>Tracked Point:</strong> Sourced from OpenSeeFace facial model (Green)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:#8b5cf6;"></span>
+              <span><strong>Heuristic Point:</strong> Geometrically interpolated forehead/neck/shoulders (Purple)</span>
+            </div>
+            <div class="legend-desc">
+              Use these guides to understand the 31 landmark nodes. When **Line Toggle** is checked, visual trace lines will project from each dot on the editor canvas to its label box to verify placements.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drag overlay tooltip -->
+  <div id="drag-tooltip" class="drag-cursor-tooltip" style="display:none;"></div>
 
   <script src="/static/app.js"></script>
 </body>

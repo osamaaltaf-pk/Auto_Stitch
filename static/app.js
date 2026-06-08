@@ -143,6 +143,49 @@ const getVoiceCardClass = (vo, i, selectedBlock, selectedIndices = [], dragOverI
   return cls;
 };
 
+const getMusicCardClass = (mu, i, selectedBlock, selectedIndices = [], dragOverIndex = null, draggedIndex = null) => {
+  let cls = "h-full relative glass-card p-2 rounded-lg flex flex-col justify-between border-2 cursor-pointer ";
+  if (dragOverIndex === i && draggedIndex !== i) {
+    cls += "drag-over-column ";
+  }
+  if (selectedBlock?.lane === 'music' && selectedBlock?.index === i) {
+    cls += "glow-active ";
+  } else if (selectedIndices.includes(i)) {
+    cls += "border-pink-500 bg-pink-500/5 shadow-[0_0_10px_rgba(236,72,153,0.15)] ";
+  } else {
+    cls += "border-carbon-border ";
+  }
+  if (mu.status === 'generating') cls += "status-generating ";
+  if (mu.status === 'done') cls += "status-done border-emerald-500/40 ";
+  if (mu.status === 'error') cls += "status-error ";
+  return cls;
+};
+
+const normalizeProjectManifest = (data) => {
+  if (!data) return data;
+  const targetLen = data.video_blocks ? data.video_blocks.length : 0;
+  
+  if (!data.sfx_blocks) data.sfx_blocks = [];
+  while (data.sfx_blocks.length < targetLen) {
+    const idx = data.sfx_blocks.length;
+    data.sfx_blocks.push({ id: `sfx_${String(idx).padStart(2, '0')}`, prompt: "", order: idx, status: "idle", file_path: null });
+  }
+  
+  if (!data.voice_blocks) data.voice_blocks = [];
+  while (data.voice_blocks.length < targetLen) {
+    const idx = data.voice_blocks.length;
+    data.voice_blocks.push({ id: `vo_${String(idx).padStart(2, '0')}`, order: idx, status: "idle", prompt: "", file_path: null, voice: "alba" });
+  }
+  
+  if (!data.music_blocks) data.music_blocks = [];
+  while (data.music_blocks.length < targetLen) {
+    const idx = data.music_blocks.length;
+    data.music_blocks.push({ id: `mu_${String(idx).padStart(2, '0')}`, order: idx, status: "idle", prompt: "", file_path: null });
+  }
+  
+  return data;
+};
+
 function App() {
   // Application State
   const [project, setProject] = useState({
@@ -151,6 +194,7 @@ function App() {
     video_blocks: [],
     sfx_blocks: [],
     voice_blocks: [],
+    music_blocks: [],
     render_complete: false
   });
   const [settings, setSettings] = useState({
@@ -252,6 +296,8 @@ function App() {
   const [linkVideoVolume, setLinkVideoVolume] = useState(false);
   const [linkVoiceVolume, setLinkVoiceVolume] = useState(false);
   const [linkSfxVolume, setLinkSfxVolume] = useState(false);
+  const [linkMusicVolume, setLinkMusicVolume] = useState(false);
+  const [skipCompletedSlots, setSkipCompletedSlots] = useState(true);
   const [audioCacheBuster, setAudioCacheBuster] = useState(Date.now());
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -259,11 +305,14 @@ function App() {
   const currentVideoVolume = selectedBlock !== null ? (project.video_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
   const currentVoiceVolume = selectedBlock !== null ? (project.voice_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
   const currentSfxVolume = selectedBlock !== null ? (project.sfx_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
+  const currentMusicVolume = (selectedBlock !== null && project.music_blocks) ? (project.music_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
 
   // Media refs for synced multi-track playback
   const videoRef = useRef(null);
   const voiceAudioRef = useRef(null);
   const sfxAudioRef = useRef(null);
+  const musicAudioRef = useRef(null);
+
 
   // Dynamically loaded available voices state & cloning indicators
   const [availableVoices, setAvailableVoices] = useState(["alba", "marius", "fantine", "cosette", "jean", "eponine"]);
@@ -359,11 +408,40 @@ function App() {
       });
     }
 
+    // 4. Merge Music
+    const musicLayers = layersList.filter(l => l.type === 'music');
+    const mergedMusicBlocks = [];
+    for (let i = 0; i < targetLen; i++) {
+      const prompts = [];
+      let combinedStatus = 'idle';
+      let combinedFilePath = null;
+      musicLayers.forEach(l => {
+        const b = l.blocks[i];
+        if (b && b.prompt && b.prompt.trim()) {
+          prompts.push(b.prompt.trim());
+          if (b.status === 'generating') combinedStatus = 'generating';
+          else if ((b.status === 'done' || b.status === 'provided' || b.status === 'error') && combinedStatus !== 'generating') {
+            combinedStatus = b.status;
+          }
+          if (b.file_path) combinedFilePath = b.file_path;
+        }
+      });
+      const primaryMusicBlock = musicLayers[0]?.blocks[i] || (project.music_blocks && project.music_blocks[i]) || { id: `mu_${String(i).padStart(2, '0')}`, order: i };
+      mergedMusicBlocks.push({
+        ...primaryMusicBlock,
+        prompt: prompts.join(", "),
+        status: combinedStatus === 'idle' ? (combinedFilePath ? 'done' : 'idle') : combinedStatus,
+        file_path: combinedFilePath,
+        order: i
+      });
+    }
+
     return {
       ...project,
       video_blocks: mergedVideoBlocks,
       sfx_blocks: mergedSfxBlocks,
-      voice_blocks: mergedVoiceBlocks
+      voice_blocks: mergedVoiceBlocks,
+      music_blocks: mergedMusicBlocks
     };
   };
 
@@ -374,13 +452,15 @@ function App() {
       setTimelineLayers([
         { id: 'video-1', type: 'video', name: 'VIDEO 1', blocks: project.video_blocks },
         { id: 'sfx-1', type: 'sfx', name: 'SFX 1', blocks: project.sfx_blocks },
-        { id: 'voice-1', type: 'voice', name: 'VOICE 1', blocks: project.voice_blocks }
+        { id: 'voice-1', type: 'voice', name: 'VOICE 1', blocks: project.voice_blocks },
+        { id: 'music-1', type: 'music', name: 'MUSIC 1', blocks: project.music_blocks || [] }
       ]);
     } else {
       setTimelineLayers(prev => prev.map(layer => {
         if (layer.id === 'video-1') return { ...layer, blocks: project.video_blocks };
         if (layer.id === 'sfx-1') return { ...layer, blocks: project.sfx_blocks };
         if (layer.id === 'voice-1') return { ...layer, blocks: project.voice_blocks };
+        if (layer.id === 'music-1') return { ...layer, blocks: project.music_blocks || [] };
 
         let blocks = [...layer.blocks];
         const targetLen = project.video_blocks.length;
@@ -388,6 +468,8 @@ function App() {
           const newIdx = blocks.length;
           if (layer.type === 'sfx') {
             blocks.push({ id: `sfx_${layer.id}_${newIdx}`, prompt: "", order: newIdx, status: "idle", file_path: null });
+          } else if (layer.type === 'music') {
+            blocks.push({ id: `mu_${layer.id}_${newIdx}`, prompt: "", order: newIdx, status: "idle", file_path: null });
           } else if (layer.type === 'voice') {
             blocks.push({ id: `vo_${layer.id}_${newIdx}`, order: newIdx, status: "idle", prompt: "", file_path: null, voice: "alba" });
           } else if (layer.type === 'video') {
@@ -407,7 +489,8 @@ function App() {
     if (videoRef.current) videoRef.current.volume = currentVideoVolume;
     if (voiceAudioRef.current) voiceAudioRef.current.volume = currentVoiceVolume;
     if (sfxAudioRef.current) sfxAudioRef.current.volume = currentSfxVolume;
-  }, [currentVideoVolume, currentVoiceVolume, currentSfxVolume]);
+    if (musicAudioRef.current) musicAudioRef.current.volume = currentMusicVolume;
+  }, [currentVideoVolume, currentVoiceVolume, currentSfxVolume, currentMusicVolume]);
 
   // Force reload audio elements when audioCacheBuster updates (e.g. generation finishes)
   useEffect(() => {
@@ -425,6 +508,13 @@ function App() {
         console.error("Failed to load sfx audio element:", e);
       }
     }
+    if (musicAudioRef.current) {
+      try {
+        musicAudioRef.current.load();
+      } catch (e) {
+        console.error("Failed to load music audio element:", e);
+      }
+    }
   }, [audioCacheBuster]);
 
   // Continuous polling for project manifest to keep UI updated
@@ -439,7 +529,8 @@ function App() {
           body: JSON.stringify({ project_name: project.project_name })
         });
         if (resp.ok) {
-          const data = await resp.json();
+          const rawData = await resp.json();
+          const data = normalizeProjectManifest(rawData);
 
           // Use ref/state current project blocks to check transitions safely inside updater
           setProject(prevProject => {
@@ -485,6 +576,7 @@ function App() {
             if (layer.id === 'video-1') return { ...layer, blocks: data.video_blocks };
             if (layer.id === 'sfx-1') return { ...layer, blocks: data.sfx_blocks };
             if (layer.id === 'voice-1') return { ...layer, blocks: data.voice_blocks };
+            if (layer.id === 'music-1') return { ...layer, blocks: data.music_blocks };
 
             // For custom layers: sync completed status / file paths
             const updatedBlocks = layer.blocks.map((block, idx) => {
@@ -529,12 +621,10 @@ function App() {
       }
       return b;
     });
-    const updatedManifest = {
-      ...project,
+    setProject(prev => ({
+      ...prev,
       video_blocks: updatedVideoBlocks
-    };
-    setProject(updatedManifest);
-    saveProject(updatedManifest);
+    }));
   };
 
   const handleVoiceVolumeChange = (val) => {
@@ -546,12 +636,10 @@ function App() {
       }
       return b;
     });
-    const updatedManifest = {
-      ...project,
+    setProject(prev => ({
+      ...prev,
       voice_blocks: updatedVoiceBlocks
-    };
-    setProject(updatedManifest);
-    saveProject(updatedManifest);
+    }));
   };
 
   const handleSfxVolumeChange = (val) => {
@@ -563,12 +651,25 @@ function App() {
       }
       return b;
     });
-    const updatedManifest = {
-      ...project,
+    setProject(prev => ({
+      ...prev,
       sfx_blocks: updatedSfxBlocks
-    };
-    setProject(updatedManifest);
-    saveProject(updatedManifest);
+    }));
+  };
+
+  const handleMusicVolumeChange = (val) => {
+    if (selectedBlock === null) return;
+    const idx = selectedBlock.index;
+    const updatedMusicBlocks = (project.music_blocks || []).map((b, i) => {
+      if (i === idx || linkMusicVolume) {
+        return { ...b, volume: val };
+      }
+      return b;
+    });
+    setProject(prev => ({
+      ...prev,
+      music_blocks: updatedMusicBlocks
+    }));
   };
 
   const toggleLinkVideoVolume = () => {
@@ -607,6 +708,18 @@ function App() {
     }
   };
 
+  const toggleLinkMusicVolume = () => {
+    const newLink = !linkMusicVolume;
+    setLinkMusicVolume(newLink);
+    if (newLink && selectedBlock !== null) {
+      const currentVal = project.music_blocks?.[selectedBlock.index]?.volume ?? 1.0;
+      const updatedMusicBlocks = (project.music_blocks || []).map(b => ({ ...b, volume: currentVal }));
+      const updatedManifest = { ...project, music_blocks: updatedMusicBlocks };
+      setProject(updatedManifest);
+      saveProject(updatedManifest);
+    }
+  };
+
   // Seek position synchronization
   const handleVideoSeek = () => {
     if (videoRef.current) {
@@ -627,6 +740,12 @@ function App() {
           sfxAudioRef.current.currentTime = curr;
         }
       }
+      if (musicAudioRef.current) {
+        const diff = Math.abs(musicAudioRef.current.currentTime - curr);
+        if (!isVideoPlaying || diff > 0.4) {
+          musicAudioRef.current.currentTime = curr;
+        }
+      }
     }
   };
 
@@ -636,6 +755,7 @@ function App() {
       if (videoRef.current) videoRef.current.pause();
       if (voiceAudioRef.current) voiceAudioRef.current.pause();
       if (sfxAudioRef.current) sfxAudioRef.current.pause();
+      if (musicAudioRef.current) musicAudioRef.current.pause();
       setIsPlaying(false);
     } else {
       let start = 0;
@@ -644,10 +764,12 @@ function App() {
       }
       if (voiceAudioRef.current) voiceAudioRef.current.currentTime = start;
       if (sfxAudioRef.current) sfxAudioRef.current.currentTime = start;
+      if (musicAudioRef.current) musicAudioRef.current.currentTime = start;
 
       if (videoRef.current) videoRef.current.play().catch(e => { });
       if (voiceAudioRef.current) voiceAudioRef.current.play().catch(e => { });
       if (sfxAudioRef.current) sfxAudioRef.current.play().catch(e => { });
+      if (musicAudioRef.current) musicAudioRef.current.play().catch(e => { });
       setIsPlaying(true);
     }
   };
@@ -667,6 +789,10 @@ function App() {
       sfxAudioRef.current.pause();
       sfxAudioRef.current.currentTime = 0;
     }
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current.currentTime = 0;
+    }
   }, [selectedBlock]);
 
   // Refs for UI
@@ -675,6 +801,7 @@ function App() {
   const laneVideoRef = useRef(null);
   const laneSfxRef = useRef(null);
   const laneVoiceRef = useRef(null);
+  const laneMusicRef = useRef(null);
 
   // Add a nice visual console log
   const addLog = (message, type = "info") => {
@@ -816,6 +943,7 @@ function App() {
     if (laneVideoRef.current) laneVideoRef.current.scrollLeft = scrollLeft;
     if (laneSfxRef.current) laneSfxRef.current.scrollLeft = scrollLeft;
     if (laneVoiceRef.current) laneVoiceRef.current.scrollLeft = scrollLeft;
+    if (laneMusicRef.current) laneMusicRef.current.scrollLeft = scrollLeft;
     if (timelineHeaderRef.current) timelineHeaderRef.current.scrollLeft = scrollLeft;
   };
 
@@ -826,6 +954,7 @@ function App() {
     if (lane === 'video') return project.video_blocks[index];
     if (lane === 'sfx') return project.sfx_blocks[index];
     if (lane === 'voice') return project.voice_blocks[index];
+    if (lane === 'music') return (project.music_blocks && project.music_blocks[index]) || null;
     return null;
   };
 
@@ -1253,7 +1382,7 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setProject(data);
+        setProject(normalizeProjectManifest(data));
         try { localStorage.setItem('as_active_project', name); } catch (e) { }
         addLog(`Project '${name}' loaded successfully.`, "success");
       } else {
@@ -1296,7 +1425,7 @@ function App() {
   const addTimelineLayer = (type) => {
     if (!type) return;
     const typeCount = timelineLayers.filter(l => l.type === type).length + 1;
-    const typeLabel = type === 'video' ? 'VIDEO' : (type === 'sfx' ? 'SFX' : 'VOICE');
+    const typeLabel = type === 'video' ? 'VIDEO' : (type === 'sfx' ? 'SFX' : (type === 'voice' ? 'VOICE' : 'MUSIC'));
     const newLayerId = `${type}-${Date.now()}`;
     const targetLen = project.video_blocks.length;
     const blocks = [];
@@ -1313,6 +1442,14 @@ function App() {
       } else if (type === 'sfx') {
         blocks.push({
           id: `sfx_${newLayerId}_${i}`,
+          prompt: "",
+          order: i,
+          status: "idle",
+          file_path: null
+        });
+      } else if (type === 'music') {
+        blocks.push({
+          id: `mu_${newLayerId}_${i}`,
           prompt: "",
           order: i,
           status: "idle",
@@ -1342,7 +1479,7 @@ function App() {
   };
 
   const removeTimelineLayer = (layerId) => {
-    if (['video-1', 'sfx-1', 'voice-1'].includes(layerId)) {
+    if (['video-1', 'sfx-1', 'voice-1', 'music-1'].includes(layerId)) {
       addLog("Cannot delete default primary system layer.", "error");
       return;
     }
@@ -1374,7 +1511,7 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setProject(data.manifest);
+        setProject(normalizeProjectManifest(data.manifest));
         addLog(`Video scan complete. Found ${data.manifest.video_blocks.length} clips!`, "success");
       } else {
         const err = await resp.json();
@@ -1390,6 +1527,7 @@ function App() {
     const v_id = `v_${String(newIdx).padStart(2, '0')}`;
     const sfx_id = `sfx_${String(newIdx).padStart(2, '0')}`;
     const vo_id = `vo_${String(newIdx).padStart(2, '0')}`;
+    const mu_id = `mu_${String(newIdx).padStart(2, '0')}`;
 
     const newVideo = [
       ...project.video_blocks,
@@ -1425,11 +1563,23 @@ function App() {
       }
     ];
 
+    const newMusic = [
+      ...(project.music_blocks || []),
+      {
+        id: mu_id,
+        prompt: "",
+        order: newIdx,
+        status: "idle",
+        file_path: null
+      }
+    ];
+
     const updated = {
       ...project,
       video_blocks: newVideo,
       sfx_blocks: newSfx,
-      voice_blocks: newVoice
+      voice_blocks: newVoice,
+      music_blocks: newMusic
     };
 
     setProject(updated);
@@ -1449,12 +1599,14 @@ function App() {
     const video_blocks = project.video_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
     const sfx_blocks = project.sfx_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
     const voice_blocks = project.voice_blocks.filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
+    const music_blocks = (project.music_blocks || []).filter((_, idx) => idx !== index).map((b, idx) => ({ ...b, order: idx }));
 
     const newManifest = {
       ...project,
       video_blocks,
       sfx_blocks,
-      voice_blocks
+      voice_blocks,
+      music_blocks
     };
 
     setProject(newManifest);
@@ -1473,7 +1625,7 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setProject(data.manifest);
+        setProject(normalizeProjectManifest(data.manifest));
         setSelectedBlock(null);
         addLog(`Cleared ${lane.toUpperCase()} media block successfully.`, "success");
       } else {
@@ -1535,7 +1687,7 @@ function App() {
         }));
 
         // Update root project manifest
-        setProject(data.manifest);
+        setProject(normalizeProjectManifest(data.manifest));
         setSelectedBlock({ lane: 'video', index, layerId: selectedBlock?.layerId || 'video-1' });
         addLog(`Custom video clip uploaded successfully for slot ${index}!`, "success");
       } else {
@@ -1568,7 +1720,7 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setProject(data.manifest);
+        setProject(normalizeProjectManifest(data.manifest));
         setSelectedBlock({ lane: 'voice', index });
         addLog(`Custom speech audio uploaded successfully for slot ${index}!`, "success");
       } else {
@@ -1598,7 +1750,7 @@ function App() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setProject(data.manifest);
+        setProject(normalizeProjectManifest(data.manifest));
         setSelectedBlock({ lane: 'sfx', index });
         addLog(`Custom sound effect uploaded successfully for slot ${index}!`, "success");
       } else {
@@ -1639,12 +1791,14 @@ function App() {
     const video_blocks = project.video_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
     const sfx_blocks = project.sfx_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
     const voice_blocks = project.voice_blocks.filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
+    const music_blocks = (project.music_blocks || []).filter((_, idx) => !selectedIndices.includes(idx)).map((b, idx) => ({ ...b, order: idx }));
 
     const newManifest = {
       ...project,
       video_blocks,
       sfx_blocks,
-      voice_blocks
+      voice_blocks,
+      music_blocks
     };
 
     setProject(newManifest);
@@ -1673,7 +1827,8 @@ function App() {
       ...project,
       video_blocks: reorder(project.video_blocks),
       sfx_blocks: reorder(project.sfx_blocks),
-      voice_blocks: reorder(project.voice_blocks)
+      voice_blocks: reorder(project.voice_blocks),
+      music_blocks: reorder(project.music_blocks || [])
     };
 
     setProject(newManifest);
@@ -1713,6 +1868,14 @@ function App() {
           status: "idle",
           file_path: null
         };
+      } else if (layer.type === 'music') {
+        newBlock = {
+          id: `mu_ins_${layer.id}_${Date.now()}`,
+          prompt: "",
+          order: index,
+          status: "idle",
+          file_path: null
+        };
       } else if (layer.type === 'voice') {
         newBlock = {
           id: `vo_ins_${layer.id}_${Date.now()}`,
@@ -1730,6 +1893,7 @@ function App() {
     const v_id = `v_ins_${Date.now()}`;
     const sfx_id = `sfx_ins_${Date.now()}`;
     const vo_id = `vo_ins_${Date.now()}`;
+    const mu_id = `mu_ins_${Date.now()}`;
 
     const newVideo = {
       id: v_id,
@@ -1756,11 +1920,20 @@ function App() {
       file_path: null
     };
 
+    const newMusic = {
+      id: mu_id,
+      prompt: "",
+      order: index,
+      status: "idle",
+      file_path: null
+    };
+
     const newManifest = {
       ...project,
       video_blocks: insertAt(project.video_blocks, newVideo),
       sfx_blocks: insertAt(project.sfx_blocks, newSfx),
-      voice_blocks: insertAt(project.voice_blocks, newVoice)
+      voice_blocks: insertAt(project.voice_blocks, newVoice),
+      music_blocks: insertAt(project.music_blocks || [], newMusic)
     };
 
     setProject(newManifest);
@@ -1787,6 +1960,7 @@ function App() {
       let video_blocks = [...project.video_blocks];
       let sfx_blocks = [...project.sfx_blocks];
       let voice_blocks = [...project.voice_blocks];
+      let music_blocks = [...(project.music_blocks || [])];
 
       const targetLen = Math.max(lines.length, video_blocks.length);
 
@@ -1813,6 +1987,11 @@ function App() {
         voice_blocks.push({ id: `vo_${String(newIdx).padStart(2, '0')}`, order: newIdx, status: "idle", prompt: "", file_path: null });
       }
 
+      while (music_blocks.length < targetLen) {
+        const newIdx = music_blocks.length;
+        music_blocks.push({ id: `mu_${String(newIdx).padStart(2, '0')}`, order: newIdx, status: "idle", prompt: "", file_path: null });
+      }
+
       lines.forEach((line, idx) => {
         if (lane === 'sfx') {
           sfx_blocks[idx].prompt = line;
@@ -1820,6 +1999,9 @@ function App() {
         } else if (lane === 'voice') {
           voice_blocks[idx].prompt = line;
           voice_blocks[idx].status = 'idle';
+        } else if (lane === 'music') {
+          music_blocks[idx].prompt = line;
+          music_blocks[idx].status = 'idle';
         }
       });
 
@@ -1827,7 +2009,8 @@ function App() {
         ...project,
         video_blocks,
         sfx_blocks,
-        voice_blocks
+        voice_blocks,
+        music_blocks
       };
 
       setProject(updatedManifest);
@@ -1895,8 +2078,7 @@ function App() {
       addLog("Please describe your sound effect first.", "error");
       return;
     }
-    // Use overrideBlockId (from timeline layer block) or fall back to merged manifest block
-    const mergedBlock = merged.sfx_blocks[index];
+    const mergedBlock = project.sfx_blocks[index];
     if (mergedBlock && mergedBlock.status === 'generating') {
       addLog(`SFX generation for slot ${index} is already in progress.`, "warning");
       return;
@@ -1916,13 +2098,12 @@ function App() {
       return l;
     }));
 
-    if (mergedBlock) {
-      mergedBlock.prompt = prompt;
-      mergedBlock.status = 'generating';
-    }
-    const updatedMerged = { ...merged, sfx_blocks: merged.sfx_blocks.map((b, idx) => idx === index ? { ...b, prompt, status: 'generating' } : b) };
-    setProject(updatedMerged);
-    await saveProject(updatedMerged);
+    const updatedProject = {
+      ...project,
+      sfx_blocks: project.sfx_blocks.map((b, idx) => idx === index ? { ...b, prompt, status: 'generating' } : b)
+    };
+    setProject(updatedProject);
+    await saveProject(updatedProject);
 
     try {
       const resp = await fetch("/api/generate/sfx", {
@@ -1949,6 +2130,64 @@ function App() {
     }
   };
 
+  // API Call: Run MUSIC generation
+  const generateMusic = async (index, prompt, params, overrideBlockId = null) => {
+    if (!prompt || !prompt.trim()) {
+      addLog("Please describe your background music first.", "error");
+      return;
+    }
+    const mergedBlock = project.music_blocks?.[index];
+    if (mergedBlock && mergedBlock.status === 'generating') {
+      addLog(`Music generation for slot ${index} is already in progress.`, "warning");
+      return;
+    }
+    const blockId = overrideBlockId || (mergedBlock ? mergedBlock.id : `mu_${String(index).padStart(2, '0')}`);
+    addLog(`Generating music block ${blockId} (slot ${index})...`, "info");
+
+    // Save latest prompt and set to generating in both project and timelineLayers
+    setTimelineLayers(prev => prev.map(l => {
+      if (l.id === (overrideBlockId ? l.id : 'music-1')) {
+        const newBlocks = [...l.blocks];
+        if (newBlocks[index]) {
+          newBlocks[index] = { ...newBlocks[index], status: 'generating', prompt };
+        }
+        return { ...l, blocks: newBlocks };
+      }
+      return l;
+    }));
+
+    const updatedProject = {
+      ...project,
+      music_blocks: (project.music_blocks || []).map((b, idx) => idx === index ? { ...b, prompt, status: 'generating' } : b)
+    };
+    setProject(updatedProject);
+    await saveProject(updatedProject);
+
+    try {
+      const resp = await fetch("/api/generate/music", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_name: project.project_name,
+          block_id: blockId,
+          prompt: prompt,
+          model: params.model || "small-music",
+          duration: params.duration || 10.0,
+          steps: params.steps || 12,
+          seed: params.seed || -1
+        })
+      });
+      if (resp.ok) {
+        addLog(`Stable Audio Music task launched for slot ${index}.`, "info");
+      } else {
+        const errData = await resp.json().catch(() => ({}));
+        addLog(`Failed initiating Music task: ${errData.detail || resp.status}`, "error");
+      }
+    } catch (e) {
+      addLog("Failed contacting server.", "error");
+    }
+  };
+
   // Trigger sequential generation for all voice blocks that have prompts but are not yet done
   const generateAllVoice = async (layerId = null) => {
     const targetLayerId = layerId || 'voice-1';
@@ -1958,13 +2197,18 @@ function App() {
       return;
     }
     
-    // Filter blocks that have prompts and are not actively generating
+    // Filter blocks that have prompts, are not actively generating, and optionally skip completed
     const blocksToGen = targetLayer.blocks
       .map((b, index) => ({ b, index }))
-      .filter(({ b }) => b.prompt && b.prompt.trim().length > 0 && b.status !== 'generating');
+      .filter(({ b }) => {
+        const hasPrompt = b.prompt && b.prompt.trim().length > 0;
+        const isNotGenerating = b.status !== 'generating';
+        const shouldSkip = skipCompletedSlots && (b.status === 'done' || b.status === 'provided');
+        return hasPrompt && isNotGenerating && !shouldSkip;
+      });
       
     if (blocksToGen.length === 0) {
-      addLog("All eligible voice blocks are already generating or have no text prompts.", "info");
+      addLog("All eligible voice blocks are already generating, completed, or have no text prompts.", "info");
       return;
     }
     
@@ -2026,10 +2270,15 @@ function App() {
     
     const blocksToGen = targetLayer.blocks
       .map((b, index) => ({ b, index }))
-      .filter(({ b }) => b.prompt && b.prompt.trim().length > 0 && b.status !== 'generating');
+      .filter(({ b }) => {
+        const hasPrompt = b.prompt && b.prompt.trim().length > 0;
+        const isNotGenerating = b.status !== 'generating';
+        const shouldSkip = skipCompletedSlots && (b.status === 'done' || b.status === 'provided');
+        return hasPrompt && isNotGenerating && !shouldSkip;
+      });
       
     if (blocksToGen.length === 0) {
-      addLog("All eligible SFX blocks are already generating or have no prompts.", "info");
+      addLog("All eligible SFX blocks are already generating, completed, or have no prompts.", "info");
       return;
     }
     
@@ -2081,7 +2330,76 @@ function App() {
     addLog(`All ${blocksToGen.length} SFX requests queued successfully. Processing one by one.`, "success");
   };
 
-
+  // Trigger sequential generation for all Music blocks that have prompts but are not yet done
+  const generateAllMusic = async (layerId = null) => {
+    const targetLayerId = layerId || 'music-1';
+    const targetLayer = timelineLayers.find(l => l.id === targetLayerId);
+    if (!targetLayer) {
+      addLog("No Music blocks found to generate.", "error");
+      return;
+    }
+    
+    const blocksToGen = targetLayer.blocks
+      .map((b, index) => ({ b, index }))
+      .filter(({ b }) => {
+        const hasPrompt = b.prompt && b.prompt.trim().length > 0;
+        const isNotGenerating = b.status !== 'generating';
+        const shouldSkip = skipCompletedSlots && (b.status === 'done' || b.status === 'provided');
+        return hasPrompt && isNotGenerating && !shouldSkip;
+      });
+      
+    if (blocksToGen.length === 0) {
+      addLog("All eligible Music blocks are already generating, completed, or have no prompts.", "info");
+      return;
+    }
+    
+    addLog(`Initiating bulk sequential Music generation for ${blocksToGen.length} slots in layer "${targetLayer.name}"...`, "info");
+    
+    // Save prompts and set to generating
+    const updatedLayers = timelineLayers.map(l => {
+      if (l.id === targetLayerId) {
+        const newBlocks = l.blocks.map((block, idx) => {
+          if (blocksToGen.some(bg => bg.index === idx)) {
+            return { ...block, status: 'generating' };
+          }
+          return block;
+        });
+        return { ...l, blocks: newBlocks };
+      }
+      return l;
+    });
+    setTimelineLayers(updatedLayers);
+    
+    const newManifest = getMergedManifest(updatedLayers);
+    setProject(newManifest);
+    await saveProject(newManifest);
+    
+    // Fire all requests to hit the backend queue
+    for (const { b, index } of blocksToGen) {
+      const canonicalId = newManifest.music_blocks[index]?.id || `mu_${String(index).padStart(2, '0')}`;
+      
+      try {
+        addLog(`Queueing Music block ${canonicalId} (slot ${index})...`, "info");
+        await fetch("/api/generate/music", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_name: project.project_name,
+            block_id: canonicalId,
+            prompt: b.prompt,
+            model: "small-music",
+            duration: 10.0,
+            steps: 12,
+            seed: -1
+          })
+        });
+      } catch (e) {
+        console.error(`Error initiating bulk Music for block ${canonicalId}:`, e);
+      }
+    }
+    
+    addLog(`All ${blocksToGen.length} Music requests queued successfully. Processing one by one.`, "success");
+  };
 
   // API Call: Trigger render
   const startRender = async () => {
@@ -2100,7 +2418,8 @@ function App() {
           concat: true,
           video_volume: 1.0,
           voice_volume: 1.0,
-          sfx_volume: 1.0
+          sfx_volume: 1.0,
+          music_volume: 1.0
         })
       });
       if (resp.ok) {
@@ -2133,12 +2452,20 @@ function App() {
         }
         return { ...prev, voice_blocks: updated };
       });
+    } else if (lane === 'music') {
+      setProject(prev => {
+        const updated = [...(prev.music_blocks || [])];
+        if (updated[index]) {
+          updated[index] = { ...updated[index], prompt: text, status: 'idle' };
+        }
+        return { ...prev, music_blocks: updated };
+      });
     }
   };
 
   // Reorder visual tracks using simple shifting logic
   const handleMoveBlock = (lane, index, direction) => {
-    const blocks = lane === 'video' ? [...project.video_blocks] : (lane === 'sfx' ? [...project.sfx_blocks] : [...project.voice_blocks]);
+    const blocks = lane === 'video' ? [...project.video_blocks] : (lane === 'sfx' ? [...project.sfx_blocks] : (lane === 'voice' ? [...project.voice_blocks] : [...(project.music_blocks || [])]));
     const targetIdx = index + direction;
     if (targetIdx < 0 || targetIdx >= blocks.length) return;
 
@@ -2153,7 +2480,8 @@ function App() {
     const updatedManifest = { ...project };
     if (lane === 'video') updatedManifest.video_blocks = blocks;
     else if (lane === 'sfx') updatedManifest.sfx_blocks = blocks;
-    else updatedManifest.voice_blocks = blocks;
+    else if (lane === 'voice') updatedManifest.voice_blocks = blocks;
+    else updatedManifest.music_blocks = blocks;
 
     setProject(updatedManifest);
     addLog(`Reordered block ${temp.id} to slot ${targetIdx}.`, "info");
@@ -2866,6 +3194,23 @@ function App() {
             </label>
           </div>
 
+          {/* Resume Mode Toggle (Skip Completed Slots) */}
+          <div className="flex items-center bg-carbon-card/50 border border-carbon-border/50 px-2.5 py-1.5 rounded-lg">
+            <label className="flex items-center gap-1.5 text-xs font-mono text-gray-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={skipCompletedSlots}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setSkipCompletedSlots(val);
+                  addLog(`Skip Completed Slots on Gen All: ${val ? 'ON' : 'OFF'}`, "info");
+                }}
+                className="w-3.5 h-3.5 accent-accent-primary"
+              />
+              <span>Skip Completed</span>
+            </label>
+          </div>
+
           {/* Interactive Status Pills */}
           <div className="flex items-center gap-2.5 text-xs font-mono">
             <div
@@ -2985,7 +3330,7 @@ function App() {
             {renderState.status === 'rendering' ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>RENDERING ({renderState.progress}%)</span>
+                <span>RENDERING ({renderState.progress >= 100 ? "99" : Math.floor(renderState.progress)}%)</span>
               </>
             ) : (
               <>
@@ -3065,7 +3410,22 @@ function App() {
           title="Voice Over Browser"
         >VOICE</button>
 
+        {/* MUSIC TAB */}
+        <button
+          onClick={() => { setActiveTab('music'); setIsLeftSidebarOpen(true); }}
+          style={{
+            height:'28px', padding:'0 14px', borderRadius:'6px', fontSize:'11px',
+            fontWeight:'bold', textTransform:'uppercase', letterSpacing:'0.06em',
+            cursor:'pointer', border:'1px solid',
+            borderColor:(activeTab==='music' && isLeftSidebarOpen) ? '#ec4899' : 'transparent',
+            background:(activeTab==='music' && isLeftSidebarOpen) ? 'rgba(236,72,153,0.18)' : 'transparent',
+            color:(activeTab==='music' && isLeftSidebarOpen) ? '#f472b6' : '#aaa'
+          }}
+          title="Background Music Browser"
+        >MUSIC</button>
+
         <div style={{ flex:1 }} />
+
 
         {/* ▶/◀ RIGHT PANEL TOGGLE */}
         <button
@@ -3137,7 +3497,7 @@ function App() {
                 className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'sfx' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
                 style={{
                   color: activeTab === 'sfx' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'sfx' ? '#7c6cff' : 'transparent'
+                  borderBottomColor: activeTab === 'sfx' ? '#ff6c9d' : 'transparent'
                 }}
               >
                 SFX
@@ -3147,10 +3507,20 @@ function App() {
                 className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'voice' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
                 style={{
                   color: activeTab === 'voice' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'voice' ? '#7c6cff' : 'transparent'
+                  borderBottomColor: activeTab === 'voice' ? '#6cffcc' : 'transparent'
                 }}
               >
                 VOICE
+              </button>
+              <button
+                onClick={() => setActiveTab("music")}
+                className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'music' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
+                style={{
+                  color: activeTab === 'music' ? 'var(--text-bright)' : 'var(--text-muted)',
+                  borderBottomColor: activeTab === 'music' ? '#ec4899' : 'transparent'
+                }}
+              >
+                MUSIC
               </button>
             </div>
             {/* Left Panel Resize Handle */}
@@ -3456,6 +3826,65 @@ function App() {
                 </div>
               )}
 
+              {/* Tab: MUSIC presets */}
+              {activeTab === 'music' && (
+                <div className="flex flex-col gap-4">
+                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                    <h3 className="text-xs font-bold font-mono text-gray-400">LOAD PROMPTS TXT</h3>
+                    <input
+                      type="file"
+                      accept=".txt"
+                      onChange={(e) => {
+                        importTextFile('music', e.target.files[0]);
+                        e.target.value = ''; // Reset input to allow re-import
+                      }}
+                      className="hidden"
+                      id="music-txt-import"
+                    />
+                    <label
+                      htmlFor="music-txt-import"
+                      className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-pink-500 text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
+                    >
+                      <Icon name="file-text" className="w-3.5 h-3.5 text-pink-400" />
+                      <span>SELECT PROMPTS TXT</span>
+                    </label>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-xs font-bold font-mono text-gray-400">MUSIC PROMPT PRESETS</h3>
+                    <p className="text-[11px] text-gray-500">Click any preset to copy text.</p>
+
+                    {[
+                      "TrackType: MUSIC. Soft cinematic piano ambient background",
+                      "TrackType: MUSIC. Upbeat acoustic guitar travel vlog track",
+                      "TrackType: MUSIC. Retro synthwave background music",
+                      "TrackType: MUSIC. Deep focus lofi hiphop beat background"
+                    ].map(preset => (
+                      <div
+                        key={preset}
+                        onClick={() => {
+                          navigator.clipboard.writeText(preset);
+                          addLog(`Copied music preset: "${preset}"`, "info");
+                          if (selectedBlock && selectedBlock.lane === 'music') {
+                            const updated = [...(project.music_blocks || [])];
+                            if (updated[selectedBlock.index]) {
+                              updated[selectedBlock.index] = { ...updated[selectedBlock.index], prompt: preset, status: 'idle' };
+                            }
+                            const newManifest = { ...project, music_blocks: updated };
+                            setProject(newManifest);
+                            saveProject(newManifest);
+                            addLog(`Pasted preset into Music slot ${selectedBlock.index}`, "success");
+                          }
+                        }}
+                        className="p-2 border border-carbon-border/50 hover:border-pink-500 bg-carbon-card/20 hover:bg-carbon-card/40 rounded-lg text-xs cursor-pointer select-text text-gray-400 transition-all font-mono"
+                      >
+                        {preset}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )}
@@ -3509,6 +3938,17 @@ function App() {
                               src={`/projects/${project.project_name}/sfx/sfx_${String(selectedBlock.index).padStart(2, '0')}.wav?t=${audioCacheBuster}`}
                               onEnded={() => {
                                 if (!project.voice_blocks[selectedBlock.index]?.prompt) {
+                                  setIsPlaying(false);
+                                }
+                              }}
+                            />
+                          )}
+                          {project.music_blocks?.[selectedBlock.index] && project.music_blocks[selectedBlock.index].status === 'done' && (
+                            <audio
+                              ref={musicAudioRef}
+                              src={`/projects/${project.project_name}/music/music_${String(selectedBlock.index).padStart(2, '0')}.wav?t=${audioCacheBuster}`}
+                              onEnded={() => {
+                                if (!project.voice_blocks[selectedBlock.index]?.prompt && !project.sfx_blocks[selectedBlock.index]?.prompt) {
                                   setIsPlaying(false);
                                 }
                               }}
@@ -3585,6 +4025,17 @@ function App() {
                           }}
                         />
                       )}
+                      {project.music_blocks?.[selectedBlock.index] && project.music_blocks[selectedBlock.index].status === 'done' && (
+                        <audio
+                          ref={musicAudioRef}
+                          src={`/projects/${project.project_name}/music/music_${String(selectedBlock.index).padStart(2, '0')}.wav?t=${audioCacheBuster}`}
+                          onEnded={() => {
+                            if (!project.voice_blocks[selectedBlock.index]?.prompt && !project.sfx_blocks[selectedBlock.index]?.prompt) {
+                              setIsPlaying(false);
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                   )
                 ) : (
@@ -3598,7 +4049,28 @@ function App() {
                   </div>
                 )
               ) : (
-                project.render_complete ? (
+                renderState.status === 'rendering' ? (
+                  <div className="flex flex-col items-center justify-center gap-4 p-6 w-full h-full bg-carbon-card/10 select-none">
+                    <div className="relative flex items-center justify-center">
+                      {/* Spinning outer ring */}
+                      <div className="w-20 h-20 border-4 border-accent-secondary/20 border-t-accent-secondary rounded-full animate-spin"></div>
+                      {/* Inner percentage display */}
+                      <div className="absolute font-mono font-bold text-sm text-white">
+                        {renderState.progress >= 100 ? "99%" : `${Math.floor(renderState.progress)}%`}
+                      </div>
+                    </div>
+                    <div className="text-center flex flex-col gap-1.5">
+                      <p className="text-xs text-gray-200 font-mono font-semibold uppercase tracking-wider animate-pulse">
+                        {renderState.progress >= 100 ? "Compiling Master Video..." : "Rendering Composition..."}
+                      </p>
+                      <p className="text-[10px] text-gray-500 max-w-[280px] leading-relaxed">
+                        {renderState.progress >= 100 
+                          ? "Mixing multi-lane audio tracks and compiling final master.mp4..." 
+                          : `Processing timeline clips...`}
+                      </p>
+                    </div>
+                  </div>
+                ) : project.render_complete ? (
                   <div className="relative w-full h-full">
                     {/* key={masterVideoTs} ensures React only remounts this element when a NEW render completes, not on every state change */}
                     <video
@@ -3675,101 +4147,143 @@ function App() {
 
               {/* Slider Controls directly below buttons (Composer Mode) */}
               {previewMode === 'composer' && (
-                <div className="flex gap-4 items-center bg-carbon-card/25 border border-carbon-border/30 rounded-xl p-3 shadow-lg select-none">
+                <div className="flex flex-col gap-2.5 bg-carbon-card/25 border border-carbon-border/30 rounded-xl p-3 shadow-lg select-none">
+                  
+                  {/* Row 1: Video and Voice Volume */}
+                  <div className="flex gap-4 items-center">
+                    {/* Video Volume */}
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-accent-primary font-mono w-10 shrink-0">VIDEO</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={currentVideoVolume}
+                        disabled={selectedBlock === null}
+                        onChange={(e) => handleVideoVolumeChange(parseFloat(e.target.value))}
+                        onMouseUp={() => saveProject()}
+                        onTouchEnd={() => saveProject()}
+                        className="custom-slider flex-1"
+                        title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
+                      />
+                      <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentVideoVolume * 100)}%</span>
+                      <button
+                        onClick={toggleLinkVideoVolume}
+                        className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
+                          linkVideoVolume
+                            ? 'bg-accent-primary/20 border border-accent-primary text-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)]'
+                            : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
+                        }`}
+                        title={linkVideoVolume ? "Unlink video volume across slots" : "Link and sync video volume to all slots"}
+                      >
+                        <Icon name={linkVideoVolume ? "link" : "unlink"} className="w-3 h-3" />
+                      </button>
+                    </div>
 
-                  {/* Video Volume */}
-                  <div className="flex-1 flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-accent-primary font-mono w-10 shrink-0">VIDEO</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={currentVideoVolume}
-                      disabled={selectedBlock === null}
-                      onChange={(e) => handleVideoVolumeChange(parseFloat(e.target.value))}
-                      className="custom-slider flex-1"
-                      title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
-                    />
-                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentVideoVolume * 100)}%</span>
-                    <button
-                      onClick={toggleLinkVideoVolume}
-                      className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
-                        linkVideoVolume
-                          ? 'bg-accent-primary/20 border border-accent-primary text-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)]'
-                          : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
-                      }`}
-                      title={linkVideoVolume ? "Unlink video volume across slots" : "Link and sync video volume to all slots"}
-                    >
-                      <Icon name={linkVideoVolume ? "link" : "unlink"} className="w-3 h-3" />
-                    </button>
+                    {/* Voice Volume */}
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-accent-tertiary font-mono w-10 shrink-0">VOICE</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={currentVoiceVolume}
+                        disabled={selectedBlock === null}
+                        onChange={(e) => handleVoiceVolumeChange(parseFloat(e.target.value))}
+                        onMouseUp={() => saveProject()}
+                        onTouchEnd={() => saveProject()}
+                        className="custom-slider flex-1"
+                        title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
+                      />
+                      <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentVoiceVolume * 100)}%</span>
+                      <button
+                        onClick={toggleLinkVoiceVolume}
+                        className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
+                          linkVoiceVolume
+                            ? 'bg-accent-tertiary/20 border border-accent-tertiary text-accent-tertiary shadow-[0_0_8px_rgba(236,72,153,0.2)]'
+                            : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
+                        }`}
+                        title={linkVoiceVolume ? "Unlink voice volume across slots" : "Link and sync voice volume to all slots"}
+                      >
+                        <Icon name={linkVoiceVolume ? "link" : "unlink"} className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Voice Volume */}
-                  <div className="flex-1 flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-accent-tertiary font-mono w-10 shrink-0">VOICE</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={currentVoiceVolume}
-                      disabled={selectedBlock === null}
-                      onChange={(e) => handleVoiceVolumeChange(parseFloat(e.target.value))}
-                      className="custom-slider flex-1"
-                      title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
-                    />
-                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentVoiceVolume * 100)}%</span>
-                    <button
-                      onClick={toggleLinkVoiceVolume}
-                      className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
-                        linkVoiceVolume
-                          ? 'bg-accent-tertiary/20 border border-accent-tertiary text-accent-tertiary shadow-[0_0_8px_rgba(236,72,153,0.2)]'
-                          : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
-                      }`}
-                      title={linkVoiceVolume ? "Unlink voice volume across slots" : "Link and sync voice volume to all slots"}
-                    >
-                      <Icon name={linkVoiceVolume ? "link" : "unlink"} className="w-3 h-3" />
-                    </button>
-                  </div>
+                  {/* Row 2: SFX and Music Volume */}
+                  <div className="flex gap-4 items-center">
+                    {/* SFX Volume */}
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-accent-secondary font-mono w-10 shrink-0">SFX</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={currentSfxVolume}
+                        disabled={selectedBlock === null}
+                        onChange={(e) => handleSfxVolumeChange(parseFloat(e.target.value))}
+                        onMouseUp={() => saveProject()}
+                        onTouchEnd={() => saveProject()}
+                        className="custom-slider flex-1"
+                        title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
+                      />
+                      <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentSfxVolume * 100)}%</span>
+                      <button
+                        onClick={toggleLinkSfxVolume}
+                        className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
+                          linkSfxVolume
+                            ? 'bg-accent-secondary/20 border border-accent-secondary text-accent-secondary shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                            : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
+                        }`}
+                        title={linkSfxVolume ? "Unlink SFX volume across slots" : "Link and sync SFX volume to all slots"}
+                      >
+                        <Icon name={linkSfxVolume ? "link" : "unlink"} className="w-3 h-3" />
+                      </button>
+                    </div>
 
-                  {/* SFX Volume */}
-                  <div className="flex-1 flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-accent-secondary font-mono w-8 shrink-0">SFX</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={currentSfxVolume}
-                      disabled={selectedBlock === null}
-                      onChange={(e) => handleSfxVolumeChange(parseFloat(e.target.value))}
-                      className="custom-slider flex-1"
-                      title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
-                    />
-                    <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentSfxVolume * 100)}%</span>
-                    <button
-                      onClick={toggleLinkSfxVolume}
-                      className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
-                        linkSfxVolume
-                          ? 'bg-accent-secondary/20 border border-accent-secondary text-accent-secondary shadow-[0_0_8px_rgba(16,185,129,0.2)]'
-                          : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
-                      }`}
-                      title={linkSfxVolume ? "Unlink SFX volume across slots" : "Link and sync SFX volume to all slots"}
-                    >
-                      <Icon name={linkSfxVolume ? "link" : "unlink"} className="w-3 h-3" />
-                    </button>
-                  </div>
+                    {/* Music Volume */}
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[9px] font-bold text-pink-500 font-mono w-10 shrink-0">MUSIC</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={currentMusicVolume}
+                        disabled={selectedBlock === null}
+                        onChange={(e) => handleMusicVolumeChange(parseFloat(e.target.value))}
+                        onMouseUp={() => saveProject()}
+                        onTouchEnd={() => saveProject()}
+                        className="custom-slider flex-1"
+                        title={selectedBlock === null ? "Select a slot on timeline to adjust volumes" : ""}
+                      />
+                      <span className="text-[9px] font-mono text-gray-500 w-8 text-right">{Math.round(currentMusicVolume * 100)}%</span>
+                      <button
+                        onClick={toggleLinkMusicVolume}
+                        className={`w-6 h-6 flex items-center justify-center rounded transition-all shrink-0 cursor-pointer ${
+                          linkMusicVolume
+                            ? 'bg-pink-500/20 border border-pink-500 text-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.2)]'
+                            : 'bg-carbon-card/50 border border-carbon-border/30 text-gray-500 hover:text-white'
+                        }`}
+                        title={linkMusicVolume ? "Unlink MUSIC volume across slots" : "Link and sync MUSIC volume to all slots"}
+                      >
+                        <Icon name={linkMusicVolume ? "link" : "unlink"} className="w-3 h-3" />
+                      </button>
+                    </div>
 
-                  {/* Play Trigger */}
-                  {selectedBlock !== null && (
-                    <button
-                      onClick={togglePlayAll}
-                      className="flex items-center justify-center gap-1 bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/40 hover:border-accent-primary text-white text-[10px] font-bold px-3 py-1.5 rounded transition-all shrink-0 font-mono"
-                    >
-                      {isPlaying ? "❚❚ PAUSE" : "▶ PLAY"}
-                    </button>
-                  )}
+                    {/* Play Trigger */}
+                    {selectedBlock !== null && (
+                      <button
+                        onClick={togglePlayAll}
+                        className="flex items-center justify-center gap-1 bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/40 hover:border-accent-primary text-white text-[10px] font-bold px-3 py-1.5 rounded transition-all shrink-0 font-mono h-[26px]"
+                      >
+                        {isPlaying ? "❚❚ PAUSE" : "▶ PLAY"}
+                      </button>
+                    )}
+                  </div>
 
                 </div>
               )}
@@ -3932,20 +4446,24 @@ function App() {
                         <span className="truncate max-w-full text-gray-300" title={layer.name}>{layer.name}</span>
 
                         {/* Compact GEN ALL button inside lane header for SFX and Voice tracks */}
-                        {(layer.type === 'sfx' || layer.type === 'voice') && (
+                        {(layer.type === 'sfx' || layer.type === 'voice' || layer.type === 'music') && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               if (layer.type === 'sfx') {
                                 generateAllSfx(layer.id);
-                              } else {
+                              } else if (layer.type === 'voice') {
                                 generateAllVoice(layer.id);
+                              } else if (layer.type === 'music') {
+                                generateAllMusic(layer.id);
                               }
                             }}
                             className={`mt-1.5 px-1 py-0.5 rounded text-[8px] font-bold border transition-all cursor-pointer font-mono shrink-0 ${
                               layer.type === 'sfx'
                                 ? "bg-accent-secondary/15 hover:bg-accent-secondary/35 border-accent-secondary/30 hover:border-accent-secondary text-accent-secondary"
-                                : "bg-accent-tertiary/15 hover:bg-accent-tertiary/35 border-accent-tertiary/30 hover:border-accent-tertiary text-accent-tertiary"
+                                : layer.type === 'voice'
+                                ? "bg-accent-tertiary/15 hover:bg-accent-tertiary/35 border-accent-tertiary/30 hover:border-accent-tertiary text-accent-tertiary"
+                                : "bg-pink-500/15 hover:bg-pink-500/35 border-pink-500/30 hover:border-pink-500 text-pink-400"
                             }`}
                             title={`Generate all prompts in ${layer.name}`}
                           >
@@ -3967,7 +4485,7 @@ function App() {
 
                       {/* Timeline Lane Track */}
                       <div
-                        ref={layer.type === 'video' ? laneVideoRef : (layer.type === 'sfx' ? laneSfxRef : laneVoiceRef)}
+                        ref={layer.type === 'video' ? laneVideoRef : (layer.type === 'sfx' ? laneSfxRef : (layer.type === 'voice' ? laneVoiceRef : laneMusicRef))}
                         onScroll={handleScroll}
                         className="flex-1 overflow-x-auto flex items-center py-2 px-2 timeline-lane-track" style={{ gap: '0px' }}
                       >
@@ -4180,6 +4698,86 @@ function App() {
                                     🗣️ {block.voice || globalDefaultVoice || "alba"}
                                   </span>
 
+                                  <span className={getStatusBadgeClass(block.status)}>
+                                    {block.status.toUpperCase()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Render MUSIC block
+                          if (layer.type === 'music') {
+                            return (
+                              <div
+                                key={block.id}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                    e.stopPropagation();
+                                    handleToggleSelectIndex(i);
+                                  } else {
+                                    setSelectedBlock({ lane: 'music', index: i, layerId: layer.id });
+                                  }
+                                }}
+                                style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isBlockSelected
+                                    ? 'bg-pink-500/15 border-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.25)] text-white'
+                                    : (isColSelected
+                                      ? 'bg-carbon-card/40 border-pink-500/60 text-gray-300'
+                                      : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-pink-500/40 hover:bg-carbon-card/35')
+                                  }`}
+                              >
+                                {block.prompt && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      clearBlockMedia('music', i);
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-[9px] font-bold shadow-md opacity-0 group-hover:opacity-100 transition-all focus:outline-none z-30"
+                                    title="Clear music prompt composition"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                                <div className="flex-1 flex flex-col gap-1 w-full h-full">
+                                  <textarea
+                                    value={block.prompt}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setTimelineLayers(prev => prev.map(l => {
+                                        if (l.id === layer.id) {
+                                          const newBlocks = [...l.blocks];
+                                          newBlocks[i] = { ...newBlocks[i], prompt: text, status: 'idle' };
+                                          return { ...l, blocks: newBlocks };
+                                        }
+                                        return l;
+                                      }));
+                                      setProject(prev => {
+                                        const updatedBlocks = [...(prev.music_blocks || [])];
+                                        if (updatedBlocks[i]) {
+                                          updatedBlocks[i] = { ...updatedBlocks[i], prompt: text, status: 'idle' };
+                                        }
+                                        return { ...prev, music_blocks: updatedBlocks };
+                                      });
+                                    }}
+                                    onBlur={() => saveProject()}
+                                    placeholder="Type music prompt..."
+                                    className="w-full flex-1 bg-transparent text-[10px] text-gray-300 outline-none resize-none leading-tight font-mono border-0 focus:ring-0 p-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] font-mono mt-1 pt-1 border-t border-carbon-border/15">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Pass the timeline layer block.id as override so backend finds it in manifest
+                                      generateMusic(i, block.prompt, { model: 'small-music', duration: 10.0, steps: 12, seed: -1 }, block.id);
+                                    }}
+                                    disabled={block.status === 'generating'}
+                                    className="bg-pink-500/20 hover:bg-pink-500/40 text-pink-400 px-1.5 py-0.5 rounded font-bold transition-all text-[8px]"
+                                  >
+                                    {block.status === 'generating' ? '...' : '⚡ GEN'}
+                                  </button>
                                   <span className={getStatusBadgeClass(block.status)}>
                                     {block.status.toUpperCase()}
                                   </span>
@@ -4567,6 +5165,7 @@ function App() {
                               setProject(prev => ({ ...prev, caption_font_size: val }));
                             }}
                             onMouseUp={() => saveProject()}
+                            onTouchEnd={() => saveProject()}
                             className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
                           />
                         </div>
@@ -4692,6 +5291,7 @@ function App() {
                                   setProject(prev => ({ ...prev, caption_outline_width: val }));
                                 }}
                                 onMouseUp={() => saveProject()}
+                                onTouchEnd={() => saveProject()}
                                 className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
                               />
                             </div>
@@ -4945,6 +5545,22 @@ function App() {
                       availableVoices={availableVoices}
                       onImportTextFile={(file) => importTextFile('voice', file)}
                       onClearVoice={() => clearBlockMedia('voice', selectedBlock.index)}
+                      audioCacheBuster={audioCacheBuster}
+                    />
+                  )}
+
+                  {/* Music Block Controller */}
+                  {selectedBlock.lane === 'music' && blockData && (
+                    <MusicController
+                      index={selectedBlock.index}
+                      block={blockData}
+                      project={project}
+                      onPromptChange={(text) => handlePromptChange('music', selectedBlock.index, text)}
+                      onSaveProject={() => saveProject()}
+                      onGenerate={(prompt, params) => generateMusic(selectedBlock.index, prompt, params)}
+                      addLog={addLog}
+                      onImportTextFile={(file) => importTextFile('music', file)}
+                      onClearMusic={() => clearBlockMedia('music', selectedBlock.index)}
                       audioCacheBuster={audioCacheBuster}
                     />
                   )}
@@ -5578,6 +6194,159 @@ function SfxController({ index, block, project, onPromptChange, onSaveProject, o
             className="w-full flex items-center justify-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 hover:border-yellow-500 text-yellow-400 font-mono text-[10px] py-2 rounded-lg transition-all font-semibold"
           >
             <span>🧹 CLEAR SFX MEDIA</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Subcomponent: Music Controller Panel
+function MusicController({ index, block, project, onPromptChange, onSaveProject, onGenerate, addLog, onImportTextFile, onClearMusic, audioCacheBuster }) {
+  const [promptInput, setPromptInput] = useState(block.prompt || "");
+  const [model, setModel] = useState("small-music");
+  const [duration, setDuration] = useState(block.duration_s || 10.0);
+  const [steps, setSteps] = useState(12);
+  const [seed, setSeed] = useState(-1);
+
+  // Sync inputs on block change
+  useEffect(() => {
+    setPromptInput(block.prompt || "");
+    if (block.duration_s) setDuration(block.duration_s);
+  }, [block.id]);
+
+  const handleGen = () => {
+    onGenerate(promptInput, { model, duration, steps, seed });
+  };
+
+  // Check audio path for play availability
+  const hasAudio = block.status === 'done' && block.file_path;
+  // Convert project folder to playing route
+  const audioUrl = hasAudio ? `/projects/${project.project_name}/music/music_${String(block.order).padStart(2, '0')}.wav?t=${audioCacheBuster}` : null;
+
+  return (
+    <div className="flex flex-col gap-4 text-xs font-mono">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-gray-500">STABLE AUDIO PROMPT</label>
+        <textarea
+          value={promptInput}
+          onChange={(e) => {
+            setPromptInput(e.target.value);
+            onPromptChange(e.target.value);
+          }}
+          onBlur={() => onSaveProject()}
+          placeholder="e.g. TrackType: Music. Cinematic synthwave track, high energy beats, electronic synth"
+          className="w-full bg-carbon border border-carbon-border/50 focus:border-pink-500 outline-none px-2.5 py-2 rounded-lg text-white font-mono h-20 resize-none leading-tight"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-gray-500">MODEL TYPE</label>
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="w-full bg-carbon border border-carbon-border/50 outline-none px-2 py-1.5 rounded-lg text-gray-200"
+        >
+          <option value="small-music">small-music (Music & Ambient)</option>
+          <option value="small-sfx">small-sfx (Sound Effects)</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-gray-500">STEPS ({steps})</label>
+          <input
+            type="range"
+            min="2"
+            max="16"
+            value={steps}
+            onChange={(e) => setSteps(parseInt(e.target.value))}
+            className="custom-slider"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-gray-500">DURATION ({duration}s)</label>
+          <input
+            type="range"
+            min="1"
+            max="15"
+            step="0.5"
+            value={duration}
+            onChange={(e) => setDuration(parseFloat(e.target.value))}
+            className="custom-slider"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-gray-500">RANDOM SEED (-1 = random)</label>
+        <input
+          type="number"
+          value={seed}
+          onChange={(e) => setSeed(parseInt(e.target.value))}
+          className="bg-carbon border border-carbon-border/50 outline-none px-2 py-1.5 rounded-lg text-white font-mono"
+        />
+      </div>
+
+      <button
+        onClick={handleGen}
+        disabled={block.status === 'generating'}
+        className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-pink-600 to-red-700 hover:from-pink-500 hover:to-red-600 text-white font-bold py-2.5 rounded-lg shadow-lg hover:shadow-pink-600/10 disabled:opacity-50 transition-all mt-1"
+      >
+        {block.status === 'generating' ? (
+          <>
+            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>GENERATING...</span>
+          </>
+        ) : (
+          <>
+            <Icon name="sparkles" className="w-3.5 h-3.5" />
+            <span>GENERATE MUSIC</span>
+          </>
+        )}
+      </button>
+
+      {hasAudio && (
+        <div className="flex flex-col gap-2 mt-2 bg-carbon/50 p-2.5 border border-carbon-border rounded-lg">
+          <span className="text-[10px] text-emerald-400 font-bold">✓ AUDIO GENERATED</span>
+          <audio src={audioUrl} controls className="w-full h-8" />
+          <a
+            href={audioUrl}
+            download={`music_${String(block.order).padStart(2, '0')}.wav`}
+            className="text-center text-[10px] text-gray-500 hover:text-white underline"
+          >
+            Download WAV File
+          </a>
+        </div>
+      )}
+
+      {/* Music Prompt TXT Import */}
+      <div className="flex flex-col gap-2 border-t border-carbon-border/20 pt-4 mt-2">
+        <span className="text-[10px] font-bold font-mono text-gray-500">IMPORT PROMPTS</span>
+        <input
+          type="file"
+          accept=".txt"
+          onChange={(e) => {
+            onImportTextFile(e.target.files[0]);
+            e.target.value = ''; // Reset input to allow re-import
+          }}
+          className="hidden"
+          id="custom-music-prompt-import"
+        />
+        <label
+          htmlFor="custom-music-prompt-import"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-pink-600/20 to-red-600/20 border border-pink-500/50 hover:border-pink-500 text-xs text-white hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
+        >
+          <Icon name="file-text" className="w-3.5 h-3.5 text-pink-500" />
+          <span>UPLOAD PROMPT TXT 📤</span>
+        </label>
+
+        {block.file_path && (
+          <button
+            onClick={onClearMusic}
+            className="w-full flex items-center justify-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 hover:border-yellow-500 text-yellow-400 font-mono text-[10px] py-2 rounded-lg transition-all font-semibold"
+          >
+            <span>🧹 CLEAR MUSIC MEDIA</span>
           </button>
         )}
       </div>

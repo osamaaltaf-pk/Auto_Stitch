@@ -485,6 +485,8 @@ class RenderRequest(BaseModel):
     video_volume: Optional[float] = 1.0
     voice_volume: Optional[float] = 1.0
     sfx_volume: Optional[float] = 0.5
+    music_volume: Optional[float] = 0.5
+
 
 # --- API ENDPOINTS ---
 
@@ -1055,7 +1057,26 @@ def heal_manifest_states(data: Dict[str, Any], is_startup: bool = False) -> tupl
                     block["duration_s"] = 0.0
                     changed = True
                 
+    # Check music blocks
+    if "music_blocks" in data:
+        for block in data["music_blocks"]:
+            # Rule 1: Reset stuck 'generating' state
+            if is_startup and block.get("status") == "generating":
+                block["status"] = "idle"
+                block["error_msg"] = "Interrupted in previous session (reset to idle)"
+                changed = True
+            # Rule 2: Reset if marked completed but physical file is missing from disk
+            elif block.get("status") == "done" and block.get("file_path"):
+                p = Path(block["file_path"])
+                if not p.exists():
+                    logger.info(f"Self-healing: Music block file {p} is missing on disk. Resetting status to idle.")
+                    block["status"] = "idle"
+                    block["file_path"] = None
+                    block["duration_s"] = 0.0
+                    changed = True
+                
     return data, changed
+
 
 @app.post("/api/project/load")
 async def load_project(req: ProjectLoadRequest):
@@ -1557,7 +1578,191 @@ async def generate_sfx(req: SfxGenerateRequest):
     await sfx_queue.put(run_sfx)
     return {"status": "generating", "manifest": manifest.to_dict()}
 
+# --- MUSIC GENERATION ---
+@app.post("/api/generate/music")
+async def generate_music(req: SfxGenerateRequest):
+    settings = load_settings()
+    p_dir = PROJECTS_DIR / req.project_name
+    manifest_path = p_dir / "manifest.json"
+    
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = Manifest.from_json(f.read())
+        
+    block = next((b for b in manifest.music_blocks if b.id == req.block_id), None)
+    if not block:
+        raise HTTPException(status_code=404, detail="Music block not found in project")
+        
+    music_dir = p_dir / "music"
+    music_dir.mkdir(exist_ok=True)
+    out_wav = music_dir / f"music_{block.order:02d}.wav"
+    
+    async def run_music():
+        try:
+            # Load manifest freshly at the start of task execution to avoid concurrent overwrites
+            with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                fresh_manifest = Manifest.from_json(f_fresh.read())
+            
+            fresh_block = next((b for b in fresh_manifest.music_blocks if b.id == req.block_id), None)
+            if not fresh_block:
+                logger.error(f"Music block {req.block_id} not found when starting queued task")
+                return
+
+            # Mark block as GENERATING in manifest inside the sequential worker queue
+            fresh_block.status = BlockStatus.GENERATING
+            fresh_block.prompt = req.prompt
+            fresh_manifest.save()
+            db.save_project(req.project_name, fresh_manifest.to_dict())
+
+            if out_wav.exists():
+                try:
+                    out_wav.unlink()
+                    logger.info(f"Deleted old version of Music file: {out_wav}")
+                except Exception as e:
+                    logger.warning(f"Failed deleting old Music file: {e}")
+            async with httpx.AsyncClient(trust_env=False) as client:
+                payload = {
+                    "prompt": req.prompt,
+                    "model": req.model or "small-music",
+                    "duration": req.duration,
+                    "steps": req.steps,
+                    "seed": req.seed
+                }
+                
+                sfx_url = settings["sfx_server_url"].rstrip("/")
+                logger.info(f"Calling Stable Audio for Music at {sfx_url}/api/generate with: {payload}")
+                
+                # Trigger async generation job
+                resp = await client.post(
+                    f"{sfx_url}/api/generate",
+                    json=payload,
+                    headers={"bypass-tunnel-reminder": "true"},
+                    timeout=90.0
+                )
+                if resp.status_code != 200:
+                    try:
+                        err = resp.json().get("error", f"HTTP {resp.status_code}")
+                    except Exception:
+                        err = f"Stable Audio Server returned status {resp.status_code}: {resp.text[:120]}"
+                    
+                    with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                        fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                    fresh_block2 = next((b for b in fresh_manifest2.music_blocks if b.id == req.block_id), None)
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = err
+                    fresh_manifest2.save()
+                    db.save_project(req.project_name, fresh_manifest2.to_dict())
+                    db.log_generation(req.project_name, req.block_id, "music", req.prompt, None, "failed")
+                    return
+                    
+                job_data = resp.json()
+                job_id = job_data.get("job_id")
+                logger.info(f"Music job launched successfully. Job ID: {job_id}. Starting polling...")
+                
+                # Poll status
+                elapsed = 0
+                max_wait = 240 # 4 minutes max
+                job_done = False
+                
+                while elapsed < max_wait:
+                    await asyncio.sleep(2.0)
+                    elapsed += 2
+                    
+                    status_resp = await client.get(
+                        f"{sfx_url}/api/status/{job_id}",
+                        headers={"bypass-tunnel-reminder": "true"},
+                        timeout=15.0
+                    )
+                    if status_resp.status_code == 200:
+                        status_data = status_resp.json()
+                        job_status = status_data.get("status")
+                        logger.info(f"Music Job {job_id} Status: {job_status}")
+                        
+                        if job_status == "done":
+                            job_done = True
+                            break
+                        elif job_status == "error":
+                            err_msg = status_data.get("error", "Unknown model error")
+                            with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                                fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                            fresh_block2 = next((b for b in fresh_manifest2.music_blocks if b.id == req.block_id), None)
+                            if fresh_block2:
+                                fresh_block2.status = BlockStatus.ERROR
+                                fresh_block2.error_msg = err_msg
+                            fresh_manifest2.save()
+                            db.save_project(req.project_name, fresh_manifest2.to_dict())
+                            db.log_generation(req.project_name, req.block_id, "music", req.prompt, None, "failed")
+                            return
+                    else:
+                        logger.warning(f"Failed pulling job {job_id} status.")
+                        
+                if not job_done:
+                    with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                        fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                    fresh_block2 = next((b for b in fresh_manifest2.music_blocks if b.id == req.block_id), None)
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = "Model generation timed out"
+                    fresh_manifest2.save()
+                    db.save_project(req.project_name, fresh_manifest2.to_dict())
+                    db.log_generation(req.project_name, req.block_id, "music", req.prompt, None, "failed")
+                    return
+                    
+                # Download WAV
+                dl_resp = await client.get(
+                    f"{sfx_url}/api/download/{job_id}",
+                    headers={"bypass-tunnel-reminder": "true"},
+                    timeout=60.0
+                )
+                
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh2:
+                    fresh_manifest2 = Manifest.from_json(f_fresh2.read())
+                fresh_block2 = next((b for b in fresh_manifest2.music_blocks if b.id == req.block_id), None)
+                
+                if dl_resp.status_code == 200:
+                    with open(out_wav, "wb") as w_file:
+                        w_file.write(dl_resp.content)
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.DONE
+                        fresh_block2.file_path = str(out_wav)
+                        meta = ffprobe.get_video_metadata(out_wav)
+                        fresh_block2.duration_s = meta["duration_s"]
+                        fresh_block2.error_msg = None
+                    logger.info(f"Music file downloaded successfully → {out_wav}")
+                    db.log_generation(req.project_name, req.block_id, "music", req.prompt, str(out_wav), "success")
+                else:
+                    if fresh_block2:
+                        fresh_block2.status = BlockStatus.ERROR
+                        fresh_block2.error_msg = "Failed downloading generated audio"
+                    db.log_generation(req.project_name, req.block_id, "music", req.prompt, None, "failed")
+                
+                fresh_manifest2.save()
+                db.save_project(req.project_name, fresh_manifest2.to_dict())
+        except Exception as e:
+            logger.error(f"Error generating Music: {e}")
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f_fresh:
+                    err_manifest = Manifest.from_json(f_fresh.read())
+                err_block = next((b for b in err_manifest.music_blocks if b.id == req.block_id), None)
+                if err_block:
+                    err_block.status = BlockStatus.ERROR
+                    err_block.error_msg = str(e)
+                    err_manifest.save()
+                    db.save_project(req.project_name, err_manifest.to_dict())
+            except Exception as ex:
+                logger.error(f"Failed saving error to manifest: {ex}")
+            db.log_generation(req.project_name, req.block_id, "music", req.prompt, None, "failed")
+            return
+
+    # Put the generation task in the sequential queue so we execute one at a time
+    await sfx_queue.put(run_music)
+    return {"status": "generating", "manifest": manifest.to_dict()}
+
 # --- RENDERING ENGINE ---
+
 @app.post("/api/render")
 async def trigger_render(req: RenderRequest, background_tasks: BackgroundTasks):
     project_name = req.project_name
@@ -1594,8 +1799,10 @@ async def trigger_render(req: RenderRequest, background_tasks: BackgroundTasks):
                 on_clip_done=on_clip_progress,
                 video_volume=req.video_volume if req.video_volume is not None else 1.0,
                 voice_volume=req.voice_volume if req.voice_volume is not None else 1.0,
-                sfx_volume=req.sfx_volume if req.sfx_volume is not None else 0.5
+                sfx_volume=req.sfx_volume if req.sfx_volume is not None else 0.5,
+                music_volume=req.music_volume if req.music_volume is not None else 0.5
             )
+
             active_renders[project_name]["status"] = "done"
             active_renders[project_name]["progress"] = 100.0
             
@@ -1780,6 +1987,45 @@ async def upload_custom_sfx(project_name: str, index: int, file: UploadFile = Fi
     db.save_project(project_name, manifest.to_dict())
     return {"status": "ok", "block": block.to_dict(), "manifest": manifest.to_dict()}
 
+@app.post("/api/upload/music")
+async def upload_custom_music(project_name: str, index: int, file: UploadFile = File(...)):
+    p_dir = PROJECTS_DIR / project_name
+    manifest_path = p_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = Manifest.from_json(f.read())
+        
+    if index < 0 or index >= len(manifest.music_blocks):
+        raise HTTPException(status_code=400, detail="Invalid slot index")
+        
+    for idx, b in enumerate(manifest.music_blocks):
+        if idx != index and b.file_path and Path(b.file_path).name.lower() == file.filename.lower():
+            raise HTTPException(status_code=400, detail=f"The file '{file.filename}' is already used in slot {idx}. Duplications are not allowed.")
+        
+    music_dir = p_dir / "music"
+    music_dir.mkdir(exist_ok=True)
+    
+    out_wav = music_dir / f"music_{index:02d}.wav"
+    
+    content = await file.read()
+    with open(out_wav, "wb") as f_out:
+        f_out.write(content)
+        
+    meta = ffprobe.get_video_metadata(out_wav)
+    
+    block = manifest.music_blocks[index]
+    block.status = BlockStatus.DONE
+    block.file_path = str(out_wav)
+    block.duration_s = meta["duration_s"] if meta["duration_s"] > 0 else 5.0
+    block.prompt = f"[Uploaded Audio: {file.filename}]"
+    block.error_msg = None
+    
+    manifest.save()
+    db.save_project(project_name, manifest.to_dict())
+    return {"status": "ok", "block": block.to_dict(), "manifest": manifest.to_dict()}
+
 @app.post("/api/clear/block")
 async def clear_block_media(project_name: str, lane: str, index: int):
     p_dir = PROJECTS_DIR / project_name
@@ -1830,8 +2076,25 @@ async def clear_block_media(project_name: str, lane: str, index: int):
         block.prompt = ""
         block.status = BlockStatus.IDLE
         block.duration_s = 0.0
+    elif lane == "music":
+        if index < 0 or index >= len(manifest.music_blocks):
+            raise HTTPException(status_code=400, detail="Invalid index")
+        block = manifest.music_blocks[index]
+        if block.file_path:
+            try:
+                p = Path(block.file_path)
+                if p.exists():
+                    p.unlink()
+                    logger.info(f"Deleted physical Music file on clear: {p}")
+            except Exception as e:
+                logger.warning(f"Failed to delete Music file: {e}")
+        block.file_path = None
+        block.prompt = ""
+        block.status = BlockStatus.IDLE
+        block.duration_s = 0.0
     else:
         raise HTTPException(status_code=400, detail="Invalid lane")
+
         
     manifest.save()
     db.save_project(project_name, manifest.to_dict())

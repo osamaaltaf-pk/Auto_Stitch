@@ -151,12 +151,14 @@ def build_ffmpeg_cmd(
     video_path: Path,
     voice_path: Optional[Path],
     sfx_path: Optional[Path],
+    music_path: Optional[Path],
     output_path: Path,
     is_image: bool = False,
     duration: float = 5.0,
     video_volume: float = 1.0,
     voice_volume: float = 1.0,
     sfx_volume: float = 0.5,
+    music_volume: float = 0.5,
     canvas_w: int = 1920,
     canvas_h: int = 1080,
     fit_mode: str = "letterbox",
@@ -195,6 +197,8 @@ def build_ffmpeg_cmd(
         cmd.extend(["-i", str(voice_path)])
     if sfx_path:
         cmd.extend(["-i", str(sfx_path)])
+    if music_path:
+        cmd.extend(["-i", str(music_path)])
 
     curr_idx = 1
     voice_idx = None
@@ -207,59 +211,54 @@ def build_ffmpeg_cmd(
         sfx_idx = curr_idx
         curr_idx += 1
 
+    music_idx = None
+    if music_path:
+        music_idx = curr_idx
+        curr_idx += 1
+
+
     # Audio mixing filter complex (uses duration=longest to prevent truncation)
     audio_out = None
+    audio_inputs = []
+    filter_parts = []
+    
     if video_has_audio:
-        if voice_idx is not None and sfx_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[0:a]volume={video_volume:.2f}[vid_a];[{voice_idx}:a]volume={voice_volume:.2f}[voice_a];[{sfx_idx}:a]volume={sfx_volume:.2f}[sfx_a];[vid_a][voice_a][sfx_a]amix=inputs=3:duration=longest[audio_mix];[audio_mix]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
-        elif voice_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[0:a]volume={video_volume:.2f}[vid_a];[{voice_idx}:a]volume={voice_volume:.2f}[voice_a];[vid_a][voice_a]amix=inputs=2:duration=longest[audio_mix];[audio_mix]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
-        elif sfx_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[0:a]volume={video_volume:.2f}[vid_a];[{sfx_idx}:a]volume={sfx_volume:.2f}[sfx_a];[vid_a][sfx_a]amix=inputs=2:duration=longest[audio_mix];[audio_mix]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
+        filter_parts.append(f"[0:a]volume={video_volume:.2f}[vid_a]")
+        audio_inputs.append("[vid_a]")
+        
+    if voice_idx is not None:
+        filter_parts.append(f"[{voice_idx}:a]volume={voice_volume:.2f}[voice_a]")
+        audio_inputs.append("[voice_a]")
+        
+    if sfx_idx is not None:
+        filter_parts.append(f"[{sfx_idx}:a]volume={sfx_volume:.2f}[sfx_a]")
+        audio_inputs.append("[sfx_a]")
+        
+    if music_idx is not None:
+        filter_parts.append(f"[{music_idx}:a]volume={music_volume:.2f}[music_a]")
+        audio_inputs.append("[music_a]")
+        
+    if len(audio_inputs) > 0:
+        if len(audio_inputs) > 1:
+            mix_input_labels = "".join(audio_inputs)
+            filter_parts.append(f"{mix_input_labels}amix=inputs={len(audio_inputs)}:duration=longest[audio_mix]")
+            filter_parts.append("[audio_mix]loudnorm[outnorm]")
         else:
-            cmd.extend([
-                "-filter_complex",
-                f"[0:a]volume={video_volume:.2f}[audio_mix];[audio_mix]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
+            filter_parts.append(f"{audio_inputs[0]}loudnorm[outnorm]")
+            
+        cmd.extend([
+            "-filter_complex",
+            ";".join(filter_parts)
+        ])
+        audio_out = "[outnorm]"
     else:
-        if voice_idx is not None and sfx_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[{voice_idx}:a]volume={voice_volume:.2f}[voice_a];[{sfx_idx}:a]volume={sfx_volume:.2f}[sfx_a];[voice_a][sfx_a]amix=inputs=2:duration=longest[audio_mix];[audio_mix]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
-        elif voice_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[{voice_idx}:a]volume={voice_volume:.2f}[voice_a];[voice_a]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
-        elif sfx_idx is not None:
-            cmd.extend([
-                "-filter_complex",
-                f"[{sfx_idx}:a]volume={sfx_volume:.2f}[sfx_a];[sfx_a]loudnorm[outnorm]"
-            ])
-            audio_out = "[outnorm]"
-        else:
-            # Force silent audio track for images or silent videos when no voice/sfx prompts exist,
-            # ensuring all intermediate clips have matching stream layouts for safe concatenation.
-            cmd.extend([
-                "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"
-            ])
-            audio_out = f"{curr_idx}:a"
+        # Force silent audio track for images or silent videos when no voice/sfx/music prompts exist,
+        # ensuring all intermediate clips have matching stream layouts for safe concatenation.
+        cmd.extend([
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"
+        ])
+        audio_out = f"{curr_idx}:a"
+
 
     # Video filters list
     vf_filters = []
@@ -417,7 +416,8 @@ async def render_all(
     on_clip_done: Optional[Callable[[int, int], None]] = None,
     video_volume: float = 1.0,
     voice_volume: float = 1.0,
-    sfx_volume: float = 0.5
+    sfx_volume: float = 0.5,
+    music_volume: float = 0.5
 ) -> Path:
     """
     Renders all clips. Returns path to master.mp4 (if concat=True) or output_dir.
@@ -437,7 +437,7 @@ async def render_all(
             logger.warning(f"Could not delete stale master {master_path}: {e}")
             
     for i in range(n):
-        v_block, _, _ = manifest.get_slot(i)
+        v_block, _, _, _ = manifest.get_slot(i)
         if v_block:
             output_path = output_dir / f"clip_{i:02d}_final.mp4"
             if output_path.exists():
@@ -448,7 +448,7 @@ async def render_all(
 
     rendered_clips = []
     for i in range(n):
-        v_block, sfx_block, vo_block = manifest.get_slot(i)
+        v_block, sfx_block, vo_block, mu_block = manifest.get_slot(i)
         if not v_block:
             continue
 
@@ -471,6 +471,14 @@ async def render_all(
                     vo_path = potential_vo_path
                 else:
                     logger.warning(f"Voice file missing: {potential_vo_path}")
+                    
+        mu_path = None
+        if mu_block and mu_block.status == BlockStatus.DONE and mu_block.file_path:
+            potential_mu_path = Path(mu_block.file_path)
+            if potential_mu_path.exists():
+                mu_path = potential_mu_path
+            else:
+                logger.warning(f"Music file missing: {potential_mu_path}")
 
         is_image = getattr(v_block, 'media_type', 'video') == 'image'
         video_has_audio = False
@@ -478,15 +486,17 @@ async def render_all(
         # Check generated audio durations
         vo_dur = vo_block.duration_s if (vo_block and vo_block.duration_s) else 0.0
         sfx_dur = sfx_block.duration_s if (sfx_block and sfx_block.duration_s) else 0.0
+        mu_dur = mu_block.duration_s if (mu_block and mu_block.duration_s) else 0.0
         
         computed_duration = 5.0
         if is_image:
-            computed_duration = max(vo_dur, sfx_dur)
+            computed_duration = max(vo_dur, sfx_dur, mu_dur)
             if computed_duration <= 0.0:
                 computed_duration = v_block.duration_s if (v_block and v_block.duration_s > 0) else 5.0
         else:
             video_dur = v_block.duration_s if (v_block and v_block.duration_s > 0) else 5.0
-            computed_duration = max(video_dur, vo_dur, sfx_dur)
+            computed_duration = max(video_dur, vo_dur, sfx_dur, mu_dur)
+
 
         # ─── Dynamic Lip Sync Processing ───
         lip_sync_active = getattr(v_block, 'lip_sync_enabled', False)
@@ -568,7 +578,8 @@ async def render_all(
         word_timings = None
         captions_active = getattr(manifest, 'captions_enabled', True)
         if captions_active and vo_block and vo_block.prompt and computed_duration > 0:
-            word_timings = get_linear_word_timings(vo_block.prompt, computed_duration)
+            timing_duration = vo_dur if vo_dur > 0 else computed_duration
+            word_timings = get_linear_word_timings(vo_block.prompt, timing_duration)
             
         sfx_label = None
         if sfx_block and getattr(sfx_block, 'prompt', None):
@@ -578,12 +589,14 @@ async def render_all(
             video_path=v_path,
             voice_path=vo_path,
             sfx_path=s_path,
+            music_path=mu_path,
             output_path=output_path,
             is_image=is_image,
             duration=computed_duration,
             video_volume=getattr(v_block, 'volume', video_volume),
             voice_volume=getattr(vo_block, 'volume', voice_volume) if vo_block else 1.0,
             sfx_volume=getattr(sfx_block, 'volume', sfx_volume) if sfx_block else 1.0,
+            music_volume=getattr(mu_block, 'volume', music_volume) if mu_block else 1.0,
             canvas_w=canvas_w,
             canvas_h=canvas_h,
             fit_mode=canvas_fit,
@@ -654,7 +667,7 @@ async def concat_clips(manifest: Manifest, output_dir: Path, rendered_clips: Lis
             dur_val = 5.0
         durations.append(dur_val)
         
-        v_block, _, _ = manifest.get_slot(original_i)
+        v_block, _, _, _ = manifest.get_slot(original_i)
         trans = getattr(v_block, 'transition', 'none')
         if trans == 'none':
             trans = getattr(manifest, 'global_transition', 'none')

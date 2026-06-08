@@ -139,6 +139,34 @@ class SfxBlock:
         )
 
 @dataclass
+class MusicBlock:
+    id: str                    # e.g. "mu_01"
+    prompt: str                # text prompt for Stable Audio
+    order: int = 0             # position in lane
+    status: BlockStatus = BlockStatus.IDLE
+    file_path: Optional[str] = None   # path to generated .wav
+    duration_s: Optional[float] = None # target duration
+    error_msg: Optional[str] = None
+    volume: float = 1.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> MusicBlock:
+        return cls(
+            id=d["id"],
+            prompt=d["prompt"],
+            order=int(d.get("order", 0)),
+            status=BlockStatus(d.get("status", BlockStatus.IDLE)),
+            file_path=d.get("file_path"),
+            duration_s=float(d["duration_s"]) if d.get("duration_s") is not None else None,
+            error_msg=d.get("error_msg"),
+            volume=float(d.get("volume", 1.0))
+        )
+
+
+@dataclass
 class VoiceBlock:
     id: str                    # e.g. "vo_01"
     order: int = 0
@@ -178,6 +206,8 @@ class Manifest:
     video_blocks: List[VideoBlock] = field(default_factory=list)
     sfx_blocks: List[SfxBlock] = field(default_factory=list)
     voice_blocks: List[VoiceBlock] = field(default_factory=list)
+    music_blocks: List[MusicBlock] = field(default_factory=list)
+
     output_dir: str = "output"
     render_complete: bool = False
     canvas: str = "16:9"
@@ -208,6 +238,8 @@ class Manifest:
             "video_blocks": [asdict(b) for b in self.video_blocks],
             "sfx_blocks": [asdict(b) for b in self.sfx_blocks],
             "voice_blocks": [asdict(b) for b in self.voice_blocks],
+            "music_blocks": [asdict(b) for b in self.music_blocks],
+
             "output_dir": self.output_dir,
             "render_complete": self.render_complete,
             "canvas": self.canvas,
@@ -241,7 +273,9 @@ class Manifest:
         video_blocks = [VideoBlock.from_dict(b) for b in d.get("video_blocks", [])]
         sfx_blocks = [SfxBlock.from_dict(b) for b in d.get("sfx_blocks", [])]
         voice_blocks = [VoiceBlock.from_dict(b) for b in d.get("voice_blocks", [])]
+        music_blocks = [MusicBlock.from_dict(b) for b in d.get("music_blocks", [])]
         character_profiles = [CharacterProfile.from_dict(p) for p in d.get("character_profiles", [])]
+
 
         return cls(
             project_name=d.get("project_name", "Untitled"),
@@ -249,6 +283,8 @@ class Manifest:
             video_blocks=video_blocks,
             sfx_blocks=sfx_blocks,
             voice_blocks=voice_blocks,
+            music_blocks=music_blocks,
+
             output_dir=d.get("output_dir", "output"),
             render_complete=bool(d.get("render_complete", False)),
             canvas=d.get("canvas", "16:9"),
@@ -289,9 +325,10 @@ class Manifest:
         except Exception as e:
             logger.error(f"Failed to save manifest to {manifest_path}: {e}")
 
-    def get_slot(self, order: int) -> tuple[Optional[VideoBlock], Optional[SfxBlock], Optional[VoiceBlock]]:
-        """Return the video, sfx, voice blocks at a given order position."""
+    def get_slot(self, order: int) -> tuple[Optional[VideoBlock], Optional[SfxBlock], Optional[VoiceBlock], Optional[MusicBlock]]:
+        """Return the video, sfx, voice, music blocks at a given order position."""
         v = next((b for b in self.video_blocks if b.order == order), None)
         s = next((b for b in self.sfx_blocks if b.order == order), None)
         vo = next((b for b in self.voice_blocks if b.order == order), None)
-        return v, s, vo
+        mu = next((b for b in self.music_blocks if b.order == order), None)
+        return v, s, vo, mu
