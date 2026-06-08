@@ -1620,8 +1620,16 @@ async def generate_lip_sync(req: LipSyncRequest):
                         # Always try custom uploaded sprites first if they exist/are configured.
                         sprite = None
                         using_custom_sprite = False
-                        if getattr(char_cfg, 'sprite_char_override', None) or char_cfg.style.lower() in ['designed', 'custom']:
-                            cname = char_cfg.sprite_char_override if getattr(char_cfg, 'sprite_char_override', None) else (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}")
+                        req_override = getattr(req, 'sprite_char_override', None)
+                        cname = None
+                        if req_override and c_i == 0:
+                            cname = req_override
+                        elif getattr(char_cfg, 'sprite_char_override', None):
+                            cname = char_cfg.sprite_char_override
+                        elif char_cfg.style.lower() in ['designed', 'custom']:
+                            cname = char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}"
+
+                        if cname:
                             custom_dir = STATIC_DIR / "uploads" / "custom_mouths" / cname
                             if custom_dir.exists():
                                 # Size custom sprite using the same slider-based formula as SVG sprites:
@@ -1636,30 +1644,72 @@ async def generate_lip_sync(req: LipSyncRequest):
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
                         cx, cy = pose["mouth_center"]
 
+                        # Calculate target dimensions first to use for custom sprite erase quad
+                        target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
+                        tracked_h = 0.0
+                        if len(mouth_mask_poly) >= 10:
+                            tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                        viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
+                        min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
+                        target_h = max(6, int(max(tracked_h, min_open_h)))
+
                         # 1. Erase the mouth underlay first (always, to prevent ghosting)
-                        if mouth_mask_poly:
+                        skin_rgb = (255, 204, 153, 255)
+                        try:
+                            # Sample dynamic skin color
+                            sample_poly = mouth_mask_poly if mouth_mask_poly else []
+                            if not sample_poly:
+                                rx = target_w / 2.0
+                                ry = target_h / 2.0
+                                sample_poly = [
+                                    [cx - rx, cy - ry], [cx + rx, cy - ry],
+                                    [cx + rx, cy + ry], [cx - rx, cy + ry]
+                                ]
+                            skin_rgb = sample_dynamic_skin_color(frame_bgr, sample_poly)
+                        except Exception as e:
+                            logger.error(f"Error sampling dynamic skin color: {e}")
                             try:
-                                skin_rgb = sample_dynamic_skin_color(frame_bgr, mouth_mask_poly)
-                            except Exception as e:
-                                logger.error(f"Error sampling dynamic skin color: {e}")
-                                try:
-                                    skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
-                                except:
-                                    skin_rgb = (255, 204, 153, 255)
-                                    
-                            poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
-                            centroid = np.mean(poly_pts, axis=0)
-                            outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
-                            expanded_pts = []
-                            for P in poly_pts:
-                                diff = P - centroid
-                                dist = np.linalg.norm(diff)
-                                factor = 1.0 + (outline_width + 4.0) / (dist + 1e-5)
-                                P_expanded = centroid + diff * factor
-                                expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
-                                
-                            draw = ImageDraw.Draw(frame_img)
-                            draw.polygon(expanded_pts, fill=skin_rgb)
+                                skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
+                            except:
+                                pass
+
+                        draw = ImageDraw.Draw(frame_img)
+                        if using_custom_sprite:
+                            # Erase a quad matching the custom mouth width and calibrated mouth height to cover the full original mouth line
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            erase_w = target_w * 1.10
+                            calibrated_h = (char_cfg.height / 100.0) * base_h * scale
+                            erase_h = max(8, int(calibrated_h * 1.25))
+                            half_ew = erase_w / 2.0
+                            half_eh = erase_h / 2.0
+                            
+                            erase_offsets = [
+                                (-half_ew, -half_eh),
+                                (half_ew, -half_eh),
+                                (half_ew, half_eh),
+                                (-half_ew, half_eh)
+                            ]
+                            erase_corners = []
+                            for dx, dy in erase_offsets:
+                                rx = dx * cos_t - dy * sin_t
+                                ry = dx * sin_t + dy * cos_t
+                                erase_corners.append((int(cx + rx), int(cy + ry)))
+                            draw.polygon(erase_corners, fill=skin_rgb)
+                        else:
+                            if mouth_mask_poly:
+                                poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
+                                centroid = np.mean(poly_pts, axis=0)
+                                outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
+                                expanded_pts = []
+                                for P in poly_pts:
+                                    diff = P - centroid
+                                    dist = np.linalg.norm(diff)
+                                    factor = 1.0 + (outline_width + 4.0) / (dist + 1e-5)
+                                    P_expanded = centroid + diff * factor
+                                    expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
+                                draw.polygon(expanded_pts, fill=skin_rgb)
 
                         # 2. Render and paste the mouth sprite
                         if using_custom_sprite:
@@ -1667,20 +1717,7 @@ async def generate_lip_sync(req: LipSyncRequest):
                             sprite_np = np.array(sprite)
                             sh, sw = sprite_np.shape[:2]
                             
-                            # Calculate target dimensions
-                            # Width: slider-based × scale
-                            target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
-                            
-                            # Height: blend tracker height and viseme expected height
-                            tracked_h = 0.0
-                            if len(mouth_mask_poly) >= 10:
-                                tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
-                                
-                            viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
-                            min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
-                            target_h = max(6, int(max(tracked_h, min_open_h)))
-                            
-                            # Compute rotated box corners
+                            # Compute rotated box corners for rendering
                             theta = np.radians(pose["roll"])
                             cos_t = np.cos(theta)
                             sin_t = np.sin(theta)
@@ -1728,7 +1765,11 @@ async def generate_lip_sync(req: LipSyncRequest):
             for c_i, char_cfg in enumerate(chars):
                 # Use the real character name or the override name so custom sprite
                 # uploads stored under custom_mouths/{char_name}/ are found correctly.
-                cname = getattr(char_cfg, 'sprite_char_override', None) or (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}")
+                req_override = getattr(req, 'sprite_char_override', None)
+                if req_override and c_i == 0:
+                    cname = req_override
+                else:
+                    cname = getattr(char_cfg, 'sprite_char_override', None) or (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}")
                 mouth_dir = generate_character_mouth_set(char_cfg, cname, base_w, base_h)
                 char_mouth_dirs.append(mouth_dir)
                 sprites = {v: Image.open(mouth_dir / f"mouth_{v}.png") for v in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'X']}
@@ -1897,8 +1938,16 @@ async def generate_lip_sync(req: LipSyncRequest):
                         # Always try custom uploaded sprites first if they exist/are configured.
                         sprite = None
                         using_custom_sprite = False
-                        if getattr(req, 'sprite_char_override', None) or char_cfg.style.lower() in ['designed', 'custom']:
-                            ann_cname = req.sprite_char_override if getattr(req, 'sprite_char_override', None) else (char_names[0] if char_names else "Character 1")
+                        req_override = getattr(req, 'sprite_char_override', None)
+                        ann_cname = None
+                        if req_override:
+                            ann_cname = req_override
+                        elif getattr(char_cfg, 'sprite_char_override', None):
+                            ann_cname = char_cfg.sprite_char_override
+                        elif char_cfg.style.lower() in ['designed', 'custom']:
+                            ann_cname = char_names[0] if char_names else "Character 1"
+
+                        if ann_cname:
                             custom_dir = STATIC_DIR / "uploads" / "custom_mouths" / ann_cname
                             if custom_dir.exists():
                                 # Size custom sprite using the same slider-based formula as SVG sprites:
@@ -1913,30 +1962,72 @@ async def generate_lip_sync(req: LipSyncRequest):
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
                         cx, cy = pose["mouth_center"]
 
+                        # Calculate target dimensions first to use for custom sprite erase quad
+                        target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
+                        tracked_h = 0.0
+                        if len(mouth_mask_poly) >= 10:
+                            tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                        viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
+                        min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
+                        target_h = max(6, int(max(tracked_h, min_open_h)))
+
                         # 1. Erase the mouth underlay first (always, to prevent ghosting)
-                        if mouth_mask_poly:
+                        skin_rgb = (255, 204, 153, 255)
+                        try:
+                            # Sample dynamic skin color
+                            sample_poly = mouth_mask_poly if mouth_mask_poly else []
+                            if not sample_poly:
+                                rx = target_w / 2.0
+                                ry = target_h / 2.0
+                                sample_poly = [
+                                    [cx - rx, cy - ry], [cx + rx, cy - ry],
+                                    [cx + rx, cy + ry], [cx - rx, cy + ry]
+                                ]
+                            skin_rgb = sample_dynamic_skin_color(frame_bgr, sample_poly)
+                        except Exception as e:
+                            logger.error(f"Error sampling dynamic skin color: {e}")
                             try:
-                                skin_rgb = sample_dynamic_skin_color(frame_bgr, mouth_mask_poly)
-                            except Exception as e:
-                                logger.error(f"Error sampling dynamic skin color: {e}")
-                                try:
-                                    skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
-                                except:
-                                    skin_rgb = (255, 204, 153, 255)
-                                    
-                            poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
-                            centroid = np.mean(poly_pts, axis=0)
-                            outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
-                            expanded_pts = []
-                            for P in poly_pts:
-                                diff = P - centroid
-                                dist = np.linalg.norm(diff)
-                                factor = 1.0 + (outline_width + 4.0) / (dist + 1e-5)
-                                P_expanded = centroid + diff * factor
-                                expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
-                                
-                            draw = ImageDraw.Draw(frame_img)
-                            draw.polygon(expanded_pts, fill=skin_rgb)
+                                skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
+                            except:
+                                pass
+
+                        draw = ImageDraw.Draw(frame_img)
+                        if using_custom_sprite:
+                            # Erase a quad matching the custom mouth width and calibrated mouth height to cover the full original mouth line
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            erase_w = target_w * 1.10
+                            calibrated_h = (char_cfg.height / 100.0) * base_h * scale
+                            erase_h = max(8, int(calibrated_h * 1.25))
+                            half_ew = erase_w / 2.0
+                            half_eh = erase_h / 2.0
+                            
+                            erase_offsets = [
+                                (-half_ew, -half_eh),
+                                (half_ew, -half_eh),
+                                (half_ew, half_eh),
+                                (-half_ew, half_eh)
+                            ]
+                            erase_corners = []
+                            for dx, dy in erase_offsets:
+                                rx = dx * cos_t - dy * sin_t
+                                ry = dx * sin_t + dy * cos_t
+                                erase_corners.append((int(cx + rx), int(cy + ry)))
+                            draw.polygon(erase_corners, fill=skin_rgb)
+                        else:
+                            if mouth_mask_poly:
+                                poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
+                                centroid = np.mean(poly_pts, axis=0)
+                                outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
+                                expanded_pts = []
+                                for P in poly_pts:
+                                    diff = P - centroid
+                                    dist = np.linalg.norm(diff)
+                                    factor = 1.0 + (outline_width + 4.0) / (dist + 1e-5)
+                                    P_expanded = centroid + diff * factor
+                                    expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
+                                draw.polygon(expanded_pts, fill=skin_rgb)
 
                         # 2. Render and paste the mouth sprite
                         if using_custom_sprite:
@@ -1944,20 +2035,7 @@ async def generate_lip_sync(req: LipSyncRequest):
                             sprite_np = np.array(sprite)
                             sh, sw = sprite_np.shape[:2]
                             
-                            # Calculate target dimensions
-                            # Width: slider-based × scale
-                            target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
-                            
-                            # Height: blend tracker height and viseme expected height
-                            tracked_h = 0.0
-                            if len(mouth_mask_poly) >= 10:
-                                tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
-                                
-                            viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
-                            min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
-                            target_h = max(6, int(max(tracked_h, min_open_h)))
-                            
-                            # Compute rotated box corners
+                            # Compute rotated box corners for rendering
                             theta = np.radians(pose["roll"])
                             cos_t = np.cos(theta)
                             sin_t = np.sin(theta)
@@ -2002,10 +2080,49 @@ async def generate_lip_sync(req: LipSyncRequest):
                         frame_centers = smoothed_centers_dict[lvl][tc_idx]
                         
                         for c_i in range(len(chars)):
+                            char_cfg = chars[c_i]
                             vis = active_visemes[c_i]
                             sprite = char_sprites_list[c_i][vis]
                             sw, sh = sprite.size
                             cx, cy = frame_centers[c_i]
+                            
+                            # Check if custom sprites are used
+                            req_override = getattr(req, 'sprite_char_override', None)
+                            cname = req_override if (req_override and c_i == 0) else (getattr(char_cfg, 'sprite_char_override', None) or (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}"))
+                            custom_base_dir = STATIC_DIR / "uploads" / "custom_mouths" / cname
+                            using_custom_sprite = (char_cfg.style.lower() in ['designed', 'custom'] or getattr(char_cfg, 'sprite_char_override', None) or (req_override and c_i == 0)) and custom_base_dir.exists()
+                            
+                            if using_custom_sprite:
+                                # Sample dynamic skin color from background frame
+                                rx = sw / 2.0
+                                ry = sh / 2.0
+                                sample_poly = [
+                                    [cx - rx, cy - ry], [cx + rx, cy - ry],
+                                    [cx + rx, cy + ry], [cx - rx, cy + ry]
+                                ]
+                                skin_rgb = (255, 204, 153, 255)
+                                try:
+                                    if not (is_video and video_frames):
+                                        # For static image base, convert frame_img_base
+                                        frame_bgr_sample = cv2.cvtColor(np.array(frame_img_base), cv2.COLOR_RGBA2BGR)
+                                    else:
+                                        frame_bgr_sample = frame_bgr
+                                    skin_rgb = sample_dynamic_skin_color(frame_bgr_sample, sample_poly)
+                                except Exception as e:
+                                    logger.error(f"Error sampling skin color in static path: {e}")
+                                    try:
+                                        skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
+                                    except:
+                                        pass
+                                
+                                # Erase the original mouth underlay with 1.25 height multiplier
+                                draw = ImageDraw.Draw(frame_img)
+                                erase_w = sw * 1.10
+                                erase_h = sh * 1.25
+                                half_ew = erase_w / 2.0
+                                half_eh = erase_h / 2.0
+                                draw.rectangle([cx - half_ew, cy - half_eh, cx + half_ew, cy + half_eh], fill=skin_rgb)
+                                
                             frame_img.paste(sprite, (cx - sw // 2, cy - sh // 2), sprite)
                             
                     # Save Frame
