@@ -1028,6 +1028,10 @@ def load_custom_mouth_sprite(char_name: str, viseme: str, face_angle: float, tar
         
     try:
         img = Image.open(sprite_file).convert("RGBA")
+        # Trim transparent borders to ensure the actual mouth pixels occupy the full target_w, target_h
+        bbox = img.getbbox()
+        if bbox:
+            img = img.crop(bbox)
         
         # Mirror check: if target face_angle and closest_angle are opposite signs
         if (face_angle < -10 and closest_angle > 10) or (face_angle > 10 and closest_angle < -10):
@@ -1644,14 +1648,29 @@ async def generate_lip_sync(req: LipSyncRequest):
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
                         cx, cy = pose["mouth_center"]
 
-                        # Calculate target dimensions first to use for custom sprite erase quad
+                        # Calculate target dimensions
                         target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
                         tracked_h = 0.0
                         if len(mouth_mask_poly) >= 10:
                             tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                        
                         viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
-                        min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
-                        target_h = max(6, int(max(tracked_h, min_open_h)))
+                        calibrated_h = (char_cfg.height / 100.0) * base_h * scale
+                        min_open_h = calibrated_h * viseme_aperture.get(vis, 0.1)
+                        
+                        # Add height padding to prevent the mouth from being too small/squashed
+                        padding_h = calibrated_h * 0.15
+                        target_h = max(6, int(max(tracked_h + padding_h, min_open_h)))
+
+                        # Anchor the top of the mouth box to the tracked top lip to prevent it from going near the nose
+                        if len(mouth_mask_poly) >= 10:
+                            top_lip_pt = np.array(mouth_mask_poly[9])
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            # Shift center down along the face vertical axis by target_h / 2.0 to anchor top of box to top lip
+                            cx = top_lip_pt[0] - (target_h / 2.0) * sin_t
+                            cy = top_lip_pt[1] + (target_h / 2.0) * cos_t
 
                         # 1. Erase the mouth underlay first (always, to prevent ghosting)
                         skin_rgb = (255, 204, 153, 255)
@@ -1675,28 +1694,40 @@ async def generate_lip_sync(req: LipSyncRequest):
 
                         draw = ImageDraw.Draw(frame_img)
                         if using_custom_sprite:
-                            # Erase a quad matching the custom mouth width and calibrated mouth height to cover the full original mouth line
-                            theta = np.radians(pose["roll"])
-                            cos_t = np.cos(theta)
-                            sin_t = np.sin(theta)
-                            erase_w = target_w * 1.10
-                            calibrated_h = (char_cfg.height / 100.0) * base_h * scale
-                            erase_h = max(8, int(calibrated_h * 1.25))
-                            half_ew = erase_w / 2.0
-                            half_eh = erase_h / 2.0
-                            
-                            erase_offsets = [
-                                (-half_ew, -half_eh),
-                                (half_ew, -half_eh),
-                                (half_ew, half_eh),
-                                (-half_ew, half_eh)
-                            ]
-                            erase_corners = []
-                            for dx, dy in erase_offsets:
-                                rx = dx * cos_t - dy * sin_t
-                                ry = dx * sin_t + dy * cos_t
-                                erase_corners.append((int(cx + rx), int(cy + ry)))
-                            draw.polygon(erase_corners, fill=skin_rgb)
+                            if mouth_mask_poly:
+                                poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
+                                centroid = np.mean(poly_pts, axis=0)
+                                outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
+                                expanded_pts = []
+                                for P in poly_pts:
+                                    diff = P - centroid
+                                    dist = np.linalg.norm(diff)
+                                    # Expand mouth points dynamically to cover the lips
+                                    factor = 1.12 + (outline_width + 6.0) / (dist + 1e-5)
+                                    P_expanded = centroid + diff * factor
+                                    expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
+                                draw.polygon(expanded_pts, fill=skin_rgb)
+                            else:
+                                # Fallback if no mouth points: use a small box around center
+                                theta = np.radians(pose["roll"])
+                                cos_t = np.cos(theta)
+                                sin_t = np.sin(theta)
+                                erase_w = target_w * 1.05
+                                erase_h = target_h * 1.15
+                                half_ew = erase_w / 2.0
+                                half_eh = erase_h / 2.0
+                                erase_offsets = [
+                                    (-half_ew, -half_eh),
+                                    (half_ew, -half_eh),
+                                    (half_ew, half_eh),
+                                    (-half_ew, half_eh)
+                                ]
+                                erase_corners = []
+                                for dx, dy in erase_offsets:
+                                    rx = dx * cos_t - dy * sin_t
+                                    ry = dx * sin_t + dy * cos_t
+                                    erase_corners.append((int(cx + rx), int(cy + ry)))
+                                draw.polygon(erase_corners, fill=skin_rgb)
                         else:
                             if mouth_mask_poly:
                                 poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
@@ -1962,14 +1993,29 @@ async def generate_lip_sync(req: LipSyncRequest):
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
                         cx, cy = pose["mouth_center"]
 
-                        # Calculate target dimensions first to use for custom sprite erase quad
+                        # Calculate target dimensions
                         target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
                         tracked_h = 0.0
                         if len(mouth_mask_poly) >= 10:
                             tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                        
                         viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
-                        min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
-                        target_h = max(6, int(max(tracked_h, min_open_h)))
+                        calibrated_h = (char_cfg.height / 100.0) * base_h * scale
+                        min_open_h = calibrated_h * viseme_aperture.get(vis, 0.1)
+                        
+                        # Add height padding to prevent the mouth from being too small/squashed
+                        padding_h = calibrated_h * 0.15
+                        target_h = max(6, int(max(tracked_h + padding_h, min_open_h)))
+
+                        # Anchor the top of the mouth box to the tracked top lip to prevent it from going near the nose
+                        if len(mouth_mask_poly) >= 10:
+                            top_lip_pt = np.array(mouth_mask_poly[9])
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            # Shift center down along the face vertical axis by target_h / 2.0 to anchor top of box to top lip
+                            cx = top_lip_pt[0] - (target_h / 2.0) * sin_t
+                            cy = top_lip_pt[1] + (target_h / 2.0) * cos_t
 
                         # 1. Erase the mouth underlay first (always, to prevent ghosting)
                         skin_rgb = (255, 204, 153, 255)
@@ -1993,28 +2039,40 @@ async def generate_lip_sync(req: LipSyncRequest):
 
                         draw = ImageDraw.Draw(frame_img)
                         if using_custom_sprite:
-                            # Erase a quad matching the custom mouth width and calibrated mouth height to cover the full original mouth line
-                            theta = np.radians(pose["roll"])
-                            cos_t = np.cos(theta)
-                            sin_t = np.sin(theta)
-                            erase_w = target_w * 1.10
-                            calibrated_h = (char_cfg.height / 100.0) * base_h * scale
-                            erase_h = max(8, int(calibrated_h * 1.25))
-                            half_ew = erase_w / 2.0
-                            half_eh = erase_h / 2.0
-                            
-                            erase_offsets = [
-                                (-half_ew, -half_eh),
-                                (half_ew, -half_eh),
-                                (half_ew, half_eh),
-                                (-half_ew, half_eh)
-                            ]
-                            erase_corners = []
-                            for dx, dy in erase_offsets:
-                                rx = dx * cos_t - dy * sin_t
-                                ry = dx * sin_t + dy * cos_t
-                                erase_corners.append((int(cx + rx), int(cy + ry)))
-                            draw.polygon(erase_corners, fill=skin_rgb)
+                            if mouth_mask_poly:
+                                poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
+                                centroid = np.mean(poly_pts, axis=0)
+                                outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
+                                expanded_pts = []
+                                for P in poly_pts:
+                                    diff = P - centroid
+                                    dist = np.linalg.norm(diff)
+                                    # Expand mouth points dynamically to cover the lips
+                                    factor = 1.12 + (outline_width + 6.0) / (dist + 1e-5)
+                                    P_expanded = centroid + diff * factor
+                                    expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
+                                draw.polygon(expanded_pts, fill=skin_rgb)
+                            else:
+                                # Fallback if no mouth points: use a small box around center
+                                theta = np.radians(pose["roll"])
+                                cos_t = np.cos(theta)
+                                sin_t = np.sin(theta)
+                                erase_w = target_w * 1.05
+                                erase_h = target_h * 1.15
+                                half_ew = erase_w / 2.0
+                                half_eh = erase_h / 2.0
+                                erase_offsets = [
+                                    (-half_ew, -half_eh),
+                                    (half_ew, -half_eh),
+                                    (half_ew, half_eh),
+                                    (-half_ew, half_eh)
+                                ]
+                                erase_corners = []
+                                for dx, dy in erase_offsets:
+                                    rx = dx * cos_t - dy * sin_t
+                                    ry = dx * sin_t + dy * cos_t
+                                    erase_corners.append((int(cx + rx), int(cy + ry)))
+                                draw.polygon(erase_corners, fill=skin_rgb)
                         else:
                             if mouth_mask_poly:
                                 poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
@@ -2115,10 +2173,10 @@ async def generate_lip_sync(req: LipSyncRequest):
                                     except:
                                         pass
                                 
-                                # Erase the original mouth underlay with 1.25 height multiplier
+                                # Erase the original mouth underlay with a tight bounding box matching the actual mouth sprite size
                                 draw = ImageDraw.Draw(frame_img)
-                                erase_w = sw * 1.10
-                                erase_h = sh * 1.25
+                                erase_w = sw * 1.05
+                                erase_h = sh * 1.15
                                 half_ew = erase_w / 2.0
                                 half_eh = erase_h / 2.0
                                 draw.rectangle([cx - half_ew, cy - half_eh, cx + half_ew, cy + half_eh], fill=skin_rgb)
