@@ -22,6 +22,10 @@ class TestDatasetAPI(unittest.TestCase):
         # Clean up temporary test character folder if created
         if self.temp_char_dir.exists():
             shutil.rmtree(self.temp_char_dir)
+        # Clean up temporary custom mouths folder
+        custom_mouths_dir = BASE_DIR / "static" / "uploads" / "custom_mouths" / "test_char"
+        if custom_mouths_dir.exists():
+            shutil.rmtree(custom_mouths_dir)
 
     def test_propagate_invalid_video(self):
         payload = {
@@ -190,6 +194,31 @@ class TestDatasetAPI(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["status"], "ok")
         self.assertIn("video_url", data)
+
+    def test_upload_spritesheet(self):
+        # Create a mock transparent PNG in memory
+        from PIL import Image
+        import io
+        img = Image.new("RGBA", (669, 373), (0, 0, 0, 0))
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format="PNG")
+        img_bytes.seek(0)
+        
+        response = self.client.post(
+            "/api/character/upload-spritesheet",
+            data={"character_name": "test_char", "angle": 0},
+            files={"file": ("spritesheet.png", img_bytes, "image/png")}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("saved successfully", data["message"])
+        
+        # Verify cropped mouth files exist
+        custom_mouths_dir = BASE_DIR / "static" / "uploads" / "custom_mouths" / "test_char" / "0"
+        self.assertTrue(custom_mouths_dir.exists())
+        self.assertTrue((custom_mouths_dir / "mouth_A.png").exists())
+        self.assertTrue((custom_mouths_dir / "mouth_Neutral.png").exists())
 
 if __name__ == "__main__":
     unittest.main()

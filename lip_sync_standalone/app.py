@@ -9,7 +9,7 @@ import logging
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -961,6 +961,56 @@ def draw_mouth_sprite(viseme: str, cfg: CharacterConfig, w: int, h: int) -> Imag
         return render_single_mode('profile', viseme, cfg, w, h)
 
 
+def load_custom_mouth_sprite(char_name: str, viseme: str, face_angle: float, target_w: int, target_h: int) -> Optional[Image.Image]:
+    """
+    Attempts to load a custom uploaded mouth sprite PNG for the given character name and viseme,
+    matching the closest face angle and mirroring if necessary.
+    """
+    custom_base_dir = STATIC_DIR / "uploads" / "custom_mouths" / char_name
+    if not custom_base_dir.exists():
+        return None
+        
+    # List all subdirectories that are valid integer angles
+    available_angles = []
+    for d in custom_base_dir.iterdir():
+        if d.is_dir():
+            try:
+                available_angles.append(int(d.name))
+            except ValueError:
+                continue
+                
+    if not available_angles:
+        return None
+        
+    # Find the closest available angle to the requested face_angle
+    closest_angle = min(available_angles, key=lambda a: abs(a - face_angle))
+    
+    # Try loading mouth_{viseme}.png (checking for Neutral/X aliases too)
+    sprite_file = custom_base_dir / str(closest_angle) / f"mouth_{viseme}.png"
+    if not sprite_file.exists():
+        if viseme == 'X':
+            sprite_file = custom_base_dir / str(closest_angle) / "mouth_Neutral.png"
+        elif viseme == 'Neutral':
+            sprite_file = custom_base_dir / str(closest_angle) / "mouth_X.png"
+            
+    if not sprite_file.exists():
+        return None
+        
+    try:
+        img = Image.open(sprite_file).convert("RGBA")
+        
+        # Mirror check: if target face_angle and closest_angle are opposite signs
+        if (face_angle < -10 and closest_angle > 10) or (face_angle > 10 and closest_angle < -10):
+            logger.info(f"Mirroring custom mouth sprite {viseme} from angle {closest_angle}° for face_angle {face_angle}°")
+            img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            
+        # Resize to target size (mw, mh)
+        img = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        return img
+    except Exception as e:
+        logger.error(f"Error loading custom mouth sprite {viseme} for {char_name}: {e}")
+        return None
+
 # Compile and cache all character mouths with tilt rotations & perspective flips/compressions
 def generate_character_mouth_set(cfg: CharacterConfig, char_name: str, base_w: int, base_h: int) -> Path:
     char_dir = GENERATED_DIR / char_name
@@ -971,7 +1021,14 @@ def generate_character_mouth_set(cfg: CharacterConfig, char_name: str, base_w: i
 
     visemes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'X']
     for v in visemes:
-        sprite = draw_mouth_sprite(v, cfg, mw, mh)
+        sprite = None
+        # Check style and load custom mouth sprite
+        if cfg.style.lower() in ['designed', 'custom']:
+            sprite = load_custom_mouth_sprite(char_name, v, cfg.face_angle, mw, mh)
+            
+        if sprite is None:
+            # Fallback to procedural mouth SVGs
+            sprite = draw_mouth_sprite(v, cfg, mw, mh)
 
         # Perspective scale (extra horizontal compress/flip on top of face_angle)
         if hasattr(cfg, 'perspective') and abs(cfg.perspective - 1.0) > 0.01:
@@ -2574,6 +2631,56 @@ async def propagate_dataset(req: PropagateRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/character/upload-spritesheet")
+async def upload_spritesheet(
+    character_name: str = Form(...),
+    angle: int = Form(...),
+    file: UploadFile = File(...)
+):
+    try:
+        contents = await file.read()
+        import io
+        img = Image.open(io.BytesIO(contents)).convert("RGBA")
+        
+        # 5x2 Grid Centers in 669x373 canvas coordinate reference space
+        centers_x = [75, 205, 335, 465, 595]
+        centers_y = [105, 280]
+        cell_w = 120
+        cell_h = 100
+        
+        # Dynamic scaling relative to uploaded PNG dimensions
+        scale_x = img.width / 669.0
+        scale_y = img.height / 373.0
+        
+        target_dir = STATIC_DIR / "uploads" / "custom_mouths" / character_name / str(angle)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        visemes = ["A", "B", "C", "D", "E", "F", "G", "H", "X", "Neutral"]
+        
+        for r_idx, cy in enumerate(centers_y):
+            for c_idx, cx in enumerate(centers_x):
+                # Center/bounds scaled perfectly (NO text labels shift)
+                cx_jpg = int(cx * scale_x)
+                cy_jpg = int(cy * scale_y)
+                w_jpg = int(cell_w * scale_x)
+                h_jpg = int(cell_h * scale_y)
+                
+                left = max(0, cx_jpg - w_jpg // 2)
+                top = max(0, cy_jpg - h_jpg // 2)
+                right = min(img.width, cx_jpg + w_jpg // 2)
+                bottom = min(img.height, cy_jpg + h_jpg // 2)
+                
+                crop = img.crop((left, top, right, bottom))
+                vis_name = visemes[r_idx * 5 + c_idx]
+                crop_path = target_dir / f"mouth_{vis_name}.png"
+                crop.save(crop_path, "PNG")
+                
+        logger.info(f"Cropped spritesheet for {character_name} at angle {angle} in {target_dir}")
+        return {"status": "ok", "message": f"Sprite sheet cropped and saved successfully for character '{character_name}' at angle {angle}°."}
+    except Exception as e:
+        logger.error(f"Failed to process sprite sheet: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to crop sprite sheet: {str(e)}")
 
 if __name__ == "__main__":
 

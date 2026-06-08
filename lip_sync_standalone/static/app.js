@@ -97,6 +97,16 @@ imageFile.addEventListener("change", async (e) => {
 // SVG MOUTH PREVIEW
 // ==========================================
 function renderMouthSVG(style, skin, line, faceAngle = 0) {
+  if (style === 'designed') {
+    return `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <rect x="3" y="3" width="94" height="94" rx="12" fill="rgba(139, 92, 246, 0.1)" stroke="var(--accent-primary)" stroke-width="3" stroke-dasharray="6,4"/>
+      <path d="M 25 50 C 35 58, 65 58, 75 50 C 65 42, 35 42, 25 50 Z" fill="rgba(255, 255, 255, 0.2)" stroke="var(--text-color)" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M 40 50 Q 50 42 60 50" stroke="var(--text-color)" stroke-width="2" fill="none"/>
+      <circle cx="78" cy="22" r="8" fill="var(--accent-secondary)"/>
+      <circle cx="76" cy="20" r="1.5" fill="#fff"/>
+      <circle cx="80" cy="24" r="1.5" fill="#fff"/>
+    </svg>`;
+  }
   const absAngle = Math.abs(faceAngle);
   const side = faceAngle >= 0 ? 1 : -1; // +1 = right, -1 = left
 
@@ -1687,9 +1697,115 @@ function selectGuideTab(shape, btnEl) {
   const activeBtn = btnEl || document.getElementById(`tab-btn-${shape}`);
   if (activeBtn) activeBtn.classList.add("active");
   
-  // Set iframe src to target SVG guide file
-  if (iframe) {
-    iframe.src = `/static/guides/guide_${shape}.svg`;
+  // Hide standard elements and show/hide designed elements
+  const stdContent = document.getElementById("standard-guide-content");
+  const desContent = document.getElementById("designed-guide-content");
+  const zoomWrapper = document.getElementById("guide-zoom-slider")?.parentElement;
+  
+  if (shape === 'designed') {
+    if (stdContent) stdContent.style.display = "none";
+    if (desContent) desContent.style.display = "flex";
+    if (zoomWrapper) zoomWrapper.style.display = "none";
+    
+    // Populate character select
+    const charSelect = document.getElementById("upload-sprite-char");
+    if (charSelect) {
+      charSelect.innerHTML = "";
+      const enabledChars = Object.keys(configs).map(Number).filter(n => configs[n].enabled);
+      if (enabledChars.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No characters active — Add one first!";
+        charSelect.appendChild(opt);
+      } else {
+        enabledChars.forEach(n => {
+          const opt = document.createElement("option");
+          opt.value = `Character ${n}`;
+          opt.textContent = `Character ${n}`;
+          charSelect.appendChild(opt);
+        });
+      }
+    }
+  } else {
+    if (stdContent) stdContent.style.display = "flex";
+    if (desContent) desContent.style.display = "none";
+    if (zoomWrapper) zoomWrapper.style.display = "flex";
+    
+    // Set iframe src to target SVG guide file
+    if (iframe) {
+      iframe.src = `/static/guides/guide_${shape}.svg`;
+    }
+  }
+}
+
+async function handleSpritesheetUpload(event) {
+  event.preventDefault();
+  
+  const charNameSelect = document.getElementById("upload-sprite-char");
+  const angleSelect = document.getElementById("upload-sprite-angle");
+  const fileInput = document.getElementById("upload-sprite-file");
+  const submitBtn = document.getElementById("btn-upload-spritesheet");
+  
+  if (!charNameSelect.value) {
+    showUploadStatus("Please add a character to the workspace first.", "error");
+    return;
+  }
+  
+  if (!fileInput.files || fileInput.files.length === 0) {
+    showUploadStatus("Please select a transparent PNG sprite sheet file.", "error");
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append("character_name", charNameSelect.value);
+  formData.append("angle", angleSelect.value);
+  formData.append("file", fileInput.files[0]);
+  
+  try {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = "⏳ Cropping & Saving...";
+    showUploadStatus("Uploading sprite sheet...", "info");
+    
+    const response = await fetch("/api/character/upload-spritesheet", {
+      method: "POST",
+      body: formData
+    });
+    
+    const data = await response.json();
+    if (response.ok) {
+      showUploadStatus(`Success: ${data.message}`, "success");
+      fileInput.value = ""; // clear file input
+    } else {
+      showUploadStatus(`Error: ${data.detail || "Failed to crop sprite sheet"}`, "error");
+    }
+  } catch (error) {
+    console.error("Spritesheet upload failed:", error);
+    showUploadStatus(`Network error: ${error.message}`, "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = "✂️ Crop & Save Sprite Set";
+  }
+}
+
+function showUploadStatus(msg, type) {
+  const statusDiv = document.getElementById("spritesheet-upload-status");
+  if (!statusDiv) return;
+  
+  statusDiv.style.display = "block";
+  statusDiv.textContent = msg;
+  
+  if (type === "success") {
+    statusDiv.style.background = "rgba(16, 185, 129, 0.15)";
+    statusDiv.style.border = "1px solid rgba(16, 185, 129, 0.4)";
+    statusDiv.style.color = "#34d399";
+  } else if (type === "error") {
+    statusDiv.style.background = "rgba(239, 68, 68, 0.15)";
+    statusDiv.style.border = "1px solid rgba(239, 68, 68, 0.4)";
+    statusDiv.style.color = "#f87171";
+  } else { // info
+    statusDiv.style.background = "rgba(59, 130, 246, 0.15)";
+    statusDiv.style.border = "1px solid rgba(59, 130, 246, 0.4)";
+    statusDiv.style.color = "#60a5fa";
   }
 }
 
