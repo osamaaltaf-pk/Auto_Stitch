@@ -17,7 +17,8 @@ function createDefaultConfig(n) {
     line_color: '#000000',
     rotation: 0,
     perspective: 1.0,
-    face_angle: 0
+    face_angle: 0,
+    sprite_char_override: ""
   };
 }
 
@@ -833,6 +834,7 @@ function syncCharSettingsPanel(n) {
   document.getElementById("mouth-perspective").value  = cfg.perspective;
   document.getElementById("mouth-perspective-val").innerText = cfg.perspective.toFixed(1);
   selectPresetCard(cfg.style);
+  updateSpriteCharSelectVisibility();
 }
 
 // ==========================================
@@ -842,6 +844,7 @@ function selectPreset(name) {
   configs[activeChar].style = name;
   selectPresetCard(name);
   updateMarkers();
+  updateSpriteCharSelectVisibility();
 }
 
 function selectPresetCard(name) {
@@ -1775,6 +1778,7 @@ async function handleSpritesheetUpload(event) {
     if (response.ok) {
       showUploadStatus(`Success: ${data.message}`, "success");
       fileInput.value = ""; // clear file input
+      await populateSpriteCharDropdowns();
     } else {
       showUploadStatus(`Error: ${data.detail || "Failed to crop sprite sheet"}`, "error");
     }
@@ -1807,6 +1811,83 @@ function showUploadStatus(msg, type) {
     statusDiv.style.border = "1px solid rgba(59, 130, 246, 0.4)";
     statusDiv.style.color = "#60a5fa";
   }
+}
+
+function updateSpriteCharSelectVisibility() {
+  const panel = document.getElementById("sprite-char-panel");
+  if (!panel) return;
+  if (activeChar && configs[activeChar] && configs[activeChar].style === 'designed') {
+    panel.style.display = 'flex';
+    const select = document.getElementById("sprite-char-select");
+    if (select) {
+      select.value = configs[activeChar].sprite_char_override || "";
+    }
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+async function populateSpriteCharDropdowns() {
+  try {
+    const res = await fetch("/api/character/list-custom-sprites");
+    if (!res.ok) return;
+    const data = await res.json();
+    const chars = data.characters || [];
+    
+    // Populate Character Lab dropdown
+    const selectLab = document.getElementById("sprite-char-select");
+    if (selectLab) {
+      const prevVal = selectLab.value;
+      selectLab.innerHTML = "";
+      if (chars.length === 0) {
+        selectLab.innerHTML = '<option value="">— No sprites saved yet —</option>';
+      } else {
+        chars.forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c;
+          opt.textContent = c;
+          selectLab.appendChild(opt);
+        });
+        if (activeChar && configs[activeChar] && configs[activeChar].sprite_char_override) {
+          selectLab.value = configs[activeChar].sprite_char_override;
+        } else if (chars.includes(prevVal)) {
+          selectLab.value = prevVal;
+        } else {
+          selectLab.value = chars[0];
+          if (activeChar && configs[activeChar]) {
+            configs[activeChar].sprite_char_override = chars[0];
+          }
+        }
+      }
+    }
+
+    // Populate Annotation Lab dropdown
+    const selectAnno = document.getElementById("anno-sprite-char");
+    if (selectAnno) {
+      const prevVal = selectAnno.value;
+      selectAnno.innerHTML = '<option value="">— None (procedural SVG) —</option>';
+      chars.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        selectAnno.appendChild(opt);
+      });
+      if (chars.includes(prevVal)) {
+        selectAnno.value = prevVal;
+      } else {
+        selectAnno.value = "";
+      }
+    }
+  } catch (err) {
+    console.error("Failed to populate sprite character dropdowns:", err);
+  }
+}
+
+function onSpriteCharChange() {
+  const select = document.getElementById("sprite-char-select");
+  if (!select || activeChar === null || !configs[activeChar]) return;
+  configs[activeChar].sprite_char_override = select.value;
+  addLog(`Char ${activeChar} custom sprite character set to: ${select.value}`, "info");
 }
 
 function renderLandmarks() {
@@ -2108,7 +2189,8 @@ async function renderVideoFromAnnotations() {
           characters: multiCharAnnotations
         },
         render_all_smoothing: renderAll,
-        smoothing_level: activeSmoothingLevel
+        smoothing_level: activeSmoothingLevel,
+        sprite_char_override: document.getElementById("anno-sprite-char")?.value || ""
       })
     });
 
@@ -2439,9 +2521,11 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     setupWheelZoom();
     setupPanning();
+    populateSpriteCharDropdowns();
   });
 } else {
   setupWheelZoom();
   setupPanning();
+  populateSpriteCharDropdowns();
 }
 

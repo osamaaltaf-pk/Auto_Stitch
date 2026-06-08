@@ -129,6 +129,7 @@ class CharacterConfig(BaseModel):
   perspective: float = 1.0
   face_angle: float = 0.0   # -90=full left profile, 0=front, +90=full right profile
   landmarks_calib: Optional[List[Dict[str, float]]] = None
+  sprite_char_override: Optional[str] = None
 
 class LipSyncRequest(BaseModel):
   script: str
@@ -143,6 +144,7 @@ class LipSyncRequest(BaseModel):
   annotations: Optional[Dict[str, Any]] = None
   render_all_smoothing: Optional[bool] = False
   smoothing_level: Optional[int] = 3
+  sprite_char_override: Optional[str] = None
 
 
 class ColorSampleRequest(BaseModel):
@@ -961,6 +963,34 @@ def draw_mouth_sprite(viseme: str, cfg: CharacterConfig, w: int, h: int) -> Imag
         return render_single_mode('profile', viseme, cfg, w, h)
 
 
+def sample_dynamic_skin_color(frame_bgr, mouth_mask_poly):
+    """
+    Samples the skin color from the actual video frame by taking the average of pixels
+    immediately outside the mouth_mask_poly boundary to inherit current lighting and shading.
+    """
+    if not mouth_mask_poly:
+        return (255, 204, 153, 255)
+    try:
+        poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
+        centroid = np.mean(poly_pts, axis=0)
+        h_max, w_max = frame_bgr.shape[:2]
+        sampled_colors = []
+        for P in poly_pts:
+            diff = P - centroid
+            # Expand outward by 35% to sample cheek/lip/chin skin
+            sample_pt = centroid + diff * 1.35
+            sx = int(np.clip(sample_pt[0], 0, w_max - 1))
+            sy = int(np.clip(sample_pt[1], 0, h_max - 1))
+            sampled_colors.append(frame_bgr[sy, sx])
+        if not sampled_colors:
+            return (255, 204, 153, 255)
+        avg_bgr = np.mean(sampled_colors, axis=0)
+        return (int(avg_bgr[2]), int(avg_bgr[1]), int(avg_bgr[0]), 255)
+    except Exception as e:
+        logger.error(f"Error in sample_dynamic_skin_color: {e}")
+        return (255, 204, 153, 255)
+
+
 def load_custom_mouth_sprite(char_name: str, viseme: str, face_angle: float, target_w: int, target_h: int) -> Optional[Image.Image]:
     """
     Attempts to load a custom uploaded mouth sprite PNG for the given character name and viseme,
@@ -1020,10 +1050,23 @@ def generate_character_mouth_set(cfg: CharacterConfig, char_name: str, base_w: i
     mh = max(6,  int((cfg.height / 100.0) * base_h))
 
     visemes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'X']
+
+    # If custom sprites exist on disk for this character, always prefer them.
+    # Check whether any angle subfolder exists under custom_mouths/{char_name}/
+    custom_base_dir = STATIC_DIR / "uploads" / "custom_mouths" / char_name
+    has_custom_sprites = (cfg.style.lower() in ['designed', 'custom'] or getattr(cfg, 'sprite_char_override', None)) and custom_base_dir.exists() and any(d.is_dir() for d in custom_base_dir.iterdir())
+
+    # Persistent cache: if custom sprites already generated, skip regeneration.
+    if has_custom_sprites:
+        all_cached = all((char_dir / f"mouth_{v}.png").exists() for v in visemes)
+        if all_cached:
+            logger.info(f"Using persisted custom sprites for {char_name}: {char_dir}")
+            return char_dir
+
     for v in visemes:
         sprite = None
-        # Check style and load custom mouth sprite
-        if cfg.style.lower() in ['designed', 'custom']:
+        # Always try custom uploaded sprites first (if they exist), regardless of style setting.
+        if has_custom_sprites:
             sprite = load_custom_mouth_sprite(char_name, v, cfg.face_angle, mw, mh)
             
         if sprite is None:
@@ -1574,38 +1617,107 @@ async def generate_lip_sync(req: LipSyncRequest):
                         )
                         
                         vis = active_visemes[c_i]
-                        sprite = draw_mouth_sprite(vis, frame_cfg, mw, mh)
-                        
-                        # Apply roll rotation
-                        if abs(pose["roll"]) > 0.01:
-                            sprite = sprite.rotate(-pose["roll"], resample=Image.Resampling.BICUBIC, expand=True)
-                        
-                        # Convex Hull Mouth Masking
+                        # Always try custom uploaded sprites first if they exist/are configured.
+                        sprite = None
+                        using_custom_sprite = False
+                        if getattr(char_cfg, 'sprite_char_override', None) or char_cfg.style.lower() in ['designed', 'custom']:
+                            cname = char_cfg.sprite_char_override if getattr(char_cfg, 'sprite_char_override', None) else (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}")
+                            custom_dir = STATIC_DIR / "uploads" / "custom_mouths" / cname
+                            if custom_dir.exists():
+                                # Size custom sprite using the same slider-based formula as SVG sprites:
+                                # cfg.width% of frame width, cfg.height% of frame height, scaled by face scale.
+                                sprite_w = max(10, int((char_cfg.width  / 100.0) * base_w * scale))
+                                sprite_h = max(6,  int((char_cfg.height / 100.0) * base_h * scale))
+                                sprite = load_custom_mouth_sprite(cname, vis, pose["yaw"], sprite_w, sprite_h)
+                                if sprite is not None:
+                                    using_custom_sprite = True
+
+                        # Mouth area handling
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
+                        cx, cy = pose["mouth_center"]
+
+                        # 1. Erase the mouth underlay first (always, to prevent ghosting)
                         if mouth_mask_poly:
+                            try:
+                                skin_rgb = sample_dynamic_skin_color(frame_bgr, mouth_mask_poly)
+                            except Exception as e:
+                                logger.error(f"Error sampling dynamic skin color: {e}")
+                                try:
+                                    skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
+                                except:
+                                    skin_rgb = (255, 204, 153, 255)
+                                    
                             poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
                             centroid = np.mean(poly_pts, axis=0)
-                            outline_width = float(char_cfg.outline_width)
+                            outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
                             expanded_pts = []
                             for P in poly_pts:
                                 diff = P - centroid
                                 dist = np.linalg.norm(diff)
-                                factor = 1.0 + (outline_width + 2.0) / (dist + 1e-5)
+                                factor = 1.0 + (outline_width + 4.0) / (dist + 1e-5)
                                 P_expanded = centroid + diff * factor
                                 expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
                                 
-                            try:
-                                skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
-                            except:
-                                skin_rgb = (255, 204, 153, 255)
-                                
                             draw = ImageDraw.Draw(frame_img)
                             draw.polygon(expanded_pts, fill=skin_rgb)
-                        
-                        # Paste mouth at center
-                        cx, cy = pose["mouth_center"]
-                        sw, sh = sprite.size
-                        frame_img.paste(sprite, (int(cx - sw // 2), int(cy - sh // 2)), sprite)
+
+                        # 2. Render and paste the mouth sprite
+                        if using_custom_sprite:
+                            # Convert sprite to NumPy array
+                            sprite_np = np.array(sprite)
+                            sh, sw = sprite_np.shape[:2]
+                            
+                            # Calculate target dimensions
+                            # Width: slider-based × scale
+                            target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
+                            
+                            # Height: blend tracker height and viseme expected height
+                            tracked_h = 0.0
+                            if len(mouth_mask_poly) >= 10:
+                                tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                                
+                            viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
+                            min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
+                            target_h = max(6, int(max(tracked_h, min_open_h)))
+                            
+                            # Compute rotated box corners
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            half_w = target_w / 2.0
+                            half_h = target_h / 2.0
+                            
+                            offsets = [
+                                (-half_w, -half_h),
+                                (half_w, -half_h),
+                                (half_w, half_h),
+                                (-half_w, half_h)
+                            ]
+                            
+                            rotated_corners = []
+                            for dx, dy in offsets:
+                                rx = dx * cos_t - dy * sin_t
+                                ry = dx * sin_t + dy * cos_t
+                                rotated_corners.append([cx + rx, cy + ry])
+                                
+                            # Warp sprite using OpenCV
+                            src_pts = np.array([[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]], dtype=np.float32)
+                            dst_pts = np.array(rotated_corners, dtype=np.float32)
+                            
+                            M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                            frame_w, frame_h = frame_img.size
+                            warped_sprite = cv2.warpPerspective(sprite_np, M, (frame_w, frame_h), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0,0))
+                            
+                            warped_sprite_img = Image.fromarray(warped_sprite, 'RGBA')
+                            frame_img.paste(warped_sprite_img, (0, 0), warped_sprite_img)
+                        else:
+                            # Procedural SVG path
+                            if sprite is None:
+                                sprite = draw_mouth_sprite(vis, frame_cfg, mw, mh)
+                            if abs(pose["roll"]) > 0.01:
+                                sprite = sprite.rotate(-pose["roll"], resample=Image.Resampling.BICUBIC, expand=True)
+                            sw, sh = sprite.size
+                            frame_img.paste(sprite, (int(cx - sw // 2), int(cy - sh // 2)), sprite)
                     
                     # Save frame
                     frame_img.convert("RGBA").save(frames_dirs[lvl] / f"frame_{f:05d}.png")
@@ -1614,7 +1726,9 @@ async def generate_lip_sync(req: LipSyncRequest):
             char_mouth_dirs = []
             char_sprites_list = []
             for c_i, char_cfg in enumerate(chars):
-                cname = f"char{c_i+1}"
+                # Use the real character name or the override name so custom sprite
+                # uploads stored under custom_mouths/{char_name}/ are found correctly.
+                cname = getattr(char_cfg, 'sprite_char_override', None) or (char_names[c_i] if char_names and c_i < len(char_names) else f"char{c_i+1}")
                 mouth_dir = generate_character_mouth_set(char_cfg, cname, base_w, base_h)
                 char_mouth_dirs.append(mouth_dir)
                 sprites = {v: Image.open(mouth_dir / f"mouth_{v}.png") for v in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'X']}
@@ -1780,16 +1894,39 @@ async def generate_lip_sync(req: LipSyncRequest):
                             face_angle=pose["yaw"]
                         )
                         
-                        sprite = draw_mouth_sprite(vis, frame_cfg, mw, mh)
-                        if abs(pose["roll"]) > 0.01:
-                            sprite = sprite.rotate(-pose["roll"], resample=Image.Resampling.BICUBIC, expand=True)
-                            
-                        # Convex Hull Mouth Masking using outer lips landmarks
+                        # Always try custom uploaded sprites first if they exist/are configured.
+                        sprite = None
+                        using_custom_sprite = False
+                        if getattr(req, 'sprite_char_override', None) or char_cfg.style.lower() in ['designed', 'custom']:
+                            ann_cname = req.sprite_char_override if getattr(req, 'sprite_char_override', None) else (char_names[0] if char_names else "Character 1")
+                            custom_dir = STATIC_DIR / "uploads" / "custom_mouths" / ann_cname
+                            if custom_dir.exists():
+                                # Size custom sprite using the same slider-based formula as SVG sprites:
+                                # cfg.width% of frame width, cfg.height% of frame height, scaled by face scale.
+                                sprite_w = max(10, int((char_cfg.width  / 100.0) * base_w * scale))
+                                sprite_h = max(6,  int((char_cfg.height / 100.0) * base_h * scale))
+                                sprite = load_custom_mouth_sprite(ann_cname, vis, pose["yaw"], sprite_w, sprite_h)
+                                if sprite is not None:
+                                    using_custom_sprite = True
+
+                        # Mouth area handling
                         mouth_mask_poly = pose.get("mouth_mask_poly", [])
+                        cx, cy = pose["mouth_center"]
+
+                        # 1. Erase the mouth underlay first (always, to prevent ghosting)
                         if mouth_mask_poly:
+                            try:
+                                skin_rgb = sample_dynamic_skin_color(frame_bgr, mouth_mask_poly)
+                            except Exception as e:
+                                logger.error(f"Error sampling dynamic skin color: {e}")
+                                try:
+                                    skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
+                                except:
+                                    skin_rgb = (255, 204, 153, 255)
+                                    
                             poly_pts = np.array(mouth_mask_poly, dtype=np.float32)
                             centroid = np.mean(poly_pts, axis=0)
-                            outline_width = float(char_cfg.outline_width)
+                            outline_width = float(char_cfg.outline_width) if hasattr(char_cfg, 'outline_width') else 2.0
                             expanded_pts = []
                             for P in poly_pts:
                                 diff = P - centroid
@@ -1798,17 +1935,66 @@ async def generate_lip_sync(req: LipSyncRequest):
                                 P_expanded = centroid + diff * factor
                                 expanded_pts.append((int(P_expanded[0]), int(P_expanded[1])))
                                 
-                            try:
-                                skin_rgb = ImageColor.getrgb(char_cfg.skin_color)
-                            except:
-                                skin_rgb = (255, 204, 153, 255)
-                                
                             draw = ImageDraw.Draw(frame_img)
                             draw.polygon(expanded_pts, fill=skin_rgb)
+
+                        # 2. Render and paste the mouth sprite
+                        if using_custom_sprite:
+                            # Convert sprite to NumPy array
+                            sprite_np = np.array(sprite)
+                            sh, sw = sprite_np.shape[:2]
                             
-                        cx, cy = pose["mouth_center"]
-                        sw, sh = sprite.size
-                        frame_img.paste(sprite, (int(cx - sw // 2), int(cy - sh // 2)), sprite)
+                            # Calculate target dimensions
+                            # Width: slider-based × scale
+                            target_w = max(10, int((char_cfg.width / 100.0) * base_w * scale))
+                            
+                            # Height: blend tracker height and viseme expected height
+                            tracked_h = 0.0
+                            if len(mouth_mask_poly) >= 10:
+                                tracked_h = float(np.linalg.norm(np.array(mouth_mask_poly[3]) - np.array(mouth_mask_poly[9])))
+                                
+                            viseme_aperture = {'A': 1.0, 'B': 0.3, 'C': 0.8, 'D': 0.9, 'E': 0.6, 'F': 0.7, 'G': 0.5, 'H': 0.4, 'X': 0.1}
+                            min_open_h = (char_cfg.height / 100.0) * base_h * scale * viseme_aperture.get(vis, 0.1)
+                            target_h = max(6, int(max(tracked_h, min_open_h)))
+                            
+                            # Compute rotated box corners
+                            theta = np.radians(pose["roll"])
+                            cos_t = np.cos(theta)
+                            sin_t = np.sin(theta)
+                            half_w = target_w / 2.0
+                            half_h = target_h / 2.0
+                            
+                            offsets = [
+                                (-half_w, -half_h),
+                                (half_w, -half_h),
+                                (half_w, half_h),
+                                (-half_w, half_h)
+                            ]
+                            
+                            rotated_corners = []
+                            for dx, dy in offsets:
+                                rx = dx * cos_t - dy * sin_t
+                                ry = dx * sin_t + dy * cos_t
+                                rotated_corners.append([cx + rx, cy + ry])
+                                
+                            # Warp sprite using OpenCV
+                            src_pts = np.array([[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]], dtype=np.float32)
+                            dst_pts = np.array(rotated_corners, dtype=np.float32)
+                            
+                            M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                            frame_w, frame_h = frame_img.size
+                            warped_sprite = cv2.warpPerspective(sprite_np, M, (frame_w, frame_h), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0,0))
+                            
+                            warped_sprite_img = Image.fromarray(warped_sprite, 'RGBA')
+                            frame_img.paste(warped_sprite_img, (0, 0), warped_sprite_img)
+                        else:
+                            # Procedural SVG path
+                            if sprite is None:
+                                sprite = draw_mouth_sprite(vis, frame_cfg, mw, mh)
+                            if abs(pose["roll"]) > 0.01:
+                                sprite = sprite.rotate(-pose["roll"], resample=Image.Resampling.BICUBIC, expand=True)
+                            sw, sh = sprite.size
+                            frame_img.paste(sprite, (int(cx - sw // 2), int(cy - sh // 2)), sprite)
                     
                     else:
                         # Static Lab / Non-Annotations Path
@@ -2681,6 +2867,30 @@ async def upload_spritesheet(
     except Exception as e:
         logger.error(f"Failed to process sprite sheet: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to crop sprite sheet: {str(e)}")
+
+@app.get("/api/character/list-custom-sprites")
+async def list_custom_sprites():
+    try:
+        custom_base_dir = STATIC_DIR / "uploads" / "custom_mouths"
+        if not custom_base_dir.exists():
+            return {"characters": []}
+        
+        chars = []
+        for d in custom_base_dir.iterdir():
+            if d.is_dir():
+                # Check if there is at least one subfolder with files in it
+                has_files = False
+                for sub in d.iterdir():
+                    if sub.is_dir():
+                        if any(f.is_file() and f.name.endswith('.png') for f in sub.iterdir()):
+                            has_files = True
+                            break
+                if has_files:
+                    chars.append(d.name)
+        return {"characters": chars}
+    except Exception as e:
+        logger.error(f"Failed to list custom sprites: {e}")
+        return {"characters": []}
 
 if __name__ == "__main__":
 
