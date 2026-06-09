@@ -22,10 +22,18 @@ REM ── Check/Download FFmpeg ───────────────�
 echo.
 echo Checking for FFmpeg...
 if not exist "bin\ffmpeg.exe" (
-    echo       FFmpeg not found. Downloading release essentials zip...
+    echo       FFmpeg not found. Downloading from gyan.dev...
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-      "curl.exe -L 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -o 'ffmpeg.zip'; Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_temp; Move-Item -Path ffmpeg_temp/ffmpeg-*-essentials_build/bin/ffmpeg.exe, ffmpeg_temp/ffmpeg-*-essentials_build/bin/ffprobe.exe -Destination bin/ -Force; Remove-Item -Path ffmpeg_temp, ffmpeg.zip -Recurse -Force"
-    echo       FFmpeg successfully configured in bin/.
+      "try { curl.exe -L 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -o 'ffmpeg.zip'; Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_temp -Force; $folder = Get-ChildItem ffmpeg_temp -Directory | Select-Object -First 1; Move-Item \"$($folder.FullName)/bin/ffmpeg.exe\" bin/ffmpeg.exe -Force; Move-Item \"$($folder.FullName)/bin/ffprobe.exe\" bin/ffprobe.exe -Force; Remove-Item ffmpeg_temp, ffmpeg.zip -Recurse -Force; Write-Host 'FFmpeg download complete.' } catch { Write-Host 'ERROR: FFmpeg download failed: ' $_.Exception.Message; exit 1 }"
+    if errorlevel 1 (
+        echo.
+        echo WARNING: FFmpeg auto-download failed.
+        echo          Place ffmpeg.exe and ffprobe.exe in the bin\ folder manually.
+        echo          Download from: https://www.gyan.dev/ffmpeg/builds/
+        echo.
+    ) else (
+        echo       FFmpeg successfully configured in bin\.
+    )
 ) else (
     echo       FFmpeg already present.
 )

@@ -35,8 +35,6 @@ async def check_license_validity() -> tuple[bool, str]:
     last_check_str = data.get("last_online_check", "")
     sig = data.get("signature", "")
 
-
-
     # 2. Check local signature integrity
     computed_sig = generate_local_signature(key, gmail, machine_id, expiry)
     if computed_sig != sig:
@@ -56,7 +54,7 @@ async def check_license_validity() -> tuple[bool, str]:
 
     # 4. Attempt online real-time verification with Vercel server
     settings = load_settings()
-    server_url = settings.get("license_server_url", "https://omni-automator.vercel.app").rstrip("/")
+    server_url = settings.get("license_server_url", "https://auto-stitch-backend-iof6.vercel.app").rstrip("/")
     url = f"{server_url}/api/verify"
 
     try:
@@ -134,7 +132,7 @@ async def activate_license_endpoint(req: LicenseActivateRequest):
     """Enables users to activate their product directly from the React UI."""
     import activate
     settings = load_settings()
-    server_url = settings.get("license_server_url", "https://omni-automator.vercel.app")
+    server_url = settings.get("license_server_url", "https://auto-stitch-backend-iof6.vercel.app")
     
     success = activate.activate_license(req.license_key, req.gmail, req.password, server_url)
     if success:

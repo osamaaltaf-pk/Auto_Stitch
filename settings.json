@@ -1,7 +1,5 @@
 {
   "tts_server_url": "http://127.0.0.1:8000",
   "sfx_server_url": "http://127.0.0.1:5000",
-  "license_server_url": "https://auto-stitch-backend-iof6.vercel.app",
-  "output_dir": "D:\\AutoSticth",
-  "projects_dir": "D:\\Osama_mvp\\projects"
+  "license_server_url": "https://auto-stitch-backend-iof6.vercel.app"
 }
