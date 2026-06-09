@@ -23,7 +23,7 @@ class TTSEngine:
         # Load model with optimized parameters
         try:
             # Login to HF Hub for gated model access
-            token_path = Path(r"e:\Pocket_tts\hf token.txt")
+            token_path = Path(__file__).parent / "hf token.txt"
             if token_path.exists():
                 token = token_path.read_text().strip()
                 if token:
