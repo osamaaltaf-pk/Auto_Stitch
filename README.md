@@ -15,8 +15,8 @@ AutoStitch Studio gives content creators a **3-lane timeline** to compose videos
 | Lane | Input | Engine |
 |---|---|---|
 | **Video** | Folder of `.mp4` clips | FFmpeg |
-| **Voice** | TTS script (`.txt`) or pre-recorded `.mp3`/`.wav` | PocketTTS (local CPU) |
-| **SFX** | Sound effect prompts (`.txt`) | Stable Audio (local CPU) |
+| **Voice** | TTS script (`.txt`) or pre-recorded `.mp3`/`.wav` | TTS Engine (local CPU) |
+| **SFX** | Sound effect prompts (`.txt`) | SFX Engine (local CPU) |
 
 When you click **Render**, FFmpeg mixes all lanes into per-clip final MP4 files, then optionally concatenates them into one master video — with word-by-word captions burned in.
 
@@ -25,8 +25,8 @@ When you click **Render**, FFmpeg mixes all lanes into per-clip final MP4 files,
 ## Features
 
 - 🎬 **Multi-lane timeline** — drag, reorder, split, merge, and edit clips across 3 lanes
-- 🎙️ **Local TTS** — PocketTTS generates realistic voiceovers from text, entirely offline
-- 🔊 **Local SFX** — Stable Audio generates sound effects from text prompts on CPU
+- 🎙️ **Local TTS** — TTS engine generates realistic voiceovers from text, entirely offline
+- 🔊 **Local SFX** — SFX engine generates sound effects from text prompts on CPU
 - 🎵 **Background music** — mix music tracks with adjustable volume into the final render
 - 📝 **Auto-captions** — word-by-word caption overlay burned into video via FFmpeg drawtext
 - ✏️ **Apostrophe-safe escaping** — robust FFmpeg filter string escaping for any text
@@ -42,7 +42,7 @@ When you click **Render**, FFmpeg mixes all lanes into per-clip final MP4 files,
 |---|---|
 | OS | Windows 10 / 11 (64-bit) |
 | Python | 3.11 or 3.12 |
-| RAM | 8 GB minimum (16 GB for Stable Audio) |
+| RAM | 8 GB minimum (16 GB for SFX & Music) |
 | Storage | ~2 GB (app + engines + models) |
 | GPU | Not required — CPU only |
 
@@ -55,8 +55,8 @@ When you click **Render**, FFmpeg mixes all lanes into per-clip final MP4 files,
 setup.bat
 ```
 Presents a component selection menu:
-- **Complete** — AutoStitch + PocketTTS + Stable Audio
-- **Lightweight** — AutoStitch + PocketTTS only
+- **Complete** — AutoStitch + TTS + SFX & Music
+- **Lightweight** — AutoStitch + TTS only
 - **Core Only** — Backend only (no AI engines)
 
 Creates isolated virtual environments for each engine automatically.
@@ -65,10 +65,10 @@ Creates isolated virtual environments for each engine automatically.
 ```bat
 run.bat
 ```
-- Checks system RAM (warns if < 16 GB for Stable Audio)
+- Checks system RAM (warns if < 16 GB for SFX & Music)
 - Launches the backend at `http://localhost:8080`
 - Opens your browser automatically
-- PocketTTS and Stable Audio start in the background
+- Local TTS and SFX engines start in the background
 
 ---
 
@@ -82,8 +82,8 @@ auto_stitch/
 │   │   └── stitcher.py   ← FFmpeg pipeline, caption escaping, audio mixing
 │   ├── models/        ← Pydantic schemas
 │   └── main.py        ← App entry point, engine auto-launch, RAM check
-├── pocket_tts/        ← PocketTTS engine (local CPU TTS)
-├── stable_audio_local_cpu/ ← Stable Audio engine (local CPU SFX)
+├── text_to_speech_server/  ← Text-to-Speech engine (local CPU TTS)
+├── sfx_and_music_server/   ← SFX & Music engine (local CPU SFX/Music)
 ├── bin/               ← FFmpeg + FFprobe binaries (Windows)
 ├── static/            ← Frontend HTML/CSS/JS
 ├── projects/          ← User project manifests (JSON)
@@ -104,8 +104,8 @@ auto_stitch/
 User Input
     │
     ├── Video clips (.mp4)  ──────────────────────┐
-    ├── TTS script (.txt)  → PocketTTS → .wav ────┤
-    └── SFX prompts (.txt) → Stable Audio → .wav ─┤
+    ├── TTS script (.txt)  → TTS Engine → .wav ───┤
+    └── SFX prompts (.txt) → SFX Engine → .wav ───┤
                                                    ▼
                                          FFmpeg Stitcher
                                                │
@@ -131,13 +131,13 @@ AutoStitch uses a **hub-and-spoke** model — the main FastAPI backend manages t
 ```
 auto_stitch/
 ├── venv/                    ← Main app (port 8080)
-├── pocket_tts/
-│   └── venv/                ← PocketTTS server (port 8000)
-└── stable_audio_local_cpu/
-    └── venv/                ← Stable Audio server (port 5000)
+├── text_to_speech_server/
+│   └── venv/                ← TTS server (port 8000)
+└── sfx_and_music_server/
+│   └── venv/                ← SFX & Music server (port 5000)
 ```
 
-The main app auto-launches both engines on startup and proxies generation requests to them. If a system has < 16 GB RAM, Stable Audio is automatically skipped to prevent crashes.
+The main app auto-launches both engines on startup and proxies generation requests to them. If a system has < 16 GB RAM, the SFX & Music server launch is automatically skipped locally to prevent crashes.
 
 ---
 

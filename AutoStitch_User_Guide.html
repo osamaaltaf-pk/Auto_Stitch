@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoStitch Studio — User Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --accent: #7c6cff;
+    --accent2: #6cffcc;
+    --dark: #090a0f;
+    --card: #0f1018;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  /* ── COVER PAGE ── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 30% 20%, rgba(124,108,255,0.18) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 80%, rgba(108,255,204,0.10) 0%, transparent 60%),
+                var(--dark);
+    text-align: center;
+    padding: 4rem 2rem;
+    page-break-after: always;
+  }
+
+  .cover-logo {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 2rem;
+    box-shadow: 0 0 60px rgba(124,108,255,0.4);
+  }
+  .cover-logo svg { width: 40px; height: 40px; }
+
+  .cover h1 {
+    font-size: 3.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 40%, var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+
+  .cover-sub {
+    font-size: 1.1rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-bottom: 3rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .cover-version {
+    display: inline-block;
+    background: rgba(124,108,255,0.15);
+    border: 1px solid rgba(124,108,255,0.3);
+    color: var(--accent2);
+    padding: 0.4rem 1.2rem;
+    border-radius: 100px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-bottom: 3rem;
+  }
+
+  .cover-note {
+    color: var(--muted);
+    font-size: 0.85rem;
+    max-width: 500px;
+    line-height: 1.6;
+  }
+
+  /* ── CONTENT PAGES ── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 3rem;
+    page-break-before: always;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-num {
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    letter-spacing: 0.1em;
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent2);
+    margin: 1.8rem 0 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  h3::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 14px;
+    background: var(--accent2);
+    border-radius: 2px;
+  }
+
+  p { color: var(--muted); margin-bottom: 1rem; }
+
+  /* ── STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 1rem; margin: 1rem 0; }
+
+  .step {
+    display: flex;
+    gap: 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.2rem 1.4rem;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    min-width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), #5b4de8);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .step-content strong {
+    display: block;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  .step-content span { color: var(--muted); font-size: 0.85rem; }
+
+  /* ── CODE ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(124,108,255,0.12);
+    color: var(--accent2);
+    padding: 0.15rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    border: 1px solid rgba(124,108,255,0.2);
+  }
+
+  .code-block {
+    font-family: 'JetBrains Mono', monospace;
+    background: #060609;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    font-size: 0.82rem;
+    color: var(--accent2);
+    margin: 0.8rem 0 1.2rem;
+    line-height: 1.8;
+  }
+
+  /* ── LANES ── */
+  .lanes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+
+  .lane-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.2rem;
+  }
+
+  .lane-card .lane-icon {
+    font-size: 1.8rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .lane-card strong {
+    display: block;
+    color: white;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+  }
+
+  .lane-card span { color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+
+  /* ── TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.85rem;
+  }
+
+  th {
+    background: rgba(124,108,255,0.15);
+    color: var(--accent2);
+    font-weight: 600;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--muted);
+    vertical-align: top;
+  }
+
+  td:first-child { color: white; font-weight: 500; }
+
+  /* ── TIPS ── */
+  .tip {
+    background: rgba(108,255,204,0.06);
+    border: 1px solid rgba(108,255,204,0.2);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    color: var(--accent2);
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+  }
+
+  .warning {
+    background: rgba(251,191,36,0.06);
+    border: 1px solid rgba(251,191,36,0.2);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    color: #fbbf24;
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+  }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+
+  .flow-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    font-size: 0.78rem;
+    color: var(--text);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .flow-arrow { color: var(--accent); font-size: 1.2rem; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: white; color: #111; }
+    .cover { background: linear-gradient(135deg, #f8f4ff, #f0fdf9); page-break-after: always; }
+    .cover h1 { -webkit-text-fill-color: #3730a3; }
+    .page { page-break-before: always; }
+    .cover-logo { box-shadow: none; background: #3730a3; }
+    .step, .lane-card { background: #f8fafc; border-color: #e2e8f0; }
+    .code-block { background: #f1f5f9; color: #3730a3; border-color: #e2e8f0; }
+    code { background: #f1f5f9; color: #4f46e5; border-color: #c7d2fe; }
+    p, td, .step-content span, .lane-card span { color: #475569; }
+    td:first-child, .step-content strong, .lane-card strong, h2 { color: #0f172a; }
+    h3 { color: #4f46e5; }
+    h3::before { background: #4f46e5; }
+    th { background: #ede9fe; color: #4f46e5; }
+    .tip { background: #f0fdf9; border-color: #6ee7b7; color: #047857; }
+    .warning { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .cover-version { background: #ede9fe; border-color: #c4b5fd; color: #4f46e5; }
+    .page-num { background: #4f46e5; }
+    .step-num { background: #4f46e5; }
+    .flow-box { background: #f1f5f9; border-color: #e2e8f0; color: #0f172a; }
+    .flow-arrow { color: #4f46e5; }
+    .cover-note, .cover-sub { color: #64748b; }
+    var(--muted) { color: #475569; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ COVER ══ -->
+<div class="cover">
+  <div class="cover-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+    </svg>
+  </div>
+  <h1>AutoStitch Studio</h1>
+  <p class="cover-sub">User Guide &amp; Setup Manual</p>
+  <span class="cover-version">VERSION 1.0 · WINDOWS</span>
+  <p class="cover-note">
+    AutoStitch Studio is an AI-powered, offline-first video composition tool.<br>
+    This guide covers installation, setup, and using all three production lanes.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════ PAGE 1: OVERVIEW ══ -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-num">01</span>
+    <h2>What Is AutoStitch Studio?</h2>
+  </div>
+
+  <p>AutoStitch Studio is a locally-run Windows desktop tool that lets you produce polished videos by composing three lanes — video clips, AI voiceovers, and AI sound effects — then stitching them together with FFmpeg into a final MP4, complete with burned-in captions.</p>
+
+  <p>Everything runs on your machine. No internet required after setup. No cloud fees. No data leaves your computer.</p>
+
+  <h3>The Three Lanes</h3>
+  <div class="lanes">
+    <div class="lane-card">
+      <div class="lane-icon">🎬</div>
+      <strong>Lane 1 — Video</strong>
+      <span>Open a folder of pre-rendered .mp4 clips. They appear as a timeline of draggable tiles.</span>
+    </div>
+    <div class="lane-card">
+      <div class="lane-icon">🎙️</div>
+      <strong>Lane 2 — Voice (TTS)</strong>
+      <span>Write or paste a voice script. PocketTTS generates realistic speech locally, or use your own .wav files.</span>
+    </div>
+    <div class="lane-card">
+      <div class="lane-icon">🔊</div>
+      <strong>Lane 3 — SFX &amp; Music</strong>
+      <span>Type sound effect prompts. Stable Audio generates audio on CPU. Add background music with volume control.</span>
+    </div>
+  </div>
+
+  <h3>How It Works</h3>
+  <div class="flow">
+    <div class="flow-box">Video Clips<br><small>.mp4 folder</small></div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-box">Voice Script<br><small>PocketTTS</small></div>
+    <div class="flow-arrow">+</div>
+    <div class="flow-box">SFX Prompts<br><small>Stable Audio</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="border-color:rgba(124,108,255,0.4);color:#a5b4fc;">FFmpeg<br>Stitcher</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="border-color:rgba(108,255,204,0.4);color:#6cffcc;">Final .mp4<br>+ Captions</div>
+  </div>
+
+  <h3>System Requirements</h3>
+  <table>
+    <tr><th>Component</th><th>Requirement</th></tr>
+    <tr><td>Operating System</td><td>Windows 10 or Windows 11 (64-bit)</td></tr>
+    <tr><td>Python</td><td>3.11 or 3.12 (must be in PATH)</td></tr>
+    <tr><td>RAM</td><td>8 GB minimum · 16 GB recommended (for Stable Audio SFX)</td></tr>
+    <tr><td>Storage</td><td>~2 GB free (app + engine models)</td></tr>
+    <tr><td>GPU</td><td>Not required — all AI runs on CPU</td></tr>
+    <tr><td>Internet</td><td>Only needed during initial setup · not needed to run</td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════ PAGE 2: INSTALLATION ══ -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-num">02</span>
+    <h2>Installation &amp; First Launch</h2>
+  </div>
+
+  <h3>Step 1 — Check Python</h3>
+  <p>AutoStitch requires Python 3.11 or 3.12. Open a Command Prompt and run:</p>
+  <div class="code-block">python --version</div>
+  <p>If you see <code>Python 3.11.x</code> or <code>Python 3.12.x</code>, you're ready. If not, download Python from <strong>python.org</strong> and tick <em>"Add Python to PATH"</em> during installation.</p>
+
+  <h3>Step 2 — Run setup.bat</h3>
+  <p>Double-click <code>setup.bat</code> inside the AutoStitch folder. A setup menu appears:</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Complete Setup (Recommended)</strong>
+        <span>Installs everything: AutoStitch + PocketTTS voice engine + Stable Audio SFX engine. Best for full production use.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Lightweight (PocketTTS only)</strong>
+        <span>Installs AutoStitch + PocketTTS only. Skips Stable Audio. Good for machines with 8 GB RAM or less.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Core Only</strong>
+        <span>Installs only the AutoStitch backend. No AI engines. You can still use pre-generated audio files.</span>
+      </div>
+    </div>
+  </div>
+  <div class="tip">💡 The first-time setup may take 5–15 minutes depending on your internet speed — it downloads PyTorch for the AI engines.</div>
+
+  <h3>Step 3 — Activate License</h3>
+  <p>Double-click <code>activate.py</code> (or it will run automatically on first launch). Enter your:</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">→</div><div class="step-content"><strong>License Key</strong><span>Format: OMNI-AS-XXXX-XXXX-XXXX-XXXX — provided when you purchase.</span></div></div>
+    <div class="step"><div class="step-num">→</div><div class="step-content"><strong>Gmail &amp; Password</strong><span>Used to bind your account. These are stored securely on the licensing server.</span></div></div>
+  </div>
+  <div class="warning">⚠️ Your license is locked to this specific computer's hardware. To move to a new machine, contact support.</div>
+
+  <h3>Step 4 — Launch</h3>
+  <p>Double-click <code>run.bat</code>. AutoStitch starts at <code>http://localhost:8080</code> and opens in your browser automatically.</p>
+  <div class="tip">💡 If you have less than 16 GB RAM, AutoStitch will automatically skip launching Stable Audio to prevent crashes. You can still use PocketTTS voice generation.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ PAGE 3: USING THE APP ══ -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-num">03</span>
+    <h2>Using AutoStitch Studio</h2>
+  </div>
+
+  <h3>Creating a New Project</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-content"><strong>Click "New Project"</strong><span>Enter a project name. AutoStitch creates a manifest file to save all your lanes and settings.</span></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-content"><strong>Load Video Clips</strong><span>Click the Video lane and select a folder containing your .mp4 clips. They load in filename order.</span></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-content"><strong>Add Voice Scripts</strong><span>Click any Voice cell and type your script, or upload a .txt file with one script per line.</span></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-content"><strong>Add SFX Prompts</strong><span>Click any SFX cell and describe the sound you want. Example: "gentle ocean waves with distant seagulls".</span></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-content"><strong>Click Render</strong><span>AutoStitch mixes all lanes with FFmpeg and outputs per-clip MP4 files to the output/ folder.</span></div></div>
+  </div>
+
+  <h3>Generating Voice (TTS)</h3>
+  <p>Click <strong>Generate All TTS</strong> or click individual voice cells and press Generate. Voices are produced one at a time in a queue to prevent memory issues. Progress shows in the status bar.</p>
+  <div class="tip">💡 To use your own pre-recorded voice: upload a .wav or .mp3 file directly into any voice slot instead of typing a script.</div>
+
+  <h3>Generating Sound Effects</h3>
+  <p>Type a natural language description into any SFX cell — e.g. <em>"cinematic whoosh with deep bass"</em> — then click Generate. Stable Audio creates a stereo .wav file on your CPU. Generation takes 30–90 seconds per clip.</p>
+  <div class="warning">⚠️ Stable Audio requires 16 GB RAM. On lower-memory machines, it is automatically disabled. You can still drag-and-drop your own .wav files into SFX slots.</div>
+
+  <h3>Caption Settings</h3>
+  <p>AutoStitch burns word-by-word captions into the final video. In Settings, you can control:</p>
+  <table>
+    <tr><th>Setting</th><th>Description</th></tr>
+    <tr><td>Caption Mode</td><td>Word-by-word (default) or full-sentence</td></tr>
+    <tr><td>Font Size</td><td>Adjust caption text size</td></tr>
+    <tr><td>Font Color</td><td>Yellow (default), white, or custom</td></tr>
+    <tr><td>Position</td><td>Bottom (default) or top of frame</td></tr>
+    <tr><td>Box</td><td>Semi-transparent background behind text</td></tr>
+  </table>
+
+  <h3>Background Music</h3>
+  <p>In the Music section, upload a .mp3 or .wav file and set a volume level (0–100%). The music is mixed under the voice and SFX during final render.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ PAGE 4: RENDER & OUTPUT ══ -->
+<div class="page">
+  <div class="page-header">
+    <span class="page-num">04</span>
+    <h2>Render &amp; Output</h2>
+  </div>
+
+  <h3>Render Process</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-content"><strong>Per-clip render</strong><span>Each video clip is mixed with its matching voice, SFX, captions and music into a separate final .mp4 file.</span></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-content"><strong>Master concatenation (optional)</strong><span>All per-clip files are joined into one master.mp4 in order. Toggle this in Settings.</span></div></div>
+  </div>
+
+  <div class="code-block">
+    output/<br>
+    ├── clip_00_final.mp4<br>
+    ├── clip_01_final.mp4<br>
+    ├── clip_02_final.mp4<br>
+    └── master.mp4
+  </div>
+
+  <h3>Output Settings</h3>
+  <table>
+    <tr><th>Setting</th><th>Default</th><th>Description</th></tr>
+    <tr><td>Resolution</td><td>1920×1080</td><td>Output video resolution. Source clips are scaled and padded with black bars.</td></tr>
+    <tr><td>Voice Volume</td><td>100%</td><td>Volume of the TTS/voice audio track.</td></tr>
+    <tr><td>SFX Volume</td><td>80%</td><td>Volume of generated sound effects.</td></tr>
+    <tr><td>Music Volume</td><td>40%</td><td>Volume of background music track.</td></tr>
+    <tr><td>Output Folder</td><td>output/</td><td>Where final MP4 files are saved.</td></tr>
+  </table>
+
+  <h3>Troubleshooting</h3>
+  <table>
+    <tr><th>Problem</th><th>Solution</th></tr>
+    <tr><td>App won't open in browser</td><td>Wait 10 seconds after run.bat starts, then manually open http://localhost:8080</td></tr>
+    <tr><td>TTS generation fails</td><td>Check that pocket_tts/venv exists. Re-run setup.bat → option 1.</td></tr>
+    <tr><td>Stable Audio disabled</td><td>Normal on machines with less than 16 GB RAM. Use your own .wav SFX files instead.</td></tr>
+    <tr><td>FFmpeg error on render</td><td>Ensure bin/ffmpeg.exe exists. Re-run setup.bat to restore it.</td></tr>
+    <tr><td>Captions show garbled text</td><td>Avoid special characters like quotes in captions. Apostrophes are handled automatically.</td></tr>
+    <tr><td>License activation fails</td><td>Check your internet connection. Make sure your license key is typed exactly as given.</td></tr>
+  </table>
+
+  <h3>Support</h3>
+  <p>Contact the developer for license issues, feature requests, or bug reports:</p>
+  <div class="code-block">
+    LinkedIn: linkedin.com/in/osamaaltafpk<br>
+    WhatsApp: +92 318 766 1096<br>
+    Fiverr:   fiverr.com/neural_networks
+  </div>
+
+  <div style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); text-align:center;">
+    <p style="font-size:0.75rem; color:rgba(148,163,184,0.5);">AutoStitch Studio v1.0 · User Guide · © 2026 Osama Altaf · All Rights Reserved</p>
+  </div>
+</div>
+
+</body>
+</html>

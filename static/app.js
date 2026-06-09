@@ -306,6 +306,12 @@ function App() {
   const voiceAudioRef = useRef(null);
   const sfxAudioRef = useRef(null);
   const musicAudioRef = useRef(null);
+  const isRenderingRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
 
   // Dynamically loaded available voices state & cloning indicators
@@ -517,10 +523,21 @@ function App() {
 
     const timer = setInterval(async () => {
       try {
+        if (isSavingRef.current) return;
+
+        // Only poll if there are active generating blocks
+        const currentProj = projectRef.current;
+        const hasGeneratingBlocks = 
+          (currentProj.sfx_blocks && currentProj.sfx_blocks.some(b => b.status === 'generating')) ||
+          (currentProj.voice_blocks && currentProj.voice_blocks.some(b => b.status === 'generating')) ||
+          (currentProj.music_blocks && currentProj.music_blocks.some(b => b.status === 'generating'));
+
+        if (!hasGeneratingBlocks) return;
+
         const resp = await fetch("/api/project/load", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ project_name: project.project_name })
+          body: JSON.stringify({ project_name: currentProj.project_name })
         });
         if (resp.ok) {
           const rawData = await resp.json();
@@ -907,18 +924,30 @@ function App() {
   useEffect(() => {
     let timer;
     if (renderState.status === 'rendering') {
+      isRenderingRef.current = true;
       timer = setInterval(async () => {
         try {
-          const resp = await fetch(`/api/render/status/${project.project_name}`);
+          if (!isRenderingRef.current) {
+            clearInterval(timer);
+            return;
+          }
+          const currentProj = projectRef.current;
+          const resp = await fetch(`/api/render/status/${currentProj.project_name}`);
           const data = await resp.json();
+          if (!isRenderingRef.current) {
+            clearInterval(timer);
+            return;
+          }
           setRenderState(data);
           if (data.status === 'done') {
+            isRenderingRef.current = false;
             addLog("Render task completed! Combined master video is ready.", "success");
             clearInterval(timer);
             // Stamp a new stable timestamp ONCE — this is the only place the video src will update
             setMasterVideoTs(Date.now());
-            loadProject(project.project_name);
+            loadProject(currentProj.project_name);
           } else if (data.status === 'error') {
+            isRenderingRef.current = false;
             addLog(`Render failed: ${data.error}`, "error");
             clearInterval(timer);
           }
@@ -926,8 +955,13 @@ function App() {
           console.error(e);
         }
       }, 2000);
+    } else {
+      isRenderingRef.current = false;
     }
-    return () => clearInterval(timer);
+    return () => {
+      isRenderingRef.current = false;
+      clearInterval(timer);
+    };
   }, [renderState.status]);
 
   // Sync horizontal scrolling across lanes
@@ -995,8 +1029,8 @@ function App() {
     
     if (engine === 'tts') {
       if (isOnline) {
-        if (confirm("Do you want to shut down the PocketTTS server to save RAM? (PocketTTS uses ~300MB RAM)")) {
-          addLog("Shutting down PocketTTS server...", "info");
+        if (confirm("Do you want to shut down the TTS server to save RAM? (TTS uses ~300MB RAM)")) {
+          addLog("Shutting down TTS server...", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
               method: "POST",
@@ -1007,14 +1041,14 @@ function App() {
             addLog(resData.message, "success");
             await checkHealth();
           } catch (e) {
-            addLog("Failed shutting down PocketTTS server.", "error");
+            addLog("Failed shutting down TTS server.", "error");
           }
         }
       } else {
-        let msg = "Do you want to start the PocketTTS server?";
+        let msg = "Do you want to start the TTS server?";
         const activeSA = enginesStatus.sfx.online ? 'sfx' : (enginesStatus.music.online ? 'music' : null);
         if (activeSA) {
-          msg = `The Stable Audio ${activeSA.toUpperCase()} model is currently loaded. To conserve RAM, would you like to unload the ${activeSA.toUpperCase()} model before starting the PocketTTS server?`;
+          msg = `The ${activeSA.toUpperCase()} model is currently loaded. To conserve RAM, would you like to unload the ${activeSA.toUpperCase()} model before starting the TTS server?`;
         }
         if (confirm(msg)) {
           if (activeSA) {
@@ -1029,7 +1063,7 @@ function App() {
               console.error(err);
             }
           }
-          addLog("Starting PocketTTS server...", "info");
+          addLog("Starting TTS server...", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
               method: "POST",
@@ -1040,13 +1074,13 @@ function App() {
             addLog(resData.message, "success");
             await checkHealth();
           } catch (e) {
-            addLog("Failed starting PocketTTS server.", "error");
+            addLog("Failed starting TTS server.", "error");
           }
         }
       }
     } else if (engine === 'sfx') {
       if (isOnline) {
-        if (confirm("Do you want to unload the Stable Audio SFX model from RAM? (Saves ~2.5GB RAM)")) {
+        if (confirm("Do you want to unload the SFX model from RAM? (Saves ~2.5GB RAM)")) {
           addLog("Unloading SFX model...", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
@@ -1062,15 +1096,15 @@ function App() {
           }
         }
       } else {
-        let msg = "Would you like to load the Stable Audio SFX model? (This requires ~2.5GB RAM)";
+        let msg = "Would you like to load the SFX model? (This requires ~2.5GB RAM)";
         let unloadMusic = false;
         let unloadTts = false;
         
         if (enginesStatus.music.online) {
-          msg = "The Stable Audio MUSIC model is currently loaded. To save RAM, it is highly recommended to unload the MUSIC model before loading the SFX model. Would you like to unload the MUSIC model and load the SFX model?";
+          msg = "The MUSIC model is currently loaded. To save RAM, it is highly recommended to unload the MUSIC model before loading the SFX model. Would you like to unload the MUSIC model and load the SFX model?";
           unloadMusic = true;
         } else if (enginesStatus.tts.online) {
-          msg = "The PocketTTS server is currently running. To conserve RAM, would you like to shut down the PocketTTS server and load the SFX model?";
+          msg = "The TTS server is currently running. To conserve RAM, would you like to shut down the TTS server and load the SFX model?";
           unloadTts = true;
         }
         
@@ -1086,7 +1120,7 @@ function App() {
             } catch (err) {}
           }
           if (unloadTts) {
-            addLog("Shutting down PocketTTS server...", "info");
+            addLog("Shutting down TTS server...", "info");
             try {
               await fetch("/api/engines/toggle", {
                 method: "POST",
@@ -1095,7 +1129,7 @@ function App() {
               });
             } catch (err) {}
           }
-          addLog("Loading Stable Audio SFX model (Warmup)... This may take 1-2 minutes.", "info");
+          addLog("Loading SFX model (Warmup)... This may take 1-2 minutes.", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
               method: "POST",
@@ -1106,13 +1140,13 @@ function App() {
             addLog(resData.message, "success");
             await checkHealth();
           } catch (e) {
-            addLog("Failed loading SFX model. Ensure you have accepted models on HuggingFace and setup_all.bat ran successfully.", "error");
+            addLog("Failed loading SFX model. Ensure setup.bat ran successfully and models are cached.", "error");
           }
         }
       }
     } else if (engine === 'music') {
       if (isOnline) {
-        if (confirm("Do you want to unload the Stable Audio MUSIC model from RAM? (Saves ~2.5GB RAM)")) {
+        if (confirm("Do you want to unload the MUSIC model from RAM? (Saves ~2.5GB RAM)")) {
           addLog("Unloading MUSIC model...", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
@@ -1128,15 +1162,15 @@ function App() {
           }
         }
       } else {
-        let msg = "Would you like to load the Stable Audio MUSIC model? (This requires ~2.5GB RAM)";
+        let msg = "Would you like to load the MUSIC model? (This requires ~2.5GB RAM)";
         let unloadSfx = false;
         let unloadTts = false;
         
         if (enginesStatus.sfx.online) {
-          msg = "The Stable Audio SFX model is currently loaded. To save RAM, it is highly recommended to unload the SFX model before loading the MUSIC model. Would you like to unload the SFX model and load the MUSIC model?";
+          msg = "The SFX model is currently loaded. To save RAM, it is highly recommended to unload the SFX model before loading the MUSIC model. Would you like to unload the SFX model and load the MUSIC model?";
           unloadSfx = true;
         } else if (enginesStatus.tts.online) {
-          msg = "The PocketTTS server is currently running. To conserve RAM, would you like to shut down the PocketTTS server and load the MUSIC model?";
+          msg = "The TTS server is currently running. To conserve RAM, would you like to shut down the TTS server and load the MUSIC model?";
           unloadTts = true;
         }
         
@@ -1152,7 +1186,7 @@ function App() {
             } catch (err) {}
           }
           if (unloadTts) {
-            addLog("Shutting down PocketTTS server...", "info");
+            addLog("Shutting down TTS server...", "info");
             try {
               await fetch("/api/engines/toggle", {
                 method: "POST",
@@ -1161,7 +1195,7 @@ function App() {
               });
             } catch (err) {}
           }
-          addLog("Loading Stable Audio MUSIC model (Warmup)... This may take 1-2 minutes.", "info");
+          addLog("Loading MUSIC model (Warmup)... This may take 1-2 minutes.", "info");
           try {
             const resp = await fetch("/api/engines/toggle", {
               method: "POST",
@@ -1172,7 +1206,7 @@ function App() {
             addLog(resData.message, "success");
             await checkHealth();
           } catch (e) {
-            addLog("Failed loading MUSIC model. Ensure you have accepted models on HuggingFace and setup_all.bat ran successfully.", "error");
+            addLog("Failed loading MUSIC model. Ensure setup.bat ran successfully and models are cached.", "error");
           }
         }
       }
@@ -1246,7 +1280,7 @@ function App() {
     ]
   });
 
-  // API Call: Fetch dynamic voices from PocketTTS
+  // API Call: Fetch dynamic voices from TTS
   const fetchVoices = async () => {
     try {
       const resp = await fetch("/api/voices");
@@ -1295,7 +1329,7 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = ''; // Reset input to allow re-upload of same file
-    addLog(`Uploading audio sample '${file.name}' for cloning to PocketTTS...`, "info");
+    addLog(`Uploading audio sample '${file.name}' for cloning to TTS...`, "info");
     setIsCloning(true);
 
     const formData = new FormData();
@@ -1309,7 +1343,7 @@ function App() {
 
       if (resp.ok) {
         const data = await resp.json();
-        addLog(`Voice '${data.voice_name}' successfully cloned & registered in PocketTTS!`, "success");
+        addLog(`Voice '${data.voice_name}' successfully cloned & registered in TTS!`, "success");
         await fetchVoices();
       } else {
         const err = await resp.text();
@@ -1326,7 +1360,9 @@ function App() {
   // API Call: Load project manifest
   const loadProject = async (name) => {
     addLog(`Loading project '${name}'...`, "info");
-    setTimelineLayers([]); // Clear dynamic layers to prevent memory leaking from other projects
+    if (projectRef.current?.project_name !== name) {
+      setTimelineLayers([]); // Clear dynamic layers to prevent memory leaking from other projects
+    }
     try {
       const resp = await fetch("/api/project/load", {
         method: "POST",
@@ -1348,6 +1384,7 @@ function App() {
 
   // API Call: Save manifest
   const saveProject = async (newManifest = null, showNotification = false) => {
+    isSavingRef.current = true;
     const manifestToSave = newManifest || getMergedManifest();
     try {
       const resp = await fetch("/api/project/save", {
@@ -1371,6 +1408,8 @@ function App() {
       if (showNotification) {
         alert("❌ Network error: Could not contact local backend.");
       }
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -2073,7 +2112,7 @@ function App() {
         })
       });
       if (resp.ok) {
-        addLog(`Stable Audio task launched for slot ${index}.`, "info");
+        addLog(`SFX task launched for slot ${index}.`, "info");
       } else {
         const errData = await resp.json().catch(() => ({}));
         addLog(`Failed initiating SFX task: ${errData.detail || resp.status}`, "error");
@@ -2131,7 +2170,7 @@ function App() {
         })
       });
       if (resp.ok) {
-        addLog(`Stable Audio Music task launched for slot ${index}.`, "info");
+        addLog(`Music task launched for slot ${index}.`, "info");
       } else {
         const errData = await resp.json().catch(() => ({}));
         addLog(`Failed initiating Music task: ${errData.detail || resp.status}`, "error");
@@ -2669,7 +2708,7 @@ function App() {
                   <div>
                     <h4 className="font-bold text-sm text-white">Sound Effects (SFX) AI Orchestration</h4>
                     <p className="text-xs text-gray-400 leading-relaxed mt-1">
-                      Type sound effect descriptions directly into the SFX row slots (Lane 2). AutoStitch leverages our local Stable Audio generator to convert text descriptions to realistic high-fidelity WAV files. You can customize the generation steps, seeds, and duration, or clear assets instantly to keep your storage neat.
+                      Type sound effect descriptions directly into the SFX row slots (Lane 2). AutoStitch leverages our local sound effects generator to convert text descriptions to realistic high-fidelity WAV files. You can customize the generation steps, seeds, and duration, or clear assets instantly to keep your storage neat.
                     </p>
                   </div>
                 </div>
@@ -2682,7 +2721,7 @@ function App() {
                   <div>
                     <h4 className="font-bold text-sm text-white">Voiceover (TTS) Speech Synthesizer</h4>
                     <p className="text-xs text-gray-400 leading-relaxed mt-1">
-                      Enter script texts into the Voice row slots (Lane 3). The local PocketTTS engine synthesizes scripts into professional voice narration. You can select standard voices or upload an audio sample to clone a new custom voice. When you edit a script and regenerate, previous audios are physically deleted to ensure optimal disk cleanliness.
+                      Enter script texts into the Voice row slots (Lane 3). The local speech synthesis engine synthesizes scripts into professional voice narration. You can select standard voices or upload an audio sample to clone a new custom voice. When you edit a script and regenerate, previous audios are physically deleted to ensure optimal disk cleanliness.
                     </p>
                   </div>
                 </div>
@@ -3633,7 +3672,7 @@ function App() {
                   <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
                     <h3 className="text-xs font-bold font-mono text-gray-400">🎙️ CLONE CUSTOM VOICE</h3>
                     <p className="text-[10px] text-gray-500 font-mono leading-relaxed">
-                      Upload a short audio sample (.wav, .mp3, etc.) to clone the voice instantly using PocketTTS!
+                      Upload a short audio sample (.wav, .mp3, etc.) to clone the voice instantly using the TTS engine!
                     </p>
                     <input
                       type="file"
@@ -5514,7 +5553,7 @@ function App() {
 
             <div className="flex flex-col gap-3.5 text-xs font-mono">
               <div className="flex flex-col gap-1.5">
-                <label className="text-gray-500">POCKET TTS SERVER URL</label>
+                <label className="text-gray-500">TTS SERVER URL</label>
                 <input
                   value={settings.tts_server_url}
                   onChange={(e) => setSettings(prev => ({ ...prev, tts_server_url: e.target.value }))}
@@ -5523,7 +5562,7 @@ function App() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-gray-500">STABLE AUDIO SERVER URL (LOCAL/COLAB)</label>
+                <label className="text-gray-500">SFX & MUSIC SERVER URL (LOCAL/COLAB)</label>
                 <input
                   value={settings.sfx_server_url}
                   onChange={(e) => setSettings(prev => ({ ...prev, sfx_server_url: e.target.value }))}
@@ -5641,7 +5680,7 @@ function SfxController({ index, block, project, onPromptChange, onSaveProject, o
   return (
     <div className="flex flex-col gap-4 text-xs font-mono">
       <div className="flex flex-col gap-1.5">
-        <label className="text-gray-500">STABLE AUDIO PROMPT</label>
+        <label className="text-gray-500">SFX GENERATION PROMPT</label>
         <textarea
           value={promptInput}
           onChange={(e) => {
@@ -5794,7 +5833,7 @@ function MusicController({ index, block, project, onPromptChange, onSaveProject,
   return (
     <div className="flex flex-col gap-4 text-xs font-mono">
       <div className="flex flex-col gap-1.5">
-        <label className="text-gray-500">STABLE AUDIO PROMPT</label>
+        <label className="text-gray-500">MUSIC GENERATION PROMPT</label>
         <textarea
           value={promptInput}
           onChange={(e) => {

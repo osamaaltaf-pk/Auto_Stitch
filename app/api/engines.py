@@ -102,16 +102,16 @@ async def toggle_engine(req: EngineToggleRequest):
                         pass
                 running_processes["tts"] = None
             try:
-                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq PocketTTS*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq TTS*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except Exception:
                 pass
-            return {"status": "ok", "message": "PocketTTS server stopped."}
+            return {"status": "ok", "message": "TTS server stopped."}
             
         elif req.action == "start":
-            tts_python = BASE_DIR / "pocket_tts" / "venv" / "Scripts" / "python.exe"
-            tts_script = BASE_DIR / "pocket_tts" / "server.py"
+            tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.exe"
+            tts_script = BASE_DIR / "text_to_speech_server" / "server.py"
             if not tts_python.exists() or not tts_script.exists():
-                raise HTTPException(status_code=400, detail=f"PocketTTS files not found at {tts_python}.")
+                raise HTTPException(status_code=400, detail=f"TTS files not found at {tts_python}.")
             tts_online = False
             try:
                 async with httpx.AsyncClient(trust_env=False) as client:
@@ -121,18 +121,18 @@ async def toggle_engine(req: EngineToggleRequest):
             except Exception:
                 pass
             if tts_online:
-                return {"status": "ok", "message": "PocketTTS is already running."}
+                return {"status": "ok", "message": "TTS is already running."}
             try:
                 proc = subprocess.Popen(
                     [str(tts_python), str(tts_script)],
-                    cwd=str(BASE_DIR / "pocket_tts"),
+                    cwd=str(BASE_DIR / "text_to_speech_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
                 running_processes["tts"] = proc
                 background_subprocesses.append(proc)
-                return {"status": "ok", "message": "PocketTTS server started."}
+                return {"status": "ok", "message": "TTS server started."}
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to start PocketTTS: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to start TTS: {e}")
 
     elif req.engine == "stable_audio":
         if req.action == "stop":
@@ -148,16 +148,16 @@ async def toggle_engine(req: EngineToggleRequest):
                         pass
                 running_processes["stable_audio"] = None
             try:
-                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq Stable Audio*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run("taskkill /F /FI \"WINDOWTITLE eq Sound*\"", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except Exception:
                 pass
-            return {"status": "ok", "message": "Stable Audio server stopped."}
+            return {"status": "ok", "message": "Sound & Music server stopped."}
             
         elif req.action == "start":
-            sfx_python = BASE_DIR / "stable_audio_local_cpu" / "venv" / "Scripts" / "python.exe"
-            sfx_script = BASE_DIR / "stable_audio_local_cpu" / "server.py"
+            sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+            sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
             if not sfx_python.exists() or not sfx_script.exists():
-                raise HTTPException(status_code=400, detail="Stable Audio files not found.")
+                raise HTTPException(status_code=400, detail="Sound & Music server files not found.")
             sfx_online = False
             try:
                 async with httpx.AsyncClient(trust_env=False) as client:
@@ -167,18 +167,18 @@ async def toggle_engine(req: EngineToggleRequest):
             except Exception:
                 pass
             if sfx_online:
-                return {"status": "ok", "message": "Stable Audio is already running."}
+                return {"status": "ok", "message": "Sound & Music server is already running."}
             try:
                 proc = subprocess.Popen(
                     [str(sfx_python), str(sfx_script)],
-                    cwd=str(BASE_DIR / "stable_audio_local_cpu"),
+                    cwd=str(BASE_DIR / "sfx_and_music_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
                 running_processes["stable_audio"] = proc
                 background_subprocesses.append(proc)
-                return {"status": "ok", "message": "Stable Audio server started."}
+                return {"status": "ok", "message": "Sound & Music server started."}
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to start Stable Audio: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to start Sound & Music: {e}")
 
     elif req.engine in ("sfx", "music"):
         model_name = "small-sfx" if req.engine == "sfx" else "small-music"
@@ -190,7 +190,7 @@ async def toggle_engine(req: EngineToggleRequest):
                         return {"status": "ok", "message": f"{req.engine.upper()} model unloaded."}
             except Exception as e:
                 logger.error(f"Failed to unload model via switch endpoint: {e}")
-            return {"status": "error", "message": "Stable Audio server is not responding."}
+            return {"status": "error", "message": "Sound & Music server is not responding."}
             
         elif req.action == "start":
             sfx_online = False
@@ -216,16 +216,16 @@ async def toggle_engine(req: EngineToggleRequest):
                 except Exception:
                     pass
             
-            # 3. If still offline, launch the local Stable Audio CPU server process
+            # 3. If still offline, launch the local CPU server process
             if not sfx_online:
-                sfx_python = BASE_DIR / "stable_audio_local_cpu" / "venv" / "Scripts" / "python.exe"
-                sfx_script = BASE_DIR / "stable_audio_local_cpu" / "server.py"
+                sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+                sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
                 if not sfx_python.exists() or not sfx_script.exists():
-                    raise HTTPException(status_code=400, detail="Stable Audio files not found.")
+                    raise HTTPException(status_code=400, detail="Sound & Music server files not found.")
                 try:
                     proc = subprocess.Popen(
                         [str(sfx_python), str(sfx_script)],
-                        cwd=str(BASE_DIR / "stable_audio_local_cpu"),
+                        cwd=str(BASE_DIR / "sfx_and_music_server"),
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
                     running_processes["stable_audio"] = proc
@@ -243,7 +243,7 @@ async def toggle_engine(req: EngineToggleRequest):
                         except Exception:
                             pass
                 except Exception as e:
-                    raise HTTPException(status_code=500, detail=f"Failed to start Stable Audio server: {e}")
+                    raise HTTPException(status_code=500, detail=f"Failed to start Sound & Music server: {e}")
             
             if sfx_online:
                 # Update sfx_server_url to the working local URL so generations route correctly
@@ -269,7 +269,7 @@ async def toggle_engine(req: EngineToggleRequest):
                             return {"status": "ok", "message": f"{req.engine.upper()} model already loaded and ready."}
                         
                         # Otherwise poll /api/health until model appears in loaded_models
-                        logger.info(f"Model '{model_name}' is loading in background on Stable Audio server. Polling for up to 10 min...")
+                        logger.info(f"Model '{model_name}' is loading in background on Sound & Music server. Polling for up to 10 min...")
                         MAX_POLL_SECONDS = 600  # 10 minutes for slow CPU load
                         for _ in range(MAX_POLL_SECONDS * 2):
                             await asyncio.sleep(0.5)
@@ -284,13 +284,13 @@ async def toggle_engine(req: EngineToggleRequest):
                             except Exception:
                                 pass
                         
-                        raise HTTPException(status_code=504, detail=f"Timed out waiting for {model_name} to load (>10 min). Check Stable Audio console for errors.")
+                        raise HTTPException(status_code=504, detail=f"Timed out waiting for {model_name} to load (>10 min). Check Sound & Music console for errors.")
                         
                 except HTTPException:
                     raise
                 except Exception as e:
-                    raise HTTPException(status_code=500, detail=f"Stable Audio server error during model switch: {e}")
+                    raise HTTPException(status_code=500, detail=f"Sound & Music server error during model switch: {e}")
             else:
-                raise HTTPException(status_code=503, detail="Stable Audio server failed to start or respond.")
+                raise HTTPException(status_code=503, detail="Sound & Music server failed to start or respond.")
     
     raise HTTPException(status_code=400, detail="Invalid engine specified.")

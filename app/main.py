@@ -99,55 +99,55 @@ async def startup_event():
     tts_url = settings.get("tts_server_url", "http://127.0.0.1:8000")
     sfx_url = settings.get("sfx_server_url", "http://127.0.0.1:5000")
     
-    # 1. PocketTTS Server
+    # 1. Text-to-Speech Server
     is_tts_local = "127.0.0.1" in tts_url or "localhost" in tts_url
     if is_tts_local:
-        tts_python = BASE_DIR / "pocket_tts" / "venv" / "Scripts" / "python.exe"
-        tts_script = BASE_DIR / "pocket_tts" / "server.py"
+        tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.exe"
+        tts_script = BASE_DIR / "text_to_speech_server" / "server.py"
         if tts_python.exists() and tts_script.exists():
-            logger.info("Starting local PocketTTS server in background...")
+            logger.info("Starting local TTS server in background...")
             try:
                 proc = subprocess.Popen(
                     [str(tts_python), str(tts_script)],
-                    cwd=str(BASE_DIR / "pocket_tts"),
+                    cwd=str(BASE_DIR / "text_to_speech_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
                 background_subprocesses.append(proc)
                 running_processes["tts"] = proc
-                logger.info(f"PocketTTS server subprocess started (PID: {proc.pid})")
+                logger.info(f"TTS server subprocess started (PID: {proc.pid})")
             except Exception as e:
-                logger.error(f"Failed to start local PocketTTS server: {e}")
+                logger.error(f"Failed to start local TTS server: {e}")
         else:
-            logger.warning(f"PocketTTS local files not found at {tts_python} or {tts_script}")
+            logger.warning(f"TTS local files not found at {tts_python} or {tts_script}")
             
-    # 2. Stable Audio CPU Server
+    # 2. Sound Effects and Music CPU Server
     is_sfx_local = "127.0.0.1" in sfx_url or "localhost" in sfx_url
     if is_sfx_local:
         ram_gb = get_system_ram_gb()
         logger.info(f"Detected {ram_gb:.1f} GB of system RAM.")
         if ram_gb >= 16.0:
-            sfx_python = BASE_DIR / "stable_audio_local_cpu" / "venv" / "Scripts" / "python.exe"
-            sfx_script = BASE_DIR / "stable_audio_local_cpu" / "server.py"
+            sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+            sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
             if sfx_python.exists() and sfx_script.exists():
-                logger.info("System has >= 16GB RAM. Starting local Stable Audio CPU server in background...")
+                logger.info("System has >= 16GB RAM. Starting local SFX & Music CPU server in background...")
                 try:
                     proc = subprocess.Popen(
                         [str(sfx_python), str(sfx_script)],
-                        cwd=str(BASE_DIR / "stable_audio_local_cpu"),
+                        cwd=str(BASE_DIR / "sfx_and_music_server"),
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
                     background_subprocesses.append(proc)
                     running_processes["stable_audio"] = proc
-                    logger.info(f"Stable Audio CPU server subprocess started (PID: {proc.pid})")
+                    logger.info(f"SFX & Music CPU server subprocess started (PID: {proc.pid})")
                 except Exception as e:
-                    logger.error(f"Failed to start local Stable Audio CPU server: {e}")
+                    logger.error(f"Failed to start local SFX & Music CPU server: {e}")
             else:
-                logger.warning(f"Stable Audio local files not found at {sfx_python} or {sfx_script}")
+                logger.warning(f"SFX & Music local files not found at {sfx_python} or {sfx_script}")
         else:
             logger.warning(
-                f"Local Stable Audio is configured, but system RAM is only {ram_gb:.1f} GB (required: >= 16 GB). "
-                "Skipping local Stable Audio launch to prevent system instability. "
-                "Please run on a system with more RAM, or set 'sfx_server_url' to a remote Colab tunnel URL in settings."
+                f"Local SFX & Music server is configured, but system RAM is only {ram_gb:.1f} GB (required: >= 16 GB). "
+                "Skipping local SFX & Music launch to prevent system instability. "
+                "Please run on a system with more RAM, or set 'sfx_server_url' to a remote server URL in settings."
             )
 
 @app.on_event("shutdown")

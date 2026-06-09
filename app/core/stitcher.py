@@ -216,6 +216,12 @@ def build_ffmpeg_cmd(
         music_idx = curr_idx
         curr_idx += 1
 
+    # Append a silent reference audio track matching the exact target clip duration.
+    # This ensures that intermediate clips are padded to the correct duration
+    # and prevents audio desync during final video concatenation.
+    silent_idx = curr_idx
+    cmd.extend(["-f", "lavfi", "-t", f"{duration:.3f}", "-i", "anullsrc=r=44100:cl=stereo"])
+    curr_idx += 1
 
     # Audio mixing filter complex (uses duration=longest to prevent truncation)
     audio_out = None
@@ -239,12 +245,13 @@ def build_ffmpeg_cmd(
         audio_inputs.append("[music_a]")
         
     if len(audio_inputs) > 0:
-        if len(audio_inputs) > 1:
-            mix_input_labels = "".join(audio_inputs)
-            filter_parts.append(f"{mix_input_labels}amix=inputs={len(audio_inputs)}:duration=longest[audio_mix]")
-            filter_parts.append("[audio_mix]loudnorm[outnorm]")
-        else:
-            filter_parts.append(f"{audio_inputs[0]}loudnorm[outnorm]")
+        # Mix in the silent reference track to ensure output is exactly duration seconds long.
+        filter_parts.append(f"[{silent_idx}:a]volume=1.0[silent_a]")
+        audio_inputs.append("[silent_a]")
+        
+        mix_input_labels = "".join(audio_inputs)
+        filter_parts.append(f"{mix_input_labels}amix=inputs={len(audio_inputs)}:duration=longest:normalize=0[audio_mix]")
+        filter_parts.append("[audio_mix]loudnorm[outnorm]")
             
         cmd.extend([
             "-filter_complex",
@@ -252,12 +259,8 @@ def build_ffmpeg_cmd(
         ])
         audio_out = "[outnorm]"
     else:
-        # Force silent audio track for images or silent videos when no voice/sfx/music prompts exist,
-        # ensuring all intermediate clips have matching stream layouts for safe concatenation.
-        cmd.extend([
-            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"
-        ])
-        audio_out = f"{curr_idx}:a"
+        # Use the silent reference track directly
+        audio_out = f"{silent_idx}:a"
 
 
     # Video filters list

@@ -1,8 +1,8 @@
 # Virtual environments (each engine has its own venv)
 venv/
 .venv/
-pocket_tts/venv/
-stable_audio_local_cpu/venv/
+text_to_speech_server/venv/
+sfx_and_music_server/venv/
 
 # Python cache
 __pycache__/
@@ -21,8 +21,8 @@ projects/
 static/thumbnails/
 static/tts_audio/
 static/sfx_audio/
-stable_audio_local_cpu/outputs/
-pocket_tts/uploaded_voices/*.safetensors
+sfx_and_music_server/outputs/
+text_to_speech_server/uploaded_voices/*.safetensors
 
 # Secrets & license — user-specific, never commit
 license.json
@@ -71,8 +71,8 @@ activate.py
 *.env
 
 # AI model outputs (large audio files)
-stable_audio_local_cpu/outputs/
-pocket_tts/uploaded_voices/*.safetensors
+sfx_and_music_server/outputs/
+text_to_speech_server/uploaded_voices/*.safetensors
 
 # Logs
 *.log

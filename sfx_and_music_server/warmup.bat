@@ -1,19 +1,19 @@
 @echo off
 REM ============================================================
-REM  Stable Audio 3 — Warmup Launcher
+REM  Sound & Music Server — Warmup Launcher
 REM  Checks/downloads models, then runs a quick test generation
 REM ============================================================
 
-title Stable Audio 3 - Warmup
+title Model Warmup
 
 echo.
 echo  ====================================================
-echo    Stable Audio 3 — Model Warmup
+echo    Model Warmup & Cache Verification
 echo  ====================================================
 echo.
 echo  Choose an option:
 echo.
-echo  [1] Check + download BOTH models (music + sfx) + run test
+echo  [1] Check + download BOTH models + run test
 echo  [2] Check + download music model only
 echo  [3] Check + download sfx model only
 echo  [4] Download only (skip test generation, faster)

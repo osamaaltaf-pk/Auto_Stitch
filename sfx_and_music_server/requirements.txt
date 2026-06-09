@@ -1,11 +1,8 @@
-# Stable Audio 3 — CPU Server Dependencies
+# Audio Server Dependencies
 # Install with: pip install -r requirements.txt
 #
 # NOTE: PyTorch (CPU build) must be installed separately first:
 # pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# Stable Audio 3 inference library
-stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3.git
 
 # Web server
 flask>=3.0.0
