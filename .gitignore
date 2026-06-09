@@ -26,7 +26,6 @@ pocket_tts/uploaded_voices/*.safetensors
 
 # Secrets & license — user-specific, never commit
 license.json
-activate.py
 .env
 *.env
 

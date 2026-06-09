@@ -18,6 +18,18 @@ if errorlevel 1 (
 )
 echo       Python found.
 
+REM ── Check/Download FFmpeg ────────────────────────────
+echo.
+echo Checking for FFmpeg...
+if not exist "bin\ffmpeg.exe" (
+    echo       FFmpeg not found. Downloading release essentials zip...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "curl.exe -L 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -o 'ffmpeg.zip'; Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_temp; Move-Item -Path ffmpeg_temp/ffmpeg-*-essentials_build/bin/ffmpeg.exe, ffmpeg_temp/ffmpeg-*-essentials_build/bin/ffprobe.exe -Destination bin/ -Force; Remove-Item -Path ffmpeg_temp, ffmpeg.zip -Recurse -Force"
+    echo       FFmpeg successfully configured in bin/.
+) else (
+    echo       FFmpeg already present.
+)
+
 REM ── Component Selection ─────────────────────────────
 echo.
 echo ====================================================

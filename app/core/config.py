@@ -24,13 +24,12 @@ SETTINGS_FILE = BASE_DIR / "settings.json"
 DEFAULT_SETTINGS = {
     "tts_server_url": "http://127.0.0.1:8000",
     "sfx_server_url": "http://127.0.0.1:5000",  # Defaults to 5000 (Local CPU or Colab Tunnel)
-    "license_server_url": "https://omni-automator.vercel.app",  # Default Vercel server URL
+    "license_server_url": "https://auto-stitch-backend-iof6.vercel.app",  # Default Vercel server URL
     "output_dir": str(OUTPUT_DIR),
     "projects_dir": str(PROJECTS_DIR),
 }
 
 SECURE_SALT = "OMNI_STITCH_SECURE_SALT_2026"
-DEVELOPER_BYPASS_KEY = "Osama@1232£-80£viu%*ajoy/(592@!(/@0862hkhakowpnbtaownyekn69vhwilwn"
 
 def load_settings() -> Dict[str, Any]:
     settings = DEFAULT_SETTINGS.copy()

@@ -4,7 +4,7 @@ import datetime
 import hashlib
 import httpx
 from fastapi import APIRouter, HTTPException
-from app.core.config import BASE_DIR, load_settings, SECURE_SALT, DEVELOPER_BYPASS_KEY
+from app.core.config import BASE_DIR, load_settings, SECURE_SALT
 from app.models.schemas import LicenseActivateRequest
 
 logger = logging.getLogger("autostitch.api.license")
@@ -35,9 +35,7 @@ async def check_license_validity() -> tuple[bool, str]:
     last_check_str = data.get("last_online_check", "")
     sig = data.get("signature", "")
 
-    # 1. Developer Bypass Key
-    if key == DEVELOPER_BYPASS_KEY:
-        return True, "Lifetime Developer Bypass Unlocked"
+
 
     # 2. Check local signature integrity
     computed_sig = generate_local_signature(key, gmail, machine_id, expiry)
