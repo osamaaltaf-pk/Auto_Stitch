@@ -81,7 +81,11 @@ echo.
 echo [2/5] Setting up main application virtual environment...
 if exist "venv" goto venv_exists
 %PYTHON_CMD% -m venv venv
-if errorlevel 1 goto venv_fail
+if errorlevel 1 (
+    echo       venv creation failed. Retrying with portable fallback...
+    call :create_fallback_venv venv "..\.."
+    if errorlevel 1 goto venv_fail
+)
 echo       venv created successfully.
 goto venv_ok
 
@@ -97,7 +101,7 @@ exit /b 1
 :venv_ok
 echo       Installing main application dependencies...
 call venv\Scripts\activate.bat
-venv\Scripts\python -m pip install -r requirements.txt --quiet
+call venv\Scripts\python -m pip install -r requirements.txt --quiet
 if errorlevel 1 goto main_pip_fail
 call venv\Scripts\deactivate.bat
 echo       Main app packages installed.
@@ -117,7 +121,11 @@ echo.
 echo [3/5] Setting up Text-to-Speech ^(text_to_speech_server\venv^)...
 if exist "text_to_speech_server\venv" goto tts_venv_exists
 %PYTHON_CMD% -m venv text_to_speech_server\venv
-if errorlevel 1 goto tts_venv_fail
+if errorlevel 1 (
+    echo       TTS venv creation failed. Retrying with portable fallback...
+    call :create_fallback_venv text_to_speech_server\venv "..\..\.."
+    if errorlevel 1 goto tts_venv_fail
+)
 goto tts_venv_ok
 
 :tts_venv_exists
@@ -132,10 +140,10 @@ exit /b 1
 :tts_venv_ok
 echo       Installing Text-to-Speech dependencies...
 call text_to_speech_server\venv\Scripts\activate.bat
-text_to_speech_server\venv\Scripts\python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu -r text_to_speech_server\requirements.txt --quiet
+call text_to_speech_server\venv\Scripts\python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu -r text_to_speech_server\requirements.txt --quiet
 if errorlevel 1 goto tts_pip_fail
 echo       Installing core engine...
-text_to_speech_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('cG9ja2V0LXR0cz49MC4xLjA=').decode()])" --quiet
+call text_to_speech_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('cG9ja2V0LXR0cz49MC4xLjA=').decode()])" --quiet
 if errorlevel 1 goto tts_core_fail
 call text_to_speech_server\venv\Scripts\deactivate.bat
 echo       TTS packages installed.
@@ -164,7 +172,11 @@ echo.
 echo [4/5] Setting up Sound ^& Music Server ^(sfx_and_music_server\venv^)...
 if exist "sfx_and_music_server\venv" goto sfx_venv_exists
 %PYTHON_CMD% -m venv sfx_and_music_server\venv
-if errorlevel 1 goto sfx_venv_fail
+if errorlevel 1 (
+    echo       Sound & Music venv creation failed. Retrying with portable fallback...
+    call :create_fallback_venv sfx_and_music_server\venv "..\..\.."
+    if errorlevel 1 goto sfx_venv_fail
+)
 goto sfx_venv_ok
 
 :sfx_venv_exists
@@ -178,13 +190,13 @@ exit /b 1
 
 :sfx_venv_ok
 echo       Installing PyTorch CPU build ^(large download, one-time^)...
-sfx_and_music_server\venv\Scripts\python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet
+call sfx_and_music_server\venv\Scripts\python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet
 if errorlevel 1 goto sfx_torch_fail
 echo       Installing Sound ^& Music dependencies...
-sfx_and_music_server\venv\Scripts\python -m pip install -r sfx_and_music_server\requirements.txt --quiet
+call sfx_and_music_server\venv\Scripts\python -m pip install -r sfx_and_music_server\requirements.txt --quiet
 if errorlevel 1 goto sfx_pip_fail
 echo       Installing core generation package...
-sfx_and_music_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('Z2l0K2h0dHBzOi8vZ2l0aHViLmNvbS9TdGFiaWxpdHktQUkvc3RhYmxlLWF1ZGlvLTMuZ2l0').decode()])" --quiet
+call sfx_and_music_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('Z2l0K2h0dHBzOi8vZ2l0aHViLmNvbS9TdGFiaWxpdHktQUkvc3RhYmxlLWF1ZGlvLTMuZ2l0').decode()])" --quiet
 if errorlevel 1 goto sfx_core_fail
 echo       Sound ^& Music packages installed.
 goto sfx_done
@@ -214,7 +226,7 @@ REM ── Cache Frontend Libraries ──────────────�
 echo.
 echo [5/6] Caching offline frontend assets...
 call venv\Scripts\activate.bat
-venv\Scripts\python download_frontend_assets.py
+call venv\Scripts\python download_frontend_assets.py
 if errorlevel 1 goto frontend_cache_fail
 call venv\Scripts\deactivate.bat
 echo       Offline pre-cache download complete.
@@ -231,7 +243,7 @@ REM ── Verify & Download Models ──────────────�
 echo.
 echo [6/6] Verifying and downloading AI model files...
 call sfx_and_music_server\venv\Scripts\activate.bat
-sfx_and_music_server\venv\Scripts\python sfx_and_music_server\warmup.py --models small-music small-sfx --no-test
+call sfx_and_music_server\venv\Scripts\python sfx_and_music_server\warmup.py --models small-music small-sfx --no-test
 if errorlevel 1 goto model_download_fail
 call sfx_and_music_server\venv\Scripts\deactivate.bat
 echo       AI model files verified and ready.
@@ -254,3 +266,35 @@ echo.
 echo  To launch the unified studio, run: run.bat
 echo ====================================================
 pause
+exit /b 0
+
+:create_fallback_venv
+set "TARGET_DIR=%~1"
+set "DEPTH_OFFSET=%~2"
+echo       Creating portable environment wrapper in %TARGET_DIR%...
+mkdir "%TARGET_DIR%\Scripts" >nul 2>&1
+mkdir "%TARGET_DIR%\Lib\site-packages" >nul 2>&1
+
+REM Write python.bat
+(
+echo @echo off
+echo "%%~dp0%DEPTH_OFFSET%\bin\python_portable\python.exe" %%*
+) > "%TARGET_DIR%\Scripts\python.bat"
+
+REM Write pip.bat
+(
+echo @echo off
+echo "%%~dp0%DEPTH_OFFSET%\bin\python_portable\python.exe" -m pip %%*
+) > "%TARGET_DIR%\Scripts\pip.bat"
+
+REM Write activate.bat
+(
+echo @echo off
+echo set "VIRTUAL_ENV=%%~dp0.."
+echo set "PATH=%%~dp0;%%PATH%%"
+) > "%TARGET_DIR%\Scripts\activate.bat"
+
+REM Write deactivate.bat
+echo @echo off > "%TARGET_DIR%\Scripts\deactivate.bat"
+
+exit /b 0

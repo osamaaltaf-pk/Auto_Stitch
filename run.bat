@@ -37,6 +37,6 @@ echo Starting AutoStitch Unified Studio backend...
 echo (All required local background engines will start automatically)
 echo.
 call venv\Scripts\activate.bat
-venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+call venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 
 pause

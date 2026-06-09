@@ -109,6 +109,8 @@ async def toggle_engine(req: EngineToggleRequest):
             
         elif req.action == "start":
             tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.exe"
+            if not tts_python.exists():
+                tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.bat"
             tts_script = BASE_DIR / "text_to_speech_server" / "server.py"
             if not tts_python.exists() or not tts_script.exists():
                 raise HTTPException(status_code=400, detail=f"TTS files not found at {tts_python}.")
@@ -123,8 +125,11 @@ async def toggle_engine(req: EngineToggleRequest):
             if tts_online:
                 return {"status": "ok", "message": "TTS is already running."}
             try:
+                args = [str(tts_python), str(tts_script)]
+                if tts_python.suffix.lower() == ".bat":
+                    args = ["cmd.exe", "/c"] + args
                 proc = subprocess.Popen(
-                    [str(tts_python), str(tts_script)],
+                    args,
                     cwd=str(BASE_DIR / "text_to_speech_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
@@ -155,6 +160,8 @@ async def toggle_engine(req: EngineToggleRequest):
             
         elif req.action == "start":
             sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+            if not sfx_python.exists():
+                sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.bat"
             sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
             if not sfx_python.exists() or not sfx_script.exists():
                 raise HTTPException(status_code=400, detail="Sound & Music server files not found.")
@@ -169,8 +176,11 @@ async def toggle_engine(req: EngineToggleRequest):
             if sfx_online:
                 return {"status": "ok", "message": "Sound & Music server is already running."}
             try:
+                args = [str(sfx_python), str(sfx_script)]
+                if sfx_python.suffix.lower() == ".bat":
+                    args = ["cmd.exe", "/c"] + args
                 proc = subprocess.Popen(
-                    [str(sfx_python), str(sfx_script)],
+                    args,
                     cwd=str(BASE_DIR / "sfx_and_music_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
@@ -219,12 +229,17 @@ async def toggle_engine(req: EngineToggleRequest):
             # 3. If still offline, launch the local CPU server process
             if not sfx_online:
                 sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+                if not sfx_python.exists():
+                    sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.bat"
                 sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
                 if not sfx_python.exists() or not sfx_script.exists():
                     raise HTTPException(status_code=400, detail="Sound & Music server files not found.")
                 try:
+                    args = [str(sfx_python), str(sfx_script)]
+                    if sfx_python.suffix.lower() == ".bat":
+                        args = ["cmd.exe", "/c"] + args
                     proc = subprocess.Popen(
-                        [str(sfx_python), str(sfx_script)],
+                        args,
                         cwd=str(BASE_DIR / "sfx_and_music_server"),
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )

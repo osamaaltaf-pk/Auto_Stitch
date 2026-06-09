@@ -103,12 +103,17 @@ async def startup_event():
     is_tts_local = "127.0.0.1" in tts_url or "localhost" in tts_url
     if is_tts_local:
         tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.exe"
+        if not tts_python.exists():
+            tts_python = BASE_DIR / "text_to_speech_server" / "venv" / "Scripts" / "python.bat"
         tts_script = BASE_DIR / "text_to_speech_server" / "server.py"
         if tts_python.exists() and tts_script.exists():
             logger.info("Starting local TTS server in background...")
             try:
+                args = [str(tts_python), str(tts_script)]
+                if tts_python.suffix.lower() == ".bat":
+                    args = ["cmd.exe", "/c"] + args
                 proc = subprocess.Popen(
-                    [str(tts_python), str(tts_script)],
+                    args,
                     cwd=str(BASE_DIR / "text_to_speech_server"),
                     creationflags=subprocess.CREATE_NEW_CONSOLE
                 )
@@ -127,12 +132,17 @@ async def startup_event():
         logger.info(f"Detected {ram_gb:.1f} GB of system RAM.")
         if ram_gb >= 16.0:
             sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.exe"
+            if not sfx_python.exists():
+                sfx_python = BASE_DIR / "sfx_and_music_server" / "venv" / "Scripts" / "python.bat"
             sfx_script = BASE_DIR / "sfx_and_music_server" / "server.py"
             if sfx_python.exists() and sfx_script.exists():
                 logger.info("System has >= 16GB RAM. Starting local SFX & Music CPU server in background...")
                 try:
+                    args = [str(sfx_python), str(sfx_script)]
+                    if sfx_python.suffix.lower() == ".bat":
+                        args = ["cmd.exe", "/c"] + args
                     proc = subprocess.Popen(
-                        [str(sfx_python), str(sfx_script)],
+                        args,
                         cwd=str(BASE_DIR / "sfx_and_music_server"),
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
