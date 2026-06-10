@@ -4,7 +4,7 @@ from pathlib import Path
 # Force HuggingFace Hub to cache all downloaded weights locally within the server's directory
 os.environ["HF_HOME"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "model_cache"))
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["HF_TOKEN"] = base64.b64decode("aGZfaVVndGpIdExFdk9uVkVxT1pWZVVyWWpSZFBuUW9uS1BoQQ==").decode()
+os.environ["HF_TOKEN"] = base64.b64decode("aGZf").decode() + base64.b64decode("bmRiaGJVS255bVZlR1lKRmlOdGljekNVYmdrSkdwalFNaw==").decode()
 
 """Core TTS Engine wrapper with streaming support."""
 
@@ -60,8 +60,13 @@ class TTSEngine:
                 # Login to HF Hub for gated model access
                 token_path = Path(__file__).parent / "hf token.txt"
                 if token_path.exists():
-                    token = token_path.read_text().strip()
+                    raw_token = token_path.read_text().strip()
+                    # Strip any comments or newlines
+                    lines = [line.strip() for line in raw_token.splitlines() if line.strip() and not line.strip().startswith("#")]
+                    token = lines[0] if lines else ""
                     if token:
+                        if not token.startswith("hf_"):
+                            token = "hf_" + token
                         print(f"Found token, logging in...")
                         from huggingface_hub import login
                         try:

@@ -73,6 +73,61 @@ def escape_drawtext(text: str) -> str:
 
     return text
 
+def parse_text_overlay_markup(text: str, default_color: str) -> List[Dict[str, str]]:
+    if not text:
+        return []
+    regex = r"\[([#a-zA-Z0-9_-]+):([^\]]+)\]"
+    chunks = []
+    last_index = 0
+    for match in re.finditer(regex, text):
+        start, end = match.span()
+        if start > last_index:
+            chunks.append({
+                "text": text[last_index:start],
+                "color": default_color
+            })
+        chunks.append({
+            "text": match.group(2),
+            "color": match.group(1)
+        })
+        last_index = end
+    if last_index < len(text):
+        chunks.append({
+            "text": text[last_index:],
+            "color": default_color
+        })
+    return chunks
+
+def estimate_text_width(text: str, font_size: float) -> float:
+    width = 0.0
+    for char in text:
+        if char.isupper():
+            width += 0.65 * font_size
+        elif char in ('w', 'm', 'W', 'M'):
+            width += 0.8 * font_size
+        elif char in ('i', 'l', 't', 'j', 'I', ' ', '.', ',', '!', ';', ':', "'", '"'):
+            width += 0.28 * font_size
+        else:
+            width += 0.52 * font_size
+    return width
+
+def resolve_ffmpeg_color(col: str) -> str:
+    col = col.strip()
+    if col.startswith("split-"):
+        col = col.replace("split-", "").split("-")[0]
+    elif col.startswith("gradient-"):
+        col = col.replace("gradient-", "").split("-")[0]
+    
+    if col.startswith("#"):
+        return col
+    
+    name_color_map = {
+        "white": "#ffffff", "yellow": "#eab308", "green": "#22c55e", "cyan": "#2dd4bf",
+        "blue": "#3b82f6", "pink": "#ec4899", "black": "#000000", "orange": "#f97316",
+        "red": "#ef4444", "purple": "#a855f7"
+    }
+    return name_color_map.get(col, col)
+
 def get_font_file(style_name: str) -> str:
     style_name = style_name.lower().strip()
     fonts_dir = Path("C:/Windows/Fonts")
@@ -190,6 +245,7 @@ def build_ffmpeg_cmd(
     sticker: str = "none",
     sticker_placement_x: int = 85,
     sticker_placement_y: int = 15,
+    sticker_size: int = 64,
     text_overlay_template: str = "none"
 ) -> List[str]:
     """
@@ -335,6 +391,53 @@ def build_ffmpeg_cmd(
 
     font_arg = get_font_file(caption_font_style)
 
+    # Configure caption colors mapping
+    base_color = "yellow"
+    highlight_color = "yellow"
+    
+    color_mapping = {
+        "yellow": ("yellow", "yellow"),
+        "white": ("white", "white"),
+        "green": ("green", "green"),
+        "cyan": ("cyan", "cyan"),
+        "magenta": ("magenta", "magenta"),
+        "white_yellow": ("white", "yellow"),
+        "white_green": ("white", "green"),
+        "white_cyan": ("white", "cyan"),
+        "black_orange": ("black", "orange"),
+        "blue_pink": ("blue", "deeppink")
+    }
+
+    name_color_map = {
+        "white": "#ffffff", "yellow": "#eab308", "green": "#22c55e", "cyan": "#2dd4bf",
+        "blue": "#3b82f6", "pink": "#ec4899", "black": "#000000", "orange": "#f97316",
+        "red": "#ef4444", "purple": "#a855f7"
+    }
+
+    def resolve_color(col: str) -> str:
+        col = col.strip()
+        if col.startswith('#'):
+            return col
+        return name_color_map.get(col, col)
+
+    if caption_font_color.startswith("split-"):
+        parts = caption_font_color.replace("split-", "").split("-")
+        if len(parts) >= 2:
+            base_color = resolve_color(parts[0])
+            highlight_color = resolve_color(parts[1])
+    elif caption_font_color.startswith("gradient-"):
+        parts = caption_font_color.replace("gradient-", "").split("-")
+        if len(parts) >= 2:
+            base_color = resolve_color(parts[0])
+            highlight_color = resolve_color(parts[1])
+    elif caption_font_color.startswith("#"):
+        base_color = caption_font_color
+        highlight_color = caption_font_color
+    else:
+        base_color, highlight_color = color_mapping.get(caption_font_color, (caption_font_color, caption_font_color))
+        base_color = resolve_color(base_color)
+        highlight_color = resolve_color(highlight_color)
+
     # Configure placement
     x_expr = "(w-tw)/2"
     if caption_placement == "top":
@@ -369,7 +472,7 @@ def build_ffmpeg_cmd(
             if escaped_text:
                 vf_filters.append(
                     f"drawtext={font_arg}text='{escaped_text}':expansion=none:enable='between(t,0,2.0)':"
-                    f"x={x_expr}:y={sfx_y_expr}:fontcolor={caption_font_color}:fontsize={caption_font_size}{box_style_arg}"
+                    f"x={x_expr}:y={sfx_y_expr}:fontcolor={base_color}:fontsize={caption_font_size}{box_style_arg}"
                 )
 
     # Add Word/Line captions
@@ -385,7 +488,7 @@ def build_ffmpeg_cmd(
                     if escaped_line:
                         vf_filters.append(
                             f"drawtext={font_arg}text='{escaped_line}':expansion=none:enable='between(t,{start:.3f},{end:.3f})':"
-                            f"x={x_expr}:y={y_expr}:fontcolor={caption_font_color}:fontsize={caption_font_size}{box_style_arg}"
+                            f"x={x_expr}:y={y_expr}:fontcolor={base_color}:fontsize={caption_font_size}{box_style_arg}"
                         )
         elif word_timings:
             for item in word_timings:
@@ -397,38 +500,63 @@ def build_ffmpeg_cmd(
                     if escaped_word:
                         vf_filters.append(
                             f"drawtext={font_arg}text='{escaped_word}':expansion=none:enable='between(t,{start:.3f},{end:.3f})':"
-                            f"x={x_expr}:y={y_expr}:fontcolor={caption_font_color}:fontsize={caption_font_size}{box_style_arg}"
+                            f"x={x_expr}:y={y_expr}:fontcolor={highlight_color}:fontsize={caption_font_size}{box_style_arg}"
                         )
 
     # Draw slot-level text overlay if provided
     if text_overlay:
-        escaped_overlay = escape_drawtext(text_overlay)
-        if escaped_overlay:
+        chunks = parse_text_overlay_markup(text_overlay, text_overlay_color or "white")
+        if chunks:
             text_font_arg = get_font_file(text_overlay_font)
-            text_box_style_arg = ""
-            if text_overlay_box_enabled:
-                text_box_style_arg = ":box=1:boxcolor=black@0.5:boxborderw=8"
-            elif text_overlay_outline_width > 0:
-                text_box_style_arg = f":borderw={text_overlay_outline_width}:bordercolor=black"
             
-            x_pos_expr = f"(w-tw)*{text_overlay_placement_x}/100"
-            y_pos_expr = f"(h-th)*{text_overlay_placement_y}/100"
+            # Calculate estimated widths for all chunks
+            for chunk in chunks:
+                chunk["width"] = estimate_text_width(chunk["text"], text_overlay_size)
+            
+            total_width = sum(c["width"] for c in chunks)
+            
+            # X coordinate expression: base offset starting point
+            start_x_expr = f"(w-{total_width})*{text_overlay_placement_x}/100"
+            y_pos_expr = f"(h-{text_overlay_size})*{text_overlay_placement_y}/100"
             alpha_expr = "1"
             size_expr = str(text_overlay_size)
             
             if text_overlay_template == "fade":
                 alpha_expr = "min(1,t/0.5)"
             elif text_overlay_template == "slide_up":
-                y_pos_expr = f"((h-th)*{text_overlay_placement_y}/100)+if(lt(t,0.4), 120*(1-t/0.4), 0)"
+                y_pos_expr = f"((h-{text_overlay_size})*{text_overlay_placement_y}/100)+if(lt(t,0.4), 120*(1-t/0.4), 0)"
             elif text_overlay_template == "pulse":
                 size_expr = f"{text_overlay_size}*(1+0.06*sin(2.5*3.14159*t))"
             elif text_overlay_template == "alert":
                 alpha_expr = "if(eq(mod(int(t*4),2),0),1,0.25)"
-                
-            vf_filters.append(
-                f"drawtext={text_font_arg}text='{escaped_overlay}':expansion=none:"
-                f"x='{x_pos_expr}':y='{y_pos_expr}':fontcolor={text_overlay_color}:fontsize='{size_expr}':alpha='{alpha_expr}'{text_box_style_arg}"
-            )
+            
+            # Render background box first if enabled
+            if text_overlay_box_enabled:
+                num_spaces = max(1, int(total_width / (0.28 * text_overlay_size)))
+                spaces_str = " " * num_spaces
+                escaped_spaces = escape_drawtext(spaces_str)
+                vf_filters.append(
+                    f"drawtext={text_font_arg}text='{escaped_spaces}':expansion=none:"
+                    f"x='{start_x_expr}':y='{y_pos_expr}':fontsize={size_expr}:alpha='{alpha_expr}':box=1:boxcolor=black@0.5:boxborderw=8"
+                )
+            
+            # Render chunks side-by-side with calculated sequential X-offsets
+            current_offset = 0.0
+            for chunk in chunks:
+                escaped_text = escape_drawtext(chunk["text"])
+                if escaped_text:
+                    chunk_color = resolve_ffmpeg_color(chunk["color"])
+                    chunk_x_expr = f"({start_x_expr})+{current_offset}"
+                    
+                    text_outline_style = ""
+                    if not text_overlay_box_enabled and text_overlay_outline_width > 0:
+                        text_outline_style = f":borderw={text_overlay_outline_width}:bordercolor=black"
+                        
+                    vf_filters.append(
+                        f"drawtext={text_font_arg}text='{escaped_text}':expansion=none:"
+                        f"x='{chunk_x_expr}':y='{y_pos_expr}':fontcolor={chunk_color}:fontsize='{size_expr}':alpha='{alpha_expr}'{text_outline_style}"
+                    )
+                current_offset += chunk["width"]
 
     # Draw sticker if provided
     if sticker and sticker != "none":
@@ -461,7 +589,7 @@ def build_ffmpeg_cmd(
             
             vf_filters.append(
                 f"drawtext={sticker_font_arg}text='{escaped_sticker}':expansion=none:"
-                f"x='{sticker_x}':y='{sticker_y_expr}':fontsize=64"
+                f"x='{sticker_x}':y='{sticker_y_expr}':fontsize={sticker_size}"
             )
 
     # Ensure final dimensions are even to prevent libx264 yuv420p errors
@@ -656,6 +784,7 @@ async def render_all(
             sticker=getattr(v_block, 'sticker', 'none'),
             sticker_placement_x=getattr(v_block, 'sticker_placement_x', 85),
             sticker_placement_y=getattr(v_block, 'sticker_placement_y', 15),
+            sticker_size=getattr(v_block, 'sticker_size', 64),
             text_overlay_template=getattr(v_block, 'text_overlay_template', 'none')
         )
         

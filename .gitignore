@@ -10,9 +10,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
-# Large binaries — placed in bin/ manually after cloning
-bin/ffmpeg.exe
-bin/ffprobe.exe
 
 # Generated at runtime — not source code
 autostitch.db
@@ -55,9 +52,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
-# Large binaries — placed in bin/ manually after cloning
-bin/ffmpeg.exe
-bin/ffprobe.exe
 
 # User data — generated at runtime, not source code
 autostitch.db
@@ -86,3 +80,7 @@ desktop.ini
 # IDE
 .vscode/
 .idea/
+
+# Large binaries exceeding GitHub 100MB limit
+bin/ffmpeg.exe
+bin/ffprobe.exe

@@ -99,6 +99,7 @@ class VideoBlock:
     sticker: str = "none"
     sticker_placement_x: int = 85
     sticker_placement_y: int = 15
+    sticker_size: int = 64
     text_overlay_template: str = "none"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -132,6 +133,7 @@ class VideoBlock:
             sticker=d.get("sticker", "none"),
             sticker_placement_x=int(d.get("sticker_placement_x", 85)),
             sticker_placement_y=int(d.get("sticker_placement_y", 15)),
+            sticker_size=int(d.get("sticker_size", 64)),
             text_overlay_template=d.get("text_overlay_template", "none")
         )
 

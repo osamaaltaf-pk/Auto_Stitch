@@ -251,6 +251,66 @@ const getFilterCss = (filterId) => {
   return filters[filterId] || "none";
 };
 
+const parseTextOverlayMarkup = (text, defaultColor) => {
+  if (!text) return [];
+  const regex = /\[([#a-zA-Z0-9_-]+):([^\]]+)\]/g;
+  const chunks = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      chunks.push({
+        text: text.substring(lastIndex, matchIndex),
+        color: defaultColor
+      });
+    }
+    chunks.push({
+      text: match[2],
+      color: match[1]
+    });
+    lastIndex = regex.lastIndex;
+  }
+  
+  if (lastIndex < text.length) {
+    chunks.push({
+      text: text.substring(lastIndex),
+      color: defaultColor
+    });
+  }
+  return chunks;
+};
+
+const getStyleForColor = (color) => {
+  if (!color) return { color: 'white' };
+  const style = {};
+  if (color.startsWith('split-')) {
+    const colors = color.replace('split-', '').split('-');
+    const map = { white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf', blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316' };
+    const c1 = map[colors[0]] || colors[0] || '#ffffff';
+    const c2 = map[colors[1]] || colors[1] || '#eab308';
+    style.backgroundImage = `linear-gradient(to right, ${c1} 50%, ${c2} 50%)`;
+    style.WebkitBackgroundClip = 'text';
+    style.WebkitTextFillColor = 'transparent';
+    style.color = 'transparent';
+    style.display = 'inline-block';
+  } else if (color.startsWith('gradient-')) {
+    const colors = color.replace('gradient-', '').split('-');
+    const map = { red: '#ef4444', yellow: '#eab308', blue: '#3b82f6', cyan: '#2dd4bf', pink: '#ec4899', purple: '#a855f7' };
+    const c1 = map[colors[0]] || colors[0] || '#ef4444';
+    const c2 = map[colors[1]] || colors[1] || '#eab308';
+    style.backgroundImage = `linear-gradient(to right, ${c1}, ${c2})`;
+    style.WebkitBackgroundClip = 'text';
+    style.WebkitTextFillColor = 'transparent';
+    style.color = 'transparent';
+    style.display = 'inline-block';
+  } else {
+    style.color = color;
+  }
+  return style;
+};
+
 function App() {
   // Application State
   const [project, setProject] = useState({
@@ -305,6 +365,16 @@ function App() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(256); // Default left panel width in px (w-64)
   const [rightPanelWidth, setRightPanelWidth] = useState(320); // Default right panel width in px (w-80)
   const [previewSectionHeight, setPreviewSectionHeight] = useState(420); // Draggable preview section height in px
+  const [playerWidth, setPlayerWidth] = useState(() => {
+    try { return parseInt(localStorage.getItem('as_player_width')) || 640; } catch { return 640; }
+  }); // Draggable preview player width in px
+  const [customPresets, setCustomPresets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('as_custom_text_presets');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [newPresetName, setNewPresetName] = useState("");
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
   const [activeRailTab, setActiveRailTab] = useState("media"); // CapCut V2 rail tabs: 'media', 'effects', 'filters', 'text', 'stickers', 'transitions'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
@@ -3668,7 +3738,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'media' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-media ${activeRailTab === 'media' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Media (Video, Audio, Prompts)"
           >
             <span className="redesign-rail-icon">⊞</span>
@@ -3683,7 +3753,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'effects' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-effects ${activeRailTab === 'effects' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Visual Effects Overlays"
           >
             <span className="redesign-rail-icon">✦</span>
@@ -3698,7 +3768,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'filters' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-filters ${activeRailTab === 'filters' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Color Grading Filters"
           >
             <span className="redesign-rail-icon">◑</span>
@@ -3713,7 +3783,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'text' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-text ${activeRailTab === 'text' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Captions & Text Overlay"
           >
             <span className="redesign-rail-icon">T</span>
@@ -3728,7 +3798,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'stickers' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-stickers ${activeRailTab === 'stickers' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Stickers"
           >
             <span className="redesign-rail-icon">★</span>
@@ -3743,7 +3813,7 @@ function App() {
                 setIsLeftSidebarOpen(true);
               }
             }}
-            className={`redesign-rail-btn ${activeRailTab === 'transitions' && isLeftSidebarOpen ? 'active' : ''}`}
+            className={`redesign-rail-btn btn-transitions ${activeRailTab === 'transitions' && isLeftSidebarOpen ? 'active' : ''}`}
             title="Transitions"
           >
             <span className="redesign-rail-icon">⇄</span>
@@ -3756,7 +3826,7 @@ function App() {
           <button
             onClick={() => setIsLeftSidebarOpen(true)}
             className="absolute z-40 bg-carbon-panel/90 backdrop-blur border-y border-r border-carbon-border hover:border-accent-primary text-accent-primary hover:text-white px-2.5 py-3 rounded-r-lg transition-all shadow-[0_0_10px_rgba(124,108,255,0.15)] flex items-center justify-center font-bold"
-            style={{ left: '52px', top: '12px' }}
+            style={{ left: '64px', top: '12px' }}
             title="Expand Asset Browser"
           >
             ▶
@@ -4178,47 +4248,105 @@ function App() {
               {/* TEXT TAB CONTENT */}
               {activeRailTab === 'text' && (
                 <div className="flex flex-col gap-4">
+                  {/* SAVED STYLE PRESETS */}
                   <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">GLOBAL AUTO-CAPTIONS</h3>
-                    <p className="text-[10px] text-gray-500 leading-relaxed mb-1">Configures global captions styles for render.</p>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] text-gray-500">CAPTION FONT COLOR</label>
-                        <select
-                          value={project.caption_font_color || "yellow"}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const newManifest = { ...project, caption_font_color: val };
-                            setProject(newManifest);
-                            saveProject(newManifest);
+                    <h3 className="text-xs font-bold font-mono text-gray-400">SAVED STYLE PRESETS</h3>
+                    <p className="text-[10px] text-gray-500 leading-relaxed mb-1">Create and reuse custom styles across video slots.</p>
+                    
+                    {selectedBlock && activeVideoBlock ? (
+                      <div className="flex gap-1.5 items-center mb-1">
+                        <input
+                          type="text"
+                          value={newPresetName}
+                          onChange={(e) => setNewPresetName(e.target.value)}
+                          placeholder="Preset name (e.g. My Style)..."
+                          className="bg-carbon border border-carbon-border/50 text-white text-[11px] p-2 rounded-lg outline-none flex-1 font-mono"
+                        />
+                        <button
+                          onClick={() => {
+                            if (!newPresetName.trim()) return;
+                            const newPreset = {
+                              id: `style-preset-${Date.now()}`,
+                              name: newPresetName.trim(),
+                              font: activeVideoBlock.text_overlay_font || "arial",
+                              size: activeVideoBlock.text_overlay_size || 40,
+                              color: activeVideoBlock.text_overlay_color || "white",
+                              outline_width: activeVideoBlock.text_overlay_outline_width || 0,
+                              box_enabled: activeVideoBlock.text_overlay_box_enabled || false,
+                              template: activeVideoBlock.text_overlay_template || "none"
+                            };
+                            const updated = [...customPresets, newPreset];
+                            setCustomPresets(updated);
+                            localStorage.setItem('as_custom_text_presets', JSON.stringify(updated));
+                            setNewPresetName("");
                           }}
-                          className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer"
+                          className="bg-accent-primary hover:bg-accent-primary/80 text-white text-[11px] font-bold px-3 py-2 rounded-lg transition-all font-mono shrink-0"
                         >
-                          <option value="yellow">Yellow</option>
-                          <option value="white">White</option>
-                          <option value="green">Green</option>
-                          <option value="cyan">Cyan</option>
-                          <option value="magenta">Magenta</option>
-                        </select>
+                          Save
+                        </button>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] text-gray-500">CAPTION PLACEMENT</label>
-                        <select
-                          value={project.caption_placement || "bottom"}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const newManifest = { ...project, caption_placement: val };
-                            setProject(newManifest);
-                            saveProject(newManifest);
-                          }}
-                          className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer"
-                        >
-                          <option value="bottom">Bottom</option>
-                          <option value="top">Top</option>
-                          <option value="center">Center</option>
-                        </select>
+                    ) : (
+                      <p className="text-[10px] text-gray-500 italic mb-1">Select a video slot to save style.</p>
+                    )}
+
+                    {customPresets.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {customPresets.map(preset => {
+                          let tileBg = preset.color;
+                          if (preset.color.startsWith('split-')) {
+                            const colors = preset.color.replace('split-', '').split('-');
+                            const map = { white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf', blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316' };
+                            tileBg = `linear-gradient(to right, ${map[colors[0]] || colors[0]} 50%, ${map[colors[1]] || colors[1]} 50%)`;
+                          } else if (preset.color.startsWith('gradient-')) {
+                            const colors = preset.color.replace('gradient-', '').split('-');
+                            const map = { red: '#ef4444', yellow: '#eab308', blue: '#3b82f6', cyan: '#2dd4bf', pink: '#ec4899', purple: '#a855f7' };
+                            tileBg = `linear-gradient(to right, ${map[colors[0]] || colors[0]}, ${map[colors[1]] || colors[1]})`;
+                          }
+                          return (
+                            <div 
+                              key={preset.id}
+                              className="relative group border border-carbon-border/50 hover:border-accent-primary/60 rounded-lg p-2 bg-carbon-card/40 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.02]"
+                              onClick={() => {
+                                if (selectedBlock) {
+                                  updateBlockFields('video', selectedBlock.index, {
+                                    text_overlay_font: preset.font,
+                                    text_overlay_size: preset.size,
+                                    text_overlay_color: preset.color,
+                                    text_overlay_outline_width: preset.outline_width,
+                                    text_overlay_box_enabled: preset.box_enabled,
+                                    text_overlay_template: preset.template
+                                  });
+                                }
+                              }}
+                            >
+                              <div className="flex flex-col gap-0.5 overflow-hidden">
+                                <span className="text-[10px] font-bold text-white font-mono truncate">{preset.name}</span>
+                                <span className="text-[8px] text-gray-500 font-mono capitalize truncate">{preset.font} • {preset.size}px</span>
+                              </div>
+                              <div className="flex gap-1.5 items-center shrink-0">
+                                <div 
+                                  className="w-3.5 h-3.5 rounded-full border border-white/10" 
+                                  style={{ background: tileBg }}
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updated = customPresets.filter(p => p.id !== preset.id);
+                                    setCustomPresets(updated);
+                                    localStorage.setItem('as_custom_text_presets', JSON.stringify(updated));
+                                  }}
+                                  className="text-[9px] text-gray-500 hover:text-red-400 px-1 hover:scale-110"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    ) : (
+                      <p className="text-[9px] text-gray-600 italic font-mono text-center py-1 bg-carbon/10 rounded">No saved presets yet.</p>
+                    )}
                   </div>
 
                   <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2.5">
@@ -4230,7 +4358,7 @@ function App() {
                           <textarea
                             value={activeVideoBlock.text_overlay || ""}
                             onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay', e.target.value)}
-                            placeholder="Enter overlay text..."
+                            placeholder="Enter overlay text (e.g. hello [yellow:world])..."
                             className="w-full h-16 bg-carbon border border-carbon-border/50 focus:border-accent-primary outline-none p-2 rounded-lg text-white font-sans text-xs resize-none"
                           />
                         </div>
@@ -4259,7 +4387,7 @@ function App() {
                           <input
                             type="range"
                             min="12"
-                            max="120"
+                            max="300"
                             step="1"
                             value={activeVideoBlock.text_overlay_size || 40}
                             onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_size', parseInt(e.target.value))}
@@ -4268,24 +4396,80 @@ function App() {
                         </div>
 
                         <div className="flex flex-col gap-1">
-                          <label className="text-[10px] text-gray-500">TEXT COLOR</label>
+                          <label className="text-[10px] text-gray-500 font-mono">TEXT COLOR</label>
                           <div className="flex gap-1.5 flex-wrap">
-                            {['white', 'yellow', '#2dd4bf', '#ef4444', '#22c55e', '#f97316', '#a855f7'].map(color => (
-                              <button
-                                key={color}
-                                onClick={() => updateBlockField('video', selectedBlock.index, 'text_overlay_color', color)}
-                                className={`w-6 h-6 rounded-full border ${activeVideoBlock.text_overlay_color === color ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
-                                style={{ backgroundColor: color }}
-                                title={color}
+                            {[
+                              'white', 'yellow', '#2dd4bf', '#ef4444', '#22c55e', '#f97316', '#a855f7',
+                              'split-white-yellow', 'split-white-cyan', 'split-blue-pink', 'split-black-orange',
+                              'gradient-red-yellow', 'gradient-blue-cyan', 'gradient-pink-purple'
+                            ].map(color => {
+                              let btnBg = color;
+                              if (color.startsWith('split-')) {
+                                const colors = color.replace('split-', '').split('-');
+                                const map = { white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf', blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316' };
+                                btnBg = `linear-gradient(to right, ${map[colors[0]]} 50%, ${map[colors[1]]} 50%)`;
+                              } else if (color.startsWith('gradient-')) {
+                                const colors = color.replace('gradient-', '').split('-');
+                                const map = { red: '#ef4444', yellow: '#eab308', blue: '#3b82f6', cyan: '#2dd4bf', pink: '#ec4899', purple: '#a855f7' };
+                                btnBg = `linear-gradient(to right, ${map[colors[0]]}, ${map[colors[1]]})`;
+                              }
+                              return (
+                                <button
+                                  key={color}
+                                  onClick={() => updateBlockField('video', selectedBlock.index, 'text_overlay_color', color)}
+                                  className={`w-6 h-6 rounded-full border ${activeVideoBlock.text_overlay_color === color ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                                  style={{ background: btnBg }}
+                                  title={color.replace('-', ' ').toUpperCase()}
+                                />
+                              );
+                            })}
+                            
+                            {(!activeVideoBlock.text_overlay_color || (!activeVideoBlock.text_overlay_color.startsWith('split-') && !activeVideoBlock.text_overlay_color.startsWith('gradient-'))) ? (
+                              <input
+                                type="color"
+                                value={activeVideoBlock.text_overlay_color && activeVideoBlock.text_overlay_color.startsWith('#') ? activeVideoBlock.text_overlay_color : '#ffffff'}
+                                onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_color', e.target.value)}
+                                className="w-6 h-6 p-0 rounded-full border border-white/10 cursor-pointer overflow-hidden"
+                                title="Custom color"
                               />
-                            ))}
-                            <input
-                              type="color"
-                              value={activeVideoBlock.text_overlay_color && activeVideoBlock.text_overlay_color.startsWith('#') ? activeVideoBlock.text_overlay_color : '#ffffff'}
-                              onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_color', e.target.value)}
-                              className="w-6 h-6 p-0 rounded-full border-0 cursor-pointer overflow-hidden"
-                              title="Custom color"
-                            />
+                            ) : (
+                              (() => {
+                                const isSplit = activeVideoBlock.text_overlay_color.startsWith('split-');
+                                const prefix = isSplit ? 'split-' : 'gradient-';
+                                const parts = activeVideoBlock.text_overlay_color.replace(prefix, '').split('-');
+                                const map = {
+                                  white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf',
+                                  blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316',
+                                  red: '#ef4444', purple: '#a855f7'
+                                };
+                                const c1 = map[parts[0]] || parts[0] || '#ffffff';
+                                const c2 = map[parts[1]] || parts[1] || '#ffffff';
+                                return (
+                                  <div className="flex gap-1 items-center bg-carbon/50 p-1 rounded-lg border border-carbon-border/30">
+                                    <input
+                                      type="color"
+                                      value={c1.startsWith('#') ? c1 : '#ffffff'}
+                                      onChange={(e) => {
+                                        const newColor = `${prefix}${e.target.value}-${c2}`;
+                                        updateBlockField('video', selectedBlock.index, 'text_overlay_color', newColor);
+                                      }}
+                                      className="w-5 h-5 p-0 rounded border-0 cursor-pointer overflow-hidden"
+                                      title="Color 1"
+                                    />
+                                    <input
+                                      type="color"
+                                      value={c2.startsWith('#') ? c2 : '#ffffff'}
+                                      onChange={(e) => {
+                                        const newColor = `${prefix}${c1}-${e.target.value}`;
+                                        updateBlockField('video', selectedBlock.index, 'text_overlay_color', newColor);
+                                      }}
+                                      className="w-5 h-5 p-0 rounded border-0 cursor-pointer overflow-hidden"
+                                      title="Color 2"
+                                    />
+                                  </div>
+                                );
+                              })()
+                            )}
                           </div>
                         </div>
 
@@ -4373,7 +4557,7 @@ function App() {
               {activeRailTab === 'stickers' && (
                 <div className="flex flex-col gap-3">
                   <h3 className="text-xs font-bold font-mono text-gray-400 mb-1">Stickers Presets</h3>
-                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (
+                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (<>
                     <div className="redesign-grid">
                       {stickersPresets.map(st => {
                         const isActive = activeVideoBlock && activeVideoBlock.sticker === st.id;
@@ -4392,7 +4576,23 @@ function App() {
                           </button>
                         );
                       })}
-                    </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 mt-3 bg-carbon-card/30 border border-carbon-border p-3 rounded-lg">
+                        <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                          <span>STICKER SIZE</span>
+                          <span className="text-accent-primary font-bold">{activeVideoBlock.sticker_size || 64}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="200"
+                          step="1"
+                          value={activeVideoBlock.sticker_size || 64}
+                          onChange={(e) => updateBlockField('video', selectedBlock.index, 'sticker_size', parseInt(e.target.value))}
+                          className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                        />
+                      </div>
+                    </>
                   ) : (
                     <p className="text-xs text-gray-500 italic font-mono">Select a video timeline slot to apply stickers.</p>
                   )}
@@ -4441,7 +4641,38 @@ function App() {
             className="shrink-0 border-b border-carbon-border bg-carbon-panel/40 flex flex-col items-center justify-start gap-3 select-text overflow-hidden pt-4 pb-3 px-5"
           >
             {/* Centered Video Screen Section — grows with preview section height */}
-            <div className="w-[600px] flex-1 min-h-[160px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl">
+            <div 
+              style={{ width: `${playerWidth}px` }}
+              className="flex-1 min-h-[160px] rounded-xl bg-carbon-card overflow-hidden relative border border-carbon-border/60 flex flex-col justify-center items-center group shadow-2xl"
+            >
+              {/* Draggable handle for player width resizing */}
+              <div
+                className="absolute top-0 bottom-0 right-0 w-2.5 cursor-ew-resize hover:bg-accent-primary/40 active:bg-accent-primary flex items-center justify-center transition-all group-hover:w-3 z-50"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startWidth = playerWidth;
+                  const startX = e.clientX;
+                  
+                  const onMouseMove = (moveEvent) => {
+                    const diffX = moveEvent.clientX - startX;
+                    const newWidth = Math.max(360, Math.min(1200, startWidth + diffX));
+                    setPlayerWidth(newWidth);
+                    localStorage.setItem('as_player_width', newWidth);
+                  };
+                  
+                  const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                  };
+                  
+                  document.addEventListener('mousemove', onMouseMove);
+                  document.addEventListener('mouseup', onMouseUp);
+                }}
+              >
+                <div className="w-1 h-8 rounded-full bg-gray-500/50 group-hover:bg-white/50" />
+              </div>
+
               {previewMode === 'composer' ? (
                 selectedBlock !== null && project.video_blocks[selectedBlock.index] ? (
                   project.video_blocks[selectedBlock.index].file_path ? (
@@ -4505,89 +4736,105 @@ function App() {
                             </div>
                           )}
 
-                           {/* Bouncing Sticker Badge */}
-                           {activeSticker && activeSticker.id !== 'none' && (
-                             <div
-                               className="bouncing-sticker-badge animate-none"
-                               style={{
-                                 left: `${block.sticker_placement_x ?? 85}%`,
-                                 top: `${block.sticker_placement_y ?? 15}%`,
-                                 transform: 'translate(-50%, -50%)',
-                                 position: 'absolute',
-                                 pointerEvents: 'auto',
-                                 cursor: 'move',
-                               }}
-                               onMouseDown={(e) => {
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                                 const onMouseMove = (moveEvent) => {
-                                   const relativeX = moveEvent.clientX - rect.left;
-                                   const relativeY = moveEvent.clientY - rect.top;
-                                   const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
-                                   const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
-                                   updateBlockFields('video', selectedBlock.index, {
-                                     sticker_placement_x: newXPercent,
-                                     sticker_placement_y: newYPercent
-                                   });
-                                 };
-                                 const onMouseUp = () => {
-                                   document.removeEventListener('mousemove', onMouseMove);
-                                   document.removeEventListener('mouseup', onMouseUp);
-                                 };
-                                 document.addEventListener('mousemove', onMouseMove);
-                                 document.addEventListener('mouseup', onMouseUp);
-                               }}
-                             >
-                               <div style={{ animation: 'sticker-bounce-anim 1.5s infinite alternate ease-in-out' }}>
-                                 {activeSticker.emoji}
-                               </div>
-                             </div>
-                           )}
+                            {/* Bouncing Sticker Badge */}
+                            {activeSticker && activeSticker.id !== 'none' && (
+                              <div
+                                className="bouncing-sticker-badge animate-none"
+                                style={{
+                                  left: `${block.sticker_placement_x ?? 85}%`,
+                                  top: `${block.sticker_placement_y ?? 15}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  position: 'absolute',
+                                  pointerEvents: 'auto',
+                                  cursor: 'move',
+                                  fontSize: `${(block.sticker_size || 64) * 0.4}px`,
+                                }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                                  const onMouseMove = (moveEvent) => {
+                                    const relativeX = moveEvent.clientX - rect.left;
+                                    const relativeY = moveEvent.clientY - rect.top;
+                                    const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
+                                    const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
+                                    updateBlockFields('video', selectedBlock.index, {
+                                      sticker_placement_x: newXPercent,
+                                      sticker_placement_y: newYPercent
+                                    });
+                                  };
+                                  const onMouseUp = () => {
+                                    document.removeEventListener('mousemove', onMouseMove);
+                                    document.removeEventListener('mouseup', onMouseUp);
+                                  };
+                                  document.addEventListener('mousemove', onMouseMove);
+                                  document.addEventListener('mouseup', onMouseUp);
+                                }}
+                              >
+                                <div style={{ animation: 'sticker-bounce-anim 1.5s infinite alternate ease-in-out' }}>
+                                  {activeSticker.emoji}
+                                </div>
+                              </div>
+                            )}
  
-                           {/* Draggable Text Overlay */}
-                           {block.text_overlay && (
-                             <div
-                               className="preview-text-overlay"
-                               style={{
-                                 left: `${block.text_overlay_placement_x ?? 50}%`,
-                                 top: `${block.text_overlay_placement_y ?? 50}%`,
-                                 transform: 'translate(-50%, -50%)',
-                                 fontFamily: block.text_overlay_font || 'arial',
-                                 fontSize: `${(block.text_overlay_size || 40) * 0.3}px`,
-                                 color: block.text_overlay_color || 'white',
-                                 backgroundColor: block.text_overlay_box_enabled ? 'rgba(0,0,0,0.5)' : 'transparent',
-                                 textShadow: block.text_overlay_outline_width ? `0 0 ${block.text_overlay_outline_width}px black` : 'none',
-                                 pointerEvents: 'auto',
-                                 cursor: 'move',
-                               }}
-                               onMouseDown={(e) => {
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                                 const onMouseMove = (moveEvent) => {
-                                   const relativeX = moveEvent.clientX - rect.left;
-                                   const relativeY = moveEvent.clientY - rect.top;
-                                   const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
-                                   const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
-                                   updateBlockFields('video', selectedBlock.index, {
-                                     text_overlay_placement_x: newXPercent,
-                                     text_overlay_placement_y: newYPercent
-                                   });
-                                 };
-                                 const onMouseUp = () => {
-                                   document.removeEventListener('mousemove', onMouseMove);
-                                   document.removeEventListener('mouseup', onMouseUp);
-                                 };
-                                 document.addEventListener('mousemove', onMouseMove);
-                                 document.addEventListener('mouseup', onMouseUp);
-                               }}
-                             >
-                               <span className={`text-template-${block.text_overlay_template || 'none'}`}>
-                                 {block.text_overlay}
-                               </span>
-                             </div>
-                           )}
+                            {/* Draggable Text Overlay */}
+                            {block.text_overlay && (() => {
+                              const chunks = parseTextOverlayMarkup(block.text_overlay, block.text_overlay_color || 'white');
+                              return (
+                                <div
+                                  className="preview-text-overlay"
+                                  style={{
+                                    left: `${block.text_overlay_placement_x ?? 50}%`,
+                                    top: `${block.text_overlay_placement_y ?? 50}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    position: 'absolute',
+                                    backgroundColor: block.text_overlay_box_enabled ? 'rgba(0,0,0,0.5)' : 'transparent',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    pointerEvents: 'auto',
+                                    cursor: 'move',
+                                    zIndex: 50
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                                    const onMouseMove = (moveEvent) => {
+                                      const relativeX = moveEvent.clientX - rect.left;
+                                      const relativeY = moveEvent.clientY - rect.top;
+                                      const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
+                                      const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
+                                      updateBlockFields('video', selectedBlock.index, {
+                                        text_overlay_placement_x: newXPercent,
+                                        text_overlay_placement_y: newYPercent
+                                      });
+                                    };
+                                    const onMouseUp = () => {
+                                      document.removeEventListener('mousemove', onMouseMove);
+                                      document.removeEventListener('mouseup', onMouseUp);
+                                    };
+                                    document.addEventListener('mousemove', onMouseMove);
+                                    document.addEventListener('mouseup', onMouseUp);
+                                  }}
+                                >
+                                  <span 
+                                    className={`text-template-${block.text_overlay_template || 'none'} inline-block`}
+                                    style={{
+                                      fontFamily: block.text_overlay_font || 'arial',
+                                      fontSize: `${(block.text_overlay_size || 40) * 0.3}px`,
+                                      textShadow: block.text_overlay_outline_width ? `0 0 ${block.text_overlay_outline_width}px black` : 'none',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {chunks.map((chunk, idx) => (
+                                      <span key={idx} style={getStyleForColor(chunk.color)}>
+                                        {chunk.text}
+                                      </span>
+                                    ))}
+                                  </span>
+                                </div>
+                              );
+                            })()}
 
                           {/* Hidden Audios */}
                           {project.voice_blocks[selectedBlock.index] && (project.voice_blocks[selectedBlock.index].status === 'done' || project.voice_blocks[selectedBlock.index].status === 'provided') && (
@@ -4754,7 +5001,7 @@ function App() {
               )}
 
               {/* Screen Footer Info */}
-              <div className="absolute bottom-2 left-3 bg-carbon-card/70 backdrop-blur border border-white/5 px-2 py-0.5 rounded text-[9px] font-mono text-gray-400 z-10">
+              <div className="absolute bottom-2 left-3 bg-carbon-card/70 backdrop-blur border border-white/5 px-2 py-0.5 rounded text-[9px] font-mono text-gray-400 z-10 font-bold tracking-wider">
                 {previewMode === 'composer'
                   ? (selectedBlock ? `SLOT ${selectedBlock.index} ACTIVE PREVIEW` : "COMPOSER PREVIEW")
                   : "MASTER EXPORT PREVIEW"
@@ -4763,7 +5010,10 @@ function App() {
             </div>
 
             {/* Selection Buttons & Mixer Strip */}
-            <div className="w-[600px] flex flex-col gap-3">
+            <div 
+              style={{ width: `${playerWidth}px` }}
+              className="flex flex-col gap-3"
+            >
 
               {/* Preview Selection toggles below player screen */}
               <div className="flex gap-2 justify-center items-center">
@@ -5871,23 +6121,93 @@ function App() {
                         {/* Font Color */}
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] text-gray-400 font-mono">FONT COLOR</label>
-                          <select
-                            value={project.caption_font_color || "yellow"}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const newManifest = { ...project, caption_font_color: val };
-                              setProject(newManifest);
-                              saveProject(newManifest);
-                            }}
-                            className="bg-carbon border border-carbon-border/50 text-white font-mono text-xs p-2 rounded-lg outline-none cursor-pointer"
-                          >
-                            <option value="yellow">Yellow</option>
-                            <option value="white">White</option>
-                            <option value="cyan">Cyan</option>
-                            <option value="green">Green</option>
-                            <option value="magenta">Magenta</option>
-                            <option value="red">Red</option>
-                          </select>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[
+                              'white', 'yellow', '#2dd4bf', '#ef4444', '#22c55e', '#f97316', '#a855f7',
+                              'split-white-yellow', 'split-white-cyan', 'split-blue-pink', 'split-black-orange',
+                              'gradient-red-yellow', 'gradient-blue-cyan', 'gradient-pink-purple'
+                            ].map(color => {
+                              let btnBg = color;
+                              if (color.startsWith('split-')) {
+                                const colors = color.replace('split-', '').split('-');
+                                const map = { white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf', blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316' };
+                                btnBg = `linear-gradient(to right, ${map[colors[0]]} 50%, ${map[colors[1]]} 50%)`;
+                              } else if (color.startsWith('gradient-')) {
+                                const colors = color.replace('gradient-', '').split('-');
+                                const map = { red: '#ef4444', yellow: '#eab308', blue: '#3b82f6', cyan: '#2dd4bf', pink: '#ec4899', purple: '#a855f7' };
+                                btnBg = `linear-gradient(to right, ${map[colors[0]]}, ${map[colors[1]]})`;
+                              }
+                              return (
+                                <button
+                                  key={color}
+                                  onClick={() => {
+                                    const newManifest = { ...project, caption_font_color: color };
+                                    setProject(newManifest);
+                                    saveProject(newManifest);
+                                  }}
+                                  className={`w-6 h-6 rounded-full border ${(project.caption_font_color || "yellow") === color ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                                  style={{ background: btnBg }}
+                                  title={color.replace('-', ' ').toUpperCase()}
+                                />
+                              );
+                            })}
+                            
+                            {(!(project.caption_font_color || "yellow").startsWith('split-') && !(project.caption_font_color || "yellow").startsWith('gradient-')) ? (
+                              <input
+                                type="color"
+                                value={project.caption_font_color && project.caption_font_color.startsWith('#') ? project.caption_font_color : '#ffffff'}
+                                onChange={(e) => {
+                                  const newManifest = { ...project, caption_font_color: e.target.value };
+                                  setProject(newManifest);
+                                  saveProject(newManifest);
+                                }}
+                                className="w-6 h-6 p-0 rounded-full border border-white/10 cursor-pointer overflow-hidden"
+                                title="Custom color"
+                              />
+                            ) : (
+                              (() => {
+                                const activeCol = project.caption_font_color || "yellow";
+                                const isSplit = activeCol.startsWith('split-');
+                                const prefix = isSplit ? 'split-' : 'gradient-';
+                                const parts = activeCol.replace(prefix, '').split('-');
+                                const map = {
+                                  white: '#ffffff', yellow: '#eab308', green: '#22c55e', cyan: '#2dd4bf',
+                                  blue: '#3b82f6', pink: '#ec4899', black: '#000000', orange: '#f97316',
+                                  red: '#ef4444', purple: '#a855f7'
+                                };
+                                const c1 = map[parts[0]] || parts[0] || '#ffffff';
+                                const c2 = map[parts[1]] || parts[1] || '#ffffff';
+                                return (
+                                  <div className="flex gap-1 items-center bg-carbon/50 p-1 rounded-lg border border-carbon-border/30">
+                                    <input
+                                      type="color"
+                                      value={c1.startsWith('#') ? c1 : '#ffffff'}
+                                      onChange={(e) => {
+                                        const newColor = `${prefix}${e.target.value}-${c2}`;
+                                        const newManifest = { ...project, caption_font_color: newColor };
+                                        setProject(newManifest);
+                                        saveProject(newManifest);
+                                      }}
+                                      className="w-5 h-5 p-0 rounded border-0 cursor-pointer overflow-hidden"
+                                      title="Color 1"
+                                    />
+                                    <input
+                                      type="color"
+                                      value={c2.startsWith('#') ? c2 : '#ffffff'}
+                                      onChange={(e) => {
+                                        const newColor = `${prefix}${c1}-${e.target.value}`;
+                                        const newManifest = { ...project, caption_font_color: newColor };
+                                        setProject(newManifest);
+                                        saveProject(newManifest);
+                                      }}
+                                      className="w-5 h-5 p-0 rounded border-0 cursor-pointer overflow-hidden"
+                                      title="Color 2"
+                                    />
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </div>
                         </div>
 
                         {/* Caption Placement */}

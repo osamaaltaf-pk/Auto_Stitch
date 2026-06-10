@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoStitch — Premium UI Redesign Plan</title>
+<style>
+  :root {
+    --bg: #0d0d10;
+    --bg2: #13131a;
+    --bg3: #1a1a24;
+    --bg4: #20202e;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8e6f0;
+    --text2: #9b99b0;
+    --text3: #5c5a72;
+    --purple: #7c6fff;
+    --purple-dim: rgba(124,111,255,0.12);
+    --purple-glow: rgba(124,111,255,0.25);
+    --teal: #2dd4a0;
+    --teal-dim: rgba(45,212,160,0.1);
+    --amber: #f0a940;
+    --amber-dim: rgba(240,169,64,0.1);
+    --coral: #f06060;
+    --coral-dim: rgba(240,96,96,0.1);
+    --green: #4ade80;
+    --font: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(13,13,16,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: var(--purple);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+  }
+  .logo-text { font-size: 14px; font-weight: 600; color: var(--text); }
+  .logo-sep { color: var(--text3); margin: 0 4px; }
+  .logo-sub { font-size: 12px; color: var(--text3); }
+  .topbar-pills { display: flex; gap: 6px; }
+  .pill {
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border2);
+    color: var(--text2); cursor: pointer;
+    transition: all .15s;
+    text-decoration: none;
+  }
+  .pill:hover { border-color: var(--purple); color: var(--purple); }
+  .pill.active { background: var(--purple-dim); border-color: var(--purple); color: var(--purple); }
+
+  /* HERO */
+  .hero {
+    padding: 52px 32px 40px;
+    border-bottom: 1px solid var(--border);
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .hero-eyebrow {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--purple); margin-bottom: 14px;
+  }
+  .hero-title {
+    font-size: 32px; font-weight: 700;
+    line-height: 1.2; margin-bottom: 14px;
+    background: linear-gradient(135deg, #e8e6f0 0%, #9b99b0 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-desc {
+    font-size: 15px; color: var(--text2); line-height: 1.7;
+    max-width: 640px; margin-bottom: 28px;
+  }
+  .hero-stats {
+    display: flex; gap: 32px; flex-wrap: wrap;
+  }
+  .stat { }
+  .stat-num {
+    font-size: 22px; font-weight: 700;
+    color: var(--purple);
+  }
+  .stat-label {
+    font-size: 12px; color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* CONSTRAINT BOX */
+  .constraint-box {
+    margin: 32px auto;
+    max-width: 960px;
+    padding: 0 32px;
+  }
+  .constraint-inner {
+    border: 1px solid rgba(240,169,64,0.3);
+    border-left: 3px solid var(--amber);
+    background: var(--amber-dim);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .constraint-icon { font-size: 18px; margin-top: 1px; flex-shrink: 0; }
+  .constraint-title { font-size: 13px; font-weight: 600; color: var(--amber); margin-bottom: 6px; }
+  .constraint-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .constraint-body strong { color: var(--text); font-weight: 600; }
+
+  /* LAYOUT DIAGRAM */
+  .layout-section {
+    max-width: 960px; margin: 0 auto;
+    padding: 32px 32px 0;
+  }
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text3); margin-bottom: 16px;
+  }
+  .layout-diagram {
+    border: 1px solid var(--border2);
+    border-radius: 12px; overflow: hidden;
+    background: var(--bg2);
+  }
+  .layout-title-bar {
+    padding: 10px 16px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 600;
+    color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .layout-body {
+    display: flex; height: 220px;
+  }
+
+  /* icon rail */
+  .lr-rail {
+    width: 52px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; padding: 8px 0; gap: 4px;
+  }
+  .rail-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px; cursor: pointer;
+    transition: background .15s;
+    border: 1px solid transparent;
+  }
+  .rail-btn:hover { background: var(--bg3); }
+  .rail-btn.active {
+    background: var(--purple-dim);
+    border-color: rgba(124,111,255,0.3);
+  }
+  .rail-icon { font-size: 15px; }
+  .rail-label { font-size: 8px; color: var(--text3); }
+  .rail-btn.active .rail-label { color: var(--purple); }
+
+  /* sub panel */
+  .lr-panel {
+    width: 170px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 10px 8px;
+    overflow: hidden;
+  }
+  .panel-head {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text3); margin-bottom: 8px;
+  }
+  .effect-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  }
+  .ef-tile {
+    height: 38px; border-radius: 5px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: var(--text3);
+    position: relative; overflow: hidden;
+    cursor: pointer; transition: border-color .15s;
+  }
+  .ef-tile.active {
+    border-color: var(--purple);
+    color: var(--purple);
+  }
+  .ef-bg { position: absolute; inset: 0; opacity: 0.12; }
+
+  /* composer */
+  .lr-composer {
+    flex: 1;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative; gap: 6px;
+  }
+  .preview-frame {
+    width: 90%; flex: 1;
+    border-radius: 6px;
+    background: #1a0a00;
+    border: 1px solid var(--border2);
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    margin: 10px 0 0;
+  }
+  .preview-bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #1a0800, #3d1200, #5a1e00);
+    opacity: 0.8;
+  }
+  .scanline {
+    position: absolute; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,80,80,0.7), transparent);
+    animation: scan 1.6s linear infinite;
+  }
+  @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+  .rgb-shift {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,0,0,0.03) 3px, rgba(255,0,0,0.03) 4px);
+    mix-blend-mode: screen;
+  }
+  .preview-label {
+    position: relative; z-index: 2;
+    font-size: 9px; letter-spacing: 0.12em;
+    color: rgba(255,100,80,0.85);
+  }
+  .preview-caption {
+    font-size: 9px; color: var(--text3); padding-bottom: 6px;
+  }
+
+  /* right slot panel */
+  .lr-right {
+    width: 110px; flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 10px 10px;
+  }
+  .rp-head {
+    font-size: 9px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text3); margin-bottom: 8px;
+  }
+  .rp-field { margin-bottom: 7px; }
+  .rp-label { font-size: 9px; color: var(--text3); margin-bottom: 3px; }
+  .rp-val {
+    font-size: 10px; color: var(--text2);
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 6px;
+    font-family: var(--mono);
+  }
+  .timeline-safe {
+    font-size: 9px; color: var(--teal);
+    background: var(--teal-dim);
+    border: 1px solid rgba(45,212,160,0.2);
+    border-radius: 4px; padding: 3px 6px;
+    margin-top: 10px; line-height: 1.4;
+  }
+
+  /* timeline locked badge */
+  .tl-locked {
+    margin: 0 auto 0;
+    max-width: 960px; padding: 14px 32px 0;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .tl-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--teal-dim);
+    border: 1px solid rgba(45,212,160,0.2);
+    border-radius: 8px; padding: 8px 14px;
+    font-size: 12px; color: var(--teal);
+    font-weight: 500;
+  }
+  .tl-badge-icon { font-size: 14px; }
+  .tl-badge-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+
+  /* PHASES */
+  .phases {
+    max-width: 960px; margin: 32px auto 0;
+    padding: 0 32px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .phase-card {
+    border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    background: var(--bg2);
+    transition: border-color .2s;
+  }
+  .phase-card:hover { border-color: var(--border2); }
+  .phase-header {
+    padding: 14px 18px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; user-select: none;
+  }
+  .phase-badge {
+    font-size: 10px; font-weight: 700;
+    padding: 3px 10px; border-radius: 20px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .phase-title-text {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    flex: 1;
+  }
+  .phase-meta { display: flex; gap: 8px; align-items: center; }
+  .phase-scope {
+    font-size: 10px; padding: 2px 8px; border-radius: 20px;
+    border: 1px solid var(--border2); color: var(--text3);
+  }
+  .phase-chevron {
+    font-size: 12px; color: var(--text3);
+    transition: transform .2s;
+  }
+  .phase-card.open .phase-chevron { transform: rotate(180deg); }
+  .phase-body { display: none; }
+  .phase-card.open .phase-body { display: block; }
+
+  .phase-items { padding: 16px 18px; display: flex; flex-direction: column; gap: 0; }
+  .p-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .p-item:last-child { border-bottom: none; }
+  .p-icon {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; margin-top: 1px;
+  }
+  .p-content { flex: 1; }
+  .p-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .p-desc { font-size: 12px; color: var(--text2); line-height: 1.6; }
+  .p-code {
+    display: inline-block; margin-top: 6px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--purple); background: var(--purple-dim);
+    border: 1px solid rgba(124,111,255,0.2);
+    border-radius: 5px; padding: 4px 10px;
+    line-height: 1.5;
+    white-space: pre;
+  }
+  .p-tag {
+    display: inline-block; margin-right: 4px; margin-top: 4px;
+    font-size: 10px; padding: 2px 7px; border-radius: 20px;
+    border: 1px solid var(--border2); color: var(--text3);
+  }
+
+  /* FILE TABLE */
+  .file-section {
+    max-width: 960px; margin: 0 auto;
+    padding: 32px 32px 0;
+  }
+  .file-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .file-table th {
+    background: var(--bg3);
+    padding: 10px 14px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text3); text-align: left;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .file-table td {
+    padding: 10px 14px;
+    font-size: 12px; color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .file-table tr:last-child td { border-bottom: none; }
+  .file-table tr:hover td { background: var(--bg3); }
+  .file-name { font-family: var(--mono); font-size: 11px; color: var(--purple); }
+  .file-phase { }
+  .file-scope-tag {
+    display: inline-block; font-size: 10px;
+    padding: 2px 7px; border-radius: 20px;
+    margin-right: 3px;
+  }
+
+  /* OVERLAY REFERENCE */
+  .overlay-section {
+    max-width: 960px; margin: 0 auto;
+    padding: 32px 32px 0;
+  }
+  .overlay-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .ov-card {
+    border: 1px solid var(--border);
+    border-radius: 9px; overflow: hidden;
+    background: var(--bg2);
+  }
+  .ov-preview {
+    height: 60px; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ov-label {
+    font-size: 10px; letter-spacing: 0.08em;
+    position: relative; z-index: 2;
+  }
+  .ov-meta { padding: 8px 10px; }
+  .ov-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .ov-css { font-family: var(--mono); font-size: 10px; color: var(--text3); line-height: 1.5; }
+
+  /* filter cards */
+  .filter-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .filt-card {
+    border: 1px solid var(--border);
+    border-radius: 9px; overflow: hidden;
+    background: var(--bg2);
+  }
+  .filt-preview {
+    height: 48px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='48'%3E%3Crect width='100' height='48' fill='%23663300'/%3E%3Ccircle cx='50' cy='24' r='18' fill='%23996633'/%3E%3C/svg%3E");
+    background-size: cover;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .filt-meta { padding: 8px 10px; }
+  .filt-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .filt-css { font-family: var(--mono); font-size: 10px; color: var(--text3); line-height: 1.5; }
+
+  /* VERIFICATION */
+  .verify-section {
+    max-width: 960px; margin: 0 auto;
+    padding: 32px 32px 0;
+  }
+  .verify-steps {
+    display: flex; flex-direction: column; gap: 0;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .vs-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .vs-item:hover { background: var(--bg3); }
+  .vs-item:last-child { border-bottom: none; }
+  .vs-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    flex-shrink: 0; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+  }
+  .vs-text { font-size: 13px; color: var(--text2); line-height: 1.6; flex: 1; }
+  .vs-text strong { color: var(--text); font-weight: 600; }
+  .vs-phase-tag {
+    font-size: 10px; padding: 2px 7px; border-radius: 20px;
+    flex-shrink: 0; margin-top: 2px; align-self: flex-start;
+  }
+
+  /* FOOTER */
+  .footer {
+    max-width: 960px; margin: 40px auto 0;
+    padding: 24px 32px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .footer-left { font-size: 12px; color: var(--text3); }
+  .footer-right { font-size: 12px; color: var(--text3); }
+  .footer-version {
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px;
+    padding: 2px 8px; border-radius: 20px;
+    background: var(--purple-dim); color: var(--purple);
+    border: 1px solid rgba(124,111,255,0.2);
+  }
+
+  /* color helpers */
+  .c-purple { color: var(--purple); }
+  .c-teal { color: var(--teal); }
+  .c-amber { color: var(--amber); }
+  .c-coral { color: var(--coral); }
+  .c-green { color: var(--green); }
+  .bg-purple { background: var(--purple-dim); border-color: rgba(124,111,255,0.25); color: var(--purple); }
+  .bg-teal { background: var(--teal-dim); border-color: rgba(45,212,160,0.25); color: var(--teal); }
+  .bg-amber { background: var(--amber-dim); border-color: rgba(240,169,64,0.25); color: var(--amber); }
+  .bg-coral { background: var(--coral-dim); border-color: rgba(240,96,96,0.25); color: var(--coral); }
+
+  /* scanline for VHS */
+  @keyframes vhs-scan { 0% { top: -4px; } 100% { top: 100%; } }
+  @keyframes grain-shift { 0%,100%{transform:translate(0,0)}25%{transform:translate(-1%,-1%)}75%{transform:translate(1%,1%)} }
+  @keyframes leak-slide { 0%{transform:translateX(-60%);opacity:0} 40%{opacity:0.6} 100%{transform:translateX(60%);opacity:0} }
+  @keyframes burn-pulse { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+  @keyframes vig-pulse { 0%,100%{opacity:0.55} 50%{opacity:0.7} }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo-mark">A</div>
+    <span class="logo-text">AutoStitch</span>
+    <span class="logo-sep">/</span>
+    <span class="logo-sub">Premium UI Redesign Plan</span>
+  </div>
+  <div class="topbar-pills">
+    <span class="footer-version">v2.0 Plan</span>
+    <a class="pill" href="#phases">Phases</a>
+    <a class="pill" href="#overlays">Overlays</a>
+    <a class="pill" href="#filters">Filters</a>
+    <a class="pill" href="#files">Files</a>
+    <a class="pill" href="#verify">Verify</a>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Implementation Plan · AutoStitch Studio</div>
+  <div class="hero-title">CapCut-Level Premium UI<br>Without Breaking Your Slots</div>
+  <div class="hero-desc">
+    Restructures the left panel into a vertical icon rail with Effects, Filters, Text, Stickers, and Transitions sub-panels. Adds real-time CSS overlay previews in the composer. <strong style="color:var(--teal)">Timeline and slots are untouched.</strong>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">4</div><div class="stat-label">Phases</div></div>
+    <div class="stat"><div class="stat-num">2</div><div class="stat-label">Files modified (Phase 1–2)</div></div>
+    <div class="stat"><div class="stat-num">7</div><div class="stat-label">CSS overlay effects</div></div>
+    <div class="stat"><div class="stat-num">9</div><div class="stat-label">Color grading filters</div></div>
+    <div class="stat"><div class="stat-num">0</div><div class="stat-label">Timeline changes</div></div>
+  </div>
+</div>
+
+<!-- CONSTRAINT -->
+<div class="constraint-box">
+  <div class="constraint-inner">
+    <div class="constraint-icon">🔒</div>
+    <div>
+      <div class="constraint-title">Timeline Constraint — Sacred &amp; Untouched</div>
+      <div class="constraint-body">
+        The slot grid (VIDEO / SFX / VOICE / MUSIC lanes, slot cards, GEN/DONE/ERROR buttons, time ruler, lane add buttons) <strong>will not be modified in any phase</strong>. The slot system is the core UX advantage over CapCut. All redesign work is strictly in the <strong>top half</strong>: left panel, composer preview, right settings panel.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT DIAGRAM -->
+<div class="layout-section" id="layout">
+  <div class="section-label">New Layout — What Changes Above the Timeline</div>
+  <div class="layout-diagram">
+    <div class="layout-title-bar">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      &nbsp; AutoStitch Studio — New Left Panel Concept
+    </div>
+    <div class="layout-body">
+      <!-- Icon Rail -->
+      <div class="lr-rail">
+        <div class="rail-btn">
+          <span class="rail-icon">⊞</span>
+          <span class="rail-label">Media</span>
+        </div>
+        <div class="rail-btn active">
+          <span class="rail-icon" style="color:var(--purple)">✦</span>
+          <span class="rail-label">Effects</span>
+        </div>
+        <div class="rail-btn">
+          <span class="rail-icon">◑</span>
+          <span class="rail-label">Filters</span>
+        </div>
+        <div class="rail-btn">
+          <span class="rail-icon">T</span>
+          <span class="rail-label">Text</span>
+        </div>
+        <div class="rail-btn">
+          <span class="rail-icon">★</span>
+          <span class="rail-label">Stickers</span>
+        </div>
+        <div class="rail-btn">
+          <span class="rail-icon">⇄</span>
+          <span class="rail-label">Trans.</span>
+        </div>
+      </div>
+      <!-- Sub Panel -->
+      <div class="lr-panel">
+        <div class="panel-head">Video Effects</div>
+        <div class="effect-grid">
+          <div class="ef-tile"><div class="ef-bg" style="background:#888"></div>None</div>
+          <div class="ef-tile active"><div class="ef-bg" style="background:#cc2200"></div>VHS Glitch</div>
+          <div class="ef-tile"><div class="ef-bg" style="background:#8844aa"></div>Film Grain</div>
+          <div class="ef-tile"><div class="ef-bg" style="background:#ffaa00"></div>Light Leak</div>
+          <div class="ef-tile"><div class="ef-bg" style="background:#004488"></div>Vignette</div>
+          <div class="ef-tile"><div class="ef-bg" style="background:#882200"></div>Film Burn</div>
+        </div>
+      </div>
+      <!-- Composer Preview -->
+      <div class="lr-composer">
+        <div class="preview-frame">
+          <div class="preview-bg"></div>
+          <div class="scanline"></div>
+          <div class="rgb-shift"></div>
+          <div class="preview-label">VHS GLITCH ACTIVE — SLOT 4</div>
+        </div>
+        <div class="preview-caption">Composer preview — effect overlaid via CSS, no FFmpeg call</div>
+      </div>
+      <!-- Right Panel -->
+      <div class="lr-right">
+        <div class="rp-head">Slot Settings</div>
+        <div class="rp-field">
+          <div class="rp-label">Effect</div>
+          <div class="rp-val">vhs_glitch</div>
+        </div>
+        <div class="rp-field">
+          <div class="rp-label">Filter</div>
+          <div class="rp-val">cinematic</div>
+        </div>
+        <div class="rp-field">
+          <div class="rp-label">Transition</div>
+          <div class="rp-val">fade</div>
+        </div>
+        <div class="timeline-safe">✓ Timeline<br>unchanged below</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE SAFE -->
+<div class="tl-locked">
+  <div class="tl-badge">
+    <span class="tl-badge-icon">🛡</span>
+    <div>
+      <div>Timeline &amp; Slots — No Changes</div>
+      <div class="tl-badge-sub">VIDEO · SFX · VOICE · MUSIC lanes stay exactly as-is. All slot card logic, GEN/DONE/ERROR state, lane add buttons — untouched.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASES -->
+<div class="phases" id="phases">
+  <div class="section-label" style="margin-bottom:4px">Implementation Phases</div>
+
+  <!-- Phase 1 -->
+  <div class="phase-card open" id="p1">
+    <div class="phase-header" onclick="toggle('p1')">
+      <span class="phase-badge bg-purple">Phase 1</span>
+      <span class="phase-title-text">Left panel — vertical icon rail + sub-panels</span>
+      <div class="phase-meta">
+        <span class="phase-scope">app.js · index.css</span>
+        <span class="phase-scope">Frontend only</span>
+        <span class="phase-chevron">▼</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+
+        <div class="p-item">
+          <div class="p-icon bg-purple">⊞</div>
+          <div class="p-content">
+            <div class="p-title">Replace horizontal tab bar with 52px vertical icon rail</div>
+            <div class="p-desc">Remove MEDIA / SFX / VOICE / MUSIC horizontal tabs from the left panel header. Replace with a fixed 52px-wide vertical column flush to the left edge. Each tab is a 36×36px icon button (icon + 8px label below). SFX and Music tabs removed entirely — they live on timeline track lanes where they belong.</div>
+            <div class="p-code">Tabs: Media  Effects  Filters  Text  Stickers  Transitions</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-purple">▤</div>
+          <div class="p-content">
+            <div class="p-title">Sub-panel renders to the right of the rail (~200px wide)</div>
+            <div class="p-desc">Active tab drives which sub-panel renders inside the same left panel slot. The <code style="font-family:var(--mono);font-size:11px;color:var(--purple)">activeLeftTab</code> state variable controls this. Media sub-panel keeps the existing scan/clip browser. All others are new grid UIs.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-purple">⊡</div>
+          <div class="p-content">
+            <div class="p-title">Effects + Filters + Stickers — 2-column thumbnail grids</div>
+            <div class="p-desc">Each tile: 70px wide, 52px tall, rounded border, colored CSS background representing the effect/filter, name label underneath. Active tile gets purple accent border + glow. Clicking writes to selected block metadata and triggers composer re-render. No real thumbnail images needed — CSS backgrounds only.</div>
+            <span class="p-tag">grid-template-columns: 1fr 1fr</span>
+            <span class="p-tag">gap: 6px</span>
+            <span class="p-tag">border-radius: 7px</span>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-purple">⇄</div>
+          <div class="p-content">
+            <div class="p-title">Transitions sub-panel — single column list</div>
+            <div class="p-desc">Transitions shown as single-column list items (not grid) since they represent named sequences. Items: None (Cut), Fade, Dissolve, Wipe Left, Wipe Right, Zoom In, Zoom Out, Slide Up. Clicking applies transition to the selected block's <code style="font-family:var(--mono);font-size:11px;color:var(--purple)">transition</code> metadata field.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-purple">T</div>
+          <div class="p-content">
+            <div class="p-title">Text sub-panel — two sections stacked</div>
+            <div class="p-desc">Section 1: <strong style="color:var(--text)">Auto-Captions</strong> — moves existing global subtitle settings (burn checkbox, style mode, font, color, placement, backdrop) here from the right panel Global Settings. Section 2: <strong style="color:var(--text)">Slot Text Overlay</strong> — new per-slot text annotation (added in Phase 3 with backend).</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase-card open" id="p2">
+    <div class="phase-header" onclick="toggle('p2')">
+      <span class="phase-badge bg-teal">Phase 2</span>
+      <span class="phase-title-text">Real-time CSS overlay system on the composer preview</span>
+      <div class="phase-meta">
+        <span class="phase-scope">app.js · index.css</span>
+        <span class="phase-scope">Frontend only</span>
+        <span class="phase-chevron">▼</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+
+        <div class="p-item">
+          <div class="p-icon bg-teal">👁</div>
+          <div class="p-content">
+            <div class="p-title">CSS filter applied inline to preview video/image element</div>
+            <div class="p-desc">When a slot is selected, read its <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">color_grading</code> field and apply the mapped CSS filter string directly as <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">style.filter</code> on the preview <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">&lt;video&gt;</code> or <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">&lt;img&gt;</code> element. Instant — no backend, no API call.</div>
+            <div class="p-code">cinematic:  contrast(1.15) saturate(0.85) sepia(0.1)
+cool_blue:  hue-rotate(20deg) saturate(1.2) brightness(1.05)
+warm_gold:  sepia(0.3) saturate(1.4) brightness(1.02)
+vintage:    sepia(0.4) contrast(0.9) brightness(0.95)
+hi_contrast:contrast(1.5) saturate(1.1)
+cyberpunk:  hue-rotate(270deg) saturate(2) contrast(1.1)
+bleach:     contrast(1.2) saturate(0.6) brightness(1.1)
+bw:         grayscale(1) contrast(1.1)
+teal_orange:saturate(1.4) hue-rotate(-15deg) contrast(1.1)
+indie_warm: sepia(0.2) saturate(1.3) brightness(1.04) contrast(1.05)
+retro_90s:  sepia(0.45) contrast(1.1) saturate(0.85) brightness(1.03)</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-teal">◈</div>
+          <div class="p-content">
+            <div class="p-title">Overlay div layers rendered on top of the preview for video effects</div>
+            <div class="p-desc">A container div wraps the preview media element with <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">position:relative</code>. When a slot has an <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">overlay_effect</code> set, an absolutely positioned child div is rendered on top with the matching CSS class. The class drives the animation. Switching slots swaps the class instantly.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-teal">★</div>
+          <div class="p-content">
+            <div class="p-title">Sticker overlay — bouncing badge on preview corner</div>
+            <div class="p-desc">If selected block has a <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">sticker</code> field set, render a small emoji badge absolutely in the top-right corner of the preview frame with a subtle bounce animation. Stickers: 🔥 Fire, ❤️ Like, 🔔 Subscribe, ⚠️ Warning, 💥 Boom, 💡 Idea, 📈 Viral, ⭐ Star.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-teal">⟳</div>
+          <div class="p-content">
+            <div class="p-title">Slot selection triggers preview re-render</div>
+            <div class="p-desc">Existing slot click handler already updates the right panel. Extend it to also call <code style="font-family:var(--mono);font-size:11px;color:var(--teal)">updateComposerOverlays(block)</code> which reads the block's effect/filter/sticker metadata and applies CSS classes and filter styles to the preview element. No new API endpoints.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase-card" id="p3">
+    <div class="phase-header" onclick="toggle('p3')">
+      <span class="phase-badge bg-amber">Phase 3</span>
+      <span class="phase-title-text">Text overlay — per-slot annotation with draggable position</span>
+      <div class="phase-meta">
+        <span class="phase-scope">app.js · manifest.py · stitcher.py</span>
+        <span class="phase-scope">Frontend + Backend</span>
+        <span class="phase-chevron">▼</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+
+        <div class="p-item">
+          <div class="p-icon bg-amber">📄</div>
+          <div class="p-content">
+            <div class="p-title">manifest.py — extend VideoBlock with text overlay fields</div>
+            <div class="p-desc">Add new optional fields to the <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">VideoBlock</code> dataclass. All default to safe values so existing projects load without migration.</div>
+            <div class="p-code">text_overlay: str = ""
+text_overlay_font: str = "arial"
+text_overlay_size: int = 40
+text_overlay_color: str = "white"
+text_overlay_placement_y: int = 50   # 0–100 % from top
+text_overlay_box_enabled: bool = False
+text_overlay_outline_width: int = 3</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-amber">🎬</div>
+          <div class="p-content">
+            <div class="p-title">stitcher.py — render text_overlay via FFmpeg drawtext</div>
+            <div class="p-desc">Inside <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">build_ffmpeg_cmd</code>, if <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">block.text_overlay</code> is non-empty, append a <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">drawtext</code> filter with computed y position. Also add new premium color grading filters to the existing color grading map.</div>
+            <div class="p-code">drawtext=text='{text}':fontfile='{font}':fontsize={size}:
+  fontcolor={color}:x=(w-text_w)/2:
+  y=h*{placement_y}/100:
+  box={box_enabled}:boxborderw={outline}
+
+# New FFmpeg color grading entries:
+teal_orange: colorbalance=rs=0.12:gs=0.0:bs=-0.1:
+             rm=0.15:gm=-0.03:bm=-0.15
+indie_warm:  colorbalance=rs=0.1:gs=0.05:bs=-0.05,
+             eq=contrast=1.05:brightness=0.02
+retro_90s:   eq=contrast=1.1:saturation=0.85:brightness=0.03,
+             colorbalance=rs=0.05:gs=0.02:bs=-0.04</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-amber">↕</div>
+          <div class="p-content">
+            <div class="p-title">app.js — draggable text block on composer preview</div>
+            <div class="p-desc">Render the <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">text_overlay</code> string as an absolutely positioned div over the preview. On <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">mousedown</code>, track vertical drag and compute new <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">placement_y</code> as a percentage of preview height. On <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">mouseup</code>, save to block metadata. Cursor changes to <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">ns-resize</code> on hover.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-amber">🖊</div>
+          <div class="p-content">
+            <div class="p-title">Text sub-panel — Slot Text Overlay controls</div>
+            <div class="p-desc">Below the Auto-Captions section (moved from Global Settings), add a Slot Text Overlay section: text input, font dropdown, size slider (12–96), color picker, box/outline toggle, vertical placement slider (0–100%). All inputs sync to selected block metadata in real-time.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="phase-card" id="p4">
+    <div class="phase-header" onclick="toggle('p4')">
+      <span class="phase-badge bg-coral">Phase 4</span>
+      <span class="phase-title-text">Premium media bin — drag &amp; drop + context menu</span>
+      <div class="phase-meta">
+        <span class="phase-scope">app.js</span>
+        <span class="phase-scope">Frontend only</span>
+        <span class="phase-chevron">▼</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <div class="phase-items">
+
+        <div class="p-item">
+          <div class="p-icon bg-coral">⊟</div>
+          <div class="p-content">
+            <div class="p-title">Media sub-panel — segmented category tabs</div>
+            <div class="p-desc">Add a mini tab row inside the Media sub-panel: <strong style="color:var(--text)">All · Videos · Voice · SFX · Music</strong>. Filters the asset list below. Assets shown as compact cards with filename, type icon, and duration. This is a pure UI filter on the existing asset data — no new API.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-coral">⤵</div>
+          <div class="p-content">
+            <div class="p-title">Asset cards draggable → timeline blocks are drop targets</div>
+            <div class="p-desc">Set <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">draggable=true</code> on asset cards. On <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">dragstart</code>, store asset path via <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">dataTransfer.setData("text/asset", JSON.stringify(asset))</code>. Timeline block lane cells listen for <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">dragover</code> + <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">drop</code>. Valid drop target highlights with a teal glow border. On drop, update block audio/video src.</div>
+          </div>
+        </div>
+
+        <div class="p-item">
+          <div class="p-icon bg-coral">≡</div>
+          <div class="p-content">
+            <div class="p-title">Right-click context menu on asset cards</div>
+            <div class="p-desc">On <code style="font-family:var(--mono);font-size:11px;color:var(--coral)">contextmenu</code> event, render an absolute-positioned popup with: <strong style="color:var(--text)">Apply to Selected Slot</strong> · <strong style="color:var(--text)">Insert at End</strong> · <strong style="color:var(--text)">Delete Asset</strong>. Closes on outside click via a transparent overlay div. No third-party library. Pointer-events trap on the menu itself prevents premature close.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- OVERLAY REFERENCE -->
+<div class="overlay-section" id="overlays">
+  <div class="section-label" style="margin-bottom:16px">CSS Overlay Effects Reference</div>
+  <div class="overlay-grid">
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#1a0000;overflow:hidden;">
+        <div style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(255,60,60,0.8),transparent);animation:vhs-scan 1.5s linear infinite;"></div>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,0,0,0.04) 3px,rgba(255,0,0,0.04) 4px);"></div>
+        <span class="ov-label" style="color:rgba(255,100,80,0.8);position:relative;z-index:2;font-size:9px;letter-spacing:0.1em;">VHS</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">VHS Glitch</div>
+        <div class="ov-css">.effect-vhs-glitch
+animated scanline + RGB scanlines
+@keyframes vhs-scan {
+  0%  { top: -4px }
+  100%{ top: 100% }
+}</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#0d0d0d;">
+        <div style="position:absolute;inset:0;opacity:0.6;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22/><feColorMatrix type=%22saturate%22 values=%220%22/></filter><rect width=%2280%22 height=%2280%22 filter=%22url(%23n)%22/></svg>');animation:grain-shift .08s steps(1) infinite;"></div>
+        <span class="ov-label" style="color:rgba(200,200,200,0.7);position:relative;z-index:2;font-size:9px;">GRAIN</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Film Grain</div>
+        <div class="ov-css">.effect-film-grain
+SVG feTurbulence noise overlay
+animation: grain-shift .08s
+steps(1) infinite</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#0a0a1a;overflow:hidden;">
+        <div style="position:absolute;width:200%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,220,100,0.5),rgba(255,160,60,0.3),transparent);animation:leak-slide 3s ease-in-out infinite;"></div>
+        <span class="ov-label" style="color:rgba(255,200,80,0.9);position:relative;z-index:2;font-size:9px;">LEAK</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Light Leak</div>
+        <div class="ov-css">.effect-light-leak
+sliding warm gradient
+animation: leak-slide
+3s ease-in-out infinite</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#0a0005;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 80%,rgba(255,80,0,0.6),rgba(255,40,0,0.3),transparent 70%);animation:burn-pulse 2s ease-in-out infinite;"></div>
+        <span class="ov-label" style="color:rgba(255,140,40,0.9);position:relative;z-index:2;font-size:9px;">BURN</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Film Burn</div>
+        <div class="ov-css">.effect-film-burn
+radial warm glow from bottom
+animation: burn-pulse
+2s ease-in-out infinite</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#080810;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,0.75) 100%);animation:vig-pulse 3s ease-in-out infinite;"></div>
+        <span class="ov-label" style="color:rgba(180,160,255,0.8);position:relative;z-index:2;font-size:9px;">VIGNETTE</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Vignette</div>
+        <div class="ov-css">.effect-vignette
+radial dark border overlay
+animation: vig-pulse
+3s ease-in-out infinite</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#050510;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(0,255,255,0.04) 40px,rgba(0,255,255,0.04) 42px);"></div>
+        <div style="position:absolute;left:0;right:0;height:3px;background:rgba(0,200,255,0.6);top:30%;clip-path:inset(0 20% 0 0);animation:vhs-scan 0.4s linear infinite;"></div>
+        <span class="ov-label" style="color:rgba(0,220,255,0.8);position:relative;z-index:2;font-size:9px;">DIGITAL</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Digital Glitch</div>
+        <div class="ov-css">.effect-glitch-digital
+horizontal clip offset stripes
+fast scan bar animation
+0.4s linear infinite</div>
+      </div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-preview" style="background:#0c0c0c;overflow:hidden;">
+        <div style="position:absolute;inset:0;opacity:0.25;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><circle cx=%2225%22 cy=%2235%22 r=%222%22 fill=%22white%22/><circle cx=%2260%22 cy=%2215%22 r=%221.5%22 fill=%22white%22/><circle cx=%2280%22 cy=%2260%22 r=%221%22 fill=%22white%22/><circle cx=%2210%22 cy=%2275%22 r=%221.5%22 fill=%22white%22/><circle cx=%2245%22 cy=%2285%22 r=%221%22 fill=%22white%22/></svg>');animation:grain-shift 0.12s steps(1) infinite;"></div>
+        <span class="ov-label" style="color:rgba(220,210,190,0.7);position:relative;z-index:2;font-size:9px;">DUST</span>
+      </div>
+      <div class="ov-meta">
+        <div class="ov-name">Dust</div>
+        <div class="ov-css">.effect-dust
+sparse particle SVG overlay
+animation: grain-shift
+0.12s steps(1) infinite</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FILTERS REFERENCE -->
+<div class="overlay-section" id="filters" style="padding-top:28px;">
+  <div class="section-label" style="margin-bottom:16px">CSS Color Grading Filters Reference</div>
+  <div class="filter-grid">
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:contrast(1.15) saturate(0.85) sepia(0.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Cinematic</div>
+        <div class="filt-css">contrast(1.15) saturate(0.85)
+sepia(0.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:hue-rotate(20deg) saturate(1.2) brightness(1.05);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Cool Blue</div>
+        <div class="filt-css">hue-rotate(20deg) saturate(1.2)
+brightness(1.05)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:sepia(0.3) saturate(1.4) brightness(1.02);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Warm Gold</div>
+        <div class="filt-css">sepia(0.3) saturate(1.4)
+brightness(1.02)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:sepia(0.4) contrast(0.9) brightness(0.95);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Vintage</div>
+        <div class="filt-css">sepia(0.4) contrast(0.9)
+brightness(0.95)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:contrast(1.5) saturate(1.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">High Contrast</div>
+        <div class="filt-css">contrast(1.5)
+saturate(1.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:hue-rotate(270deg) saturate(2) contrast(1.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Cyberpunk</div>
+        <div class="filt-css">hue-rotate(270deg) saturate(2)
+contrast(1.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:contrast(1.2) saturate(0.6) brightness(1.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Bleach Bypass</div>
+        <div class="filt-css">contrast(1.2) saturate(0.6)
+brightness(1.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:grayscale(1) contrast(1.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Black &amp; White</div>
+        <div class="filt-css">grayscale(1)
+contrast(1.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:saturate(1.4) hue-rotate(-15deg) contrast(1.1);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Teal &amp; Orange ✦</div>
+        <div class="filt-css">saturate(1.4) hue-rotate(-15deg)
+contrast(1.1)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:sepia(0.2) saturate(1.3) brightness(1.04) contrast(1.05);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Indie Warm ✦</div>
+        <div class="filt-css">sepia(0.2) saturate(1.3)
+brightness(1.04) contrast(1.05)</div>
+      </div>
+    </div>
+
+    <div class="filt-card">
+      <div class="filt-preview" style="filter:sepia(0.45) contrast(1.1) saturate(0.85) brightness(1.03);"></div>
+      <div class="filt-meta">
+        <div class="filt-name">Retro 90s ✦</div>
+        <div class="filt-css">sepia(0.45) contrast(1.1)
+saturate(0.85) brightness(1.03)</div>
+      </div>
+    </div>
+
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-top:10px;">✦ = new premium filters. CSS preview above matches what you'll see in the composer. FFmpeg equivalents in Phase 3.</div>
+</div>
+
+<!-- FILES TABLE -->
+<div class="file-section" id="files">
+  <div class="section-label" style="margin-bottom:16px">Files Modified Per Phase</div>
+  <table class="file-table">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Phase</th>
+        <th>Scope</th>
+        <th>What Changes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="file-name">static/app.js</span></td>
+        <td><span class="file-scope-tag bg-purple" style="border-radius:20px;padding:2px 7px;">1</span><span class="file-scope-tag bg-teal" style="border-radius:20px;padding:2px 7px;">2</span><span class="file-scope-tag bg-amber" style="border-radius:20px;padding:2px 7px;">3</span><span class="file-scope-tag bg-coral" style="border-radius:20px;padding:2px 7px;">4</span></td>
+        <td style="color:var(--text2)">Frontend</td>
+        <td style="color:var(--text2)">Icon rail, sub-panels, overlay system, text drag, drag-and-drop media</td>
+      </tr>
+      <tr>
+        <td><span class="file-name">static/index.css</span></td>
+        <td><span class="file-scope-tag bg-purple" style="border-radius:20px;padding:2px 7px;">1</span><span class="file-scope-tag bg-teal" style="border-radius:20px;padding:2px 7px;">2</span></td>
+        <td style="color:var(--text2)">Frontend</td>
+        <td style="color:var(--text2)">Icon rail layout, effect overlay CSS classes + @keyframes animations, filter grid styles, context menu styles</td>
+      </tr>
+      <tr>
+        <td><span class="file-name">app/core/manifest.py</span></td>
+        <td><span class="file-scope-tag bg-amber" style="border-radius:20px;padding:2px 7px;">3</span></td>
+        <td style="color:var(--text2)">Backend</td>
+        <td style="color:var(--text2)">Add 7 new optional text overlay fields to VideoBlock dataclass. No migration needed — all default to safe values.</td>
+      </tr>
+      <tr>
+        <td><span class="file-name">app/core/stitcher.py</span></td>
+        <td><span class="file-scope-tag bg-amber" style="border-radius:20px;padding:2px 7px;">3</span></td>
+        <td style="color:var(--text2)">Backend</td>
+        <td style="color:var(--text2)">Add drawtext filter for slot text overlay. Add teal_orange, indie_warm, retro_90s to color grading FFmpeg filter map.</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text3)" colspan="4">
+          <strong style="color:var(--teal)">No changes:</strong> timeline.js (if separate), slot card components, lane logic, GEN/DONE/ERROR state machine, audio generation pipeline, FFmpeg render pipeline (until Phase 3 adds drawtext).
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- VERIFICATION -->
+<div class="verify-section" id="verify">
+  <div class="section-label" style="margin-bottom:16px">Verification Checklist</div>
+  <div class="verify-steps">
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--purple-dim);color:var(--purple);">1</div>
+      <div class="vs-text">Launch <code style="font-family:var(--mono);font-size:11px;">run.bat</code>, open <code style="font-family:var(--mono);font-size:11px;">localhost:8080</code>. Verify <strong>left panel shows vertical icon rail</strong> with Media, Effects, Filters, Text, Stickers, Transitions tabs. No horizontal tabs visible.</div>
+      <span class="vs-phase-tag bg-purple">Phase 1</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--purple-dim);color:var(--purple);">2</div>
+      <div class="vs-text">Click <strong>Effects tab</strong> → verify 2-column grid renders with VHS Glitch, Film Grain, Light Leak, Vignette, Film Burn, Digital Glitch, Dust tiles. Click <strong>Filters tab</strong> → verify all 11 filters shown including Teal &amp; Orange, Indie Warm, Retro 90s.</div>
+      <span class="vs-phase-tag bg-purple">Phase 1</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--teal-dim);color:var(--teal);">3</div>
+      <div class="vs-text">Select a timeline VIDEO slot. Click <strong>"VHS Glitch"</strong> in Effects panel. Verify composer preview immediately shows animated scanline + RGB effect overlay. No page reload, no API call.</div>
+      <span class="vs-phase-tag bg-teal">Phase 2</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--teal-dim);color:var(--teal);">4</div>
+      <div class="vs-text">With same slot selected, click <strong>"Vintage"</strong> in Filters panel. Verify preview image/video shows sepia-toned CSS filter applied in real time. Click a different slot — verify preview reverts to that slot's filter setting.</div>
+      <span class="vs-phase-tag bg-teal">Phase 2</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--teal-dim);color:var(--teal);">5</div>
+      <div class="vs-text">Click a <strong>Sticker</strong> tile (e.g. 🔥 Fire). Verify animated emoji badge appears in top-right corner of the composer preview frame.</div>
+      <span class="vs-phase-tag bg-teal">Phase 2</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--teal-dim);color:var(--teal);">6</div>
+      <div class="vs-text">Save project. Reload page. Re-select same slot. Verify <strong>effect, filter, and sticker settings persisted</strong> and preview re-renders them on selection.</div>
+      <span class="vs-phase-tag bg-teal">Phase 2</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--amber-dim);color:var(--amber);">7</div>
+      <div class="vs-text">Click <strong>Text tab</strong>. Type overlay text in Slot Text Overlay input. Verify text renders on the composer preview. <strong>Drag it vertically</strong> on the preview — verify position updates live. Verify <code style="font-family:var(--mono);font-size:11px;">text_overlay_placement_y</code> updates in slot metadata.</div>
+      <span class="vs-phase-tag bg-amber">Phase 3</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--amber-dim);color:var(--amber);">8</div>
+      <div class="vs-text">Run <strong>RENDER</strong>. Open <code style="font-family:var(--mono);font-size:11px;">master.mp4</code>. Verify: (a) text overlay appears at correct vertical position, (b) color grading filter is applied to the correct slots, (c) all existing audio/voice/SFX still correct. Timeline slots unaffected.</div>
+      <span class="vs-phase-tag bg-amber">Phase 3</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--coral-dim);color:var(--coral);">9</div>
+      <div class="vs-text">In <strong>Media tab</strong>, verify segmented tabs (All/Videos/Voice/SFX/Music) filter the asset list. <strong>Drag a Voice file</strong> from media bin and drop onto a VOICE timeline slot — verify slot audio updates.</div>
+      <span class="vs-phase-tag bg-coral">Phase 4</span>
+    </div>
+
+    <div class="vs-item">
+      <div class="vs-num" style="background:var(--coral-dim);color:var(--coral);">10</div>
+      <div class="vs-text"><strong>Right-click</strong> an asset card. Verify context menu shows 3 options. Click <strong>"Apply to Selected Slot"</strong>. Verify slot updates. Click outside menu — verify it dismisses cleanly.</div>
+      <span class="vs-phase-tag bg-coral">Phase 4</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    AutoStitch Studio · Premium UI Redesign Plan<br>
+    <span style="color:var(--text3);font-size:11px;">Timeline &amp; slot system: untouched across all phases</span>
+  </div>
+  <div class="footer-right">
+    <span class="footer-version">v2.0</span>
+    &nbsp; Phase 1+2: frontend only &nbsp;·&nbsp; Phase 3+4: light backend additions
+  </div>
+</div>
+
+<script>
+  function toggle(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+  }
+  // Open Phase 1 and 2 by default, keep 3+4 closed on load
+  document.getElementById('p3').classList.remove('open');
+  document.getElementById('p4').classList.remove('open');
+</script>
+
+</body>
+</html>
