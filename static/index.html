@@ -3,6 +3,21 @@
 
 <head>
   <meta charset="UTF-8">
+  <script>
+    // Silence console warnings from client-side Babel and Tailwind runtime compilation
+    (function() {
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && typeof args[0] === 'string' && (
+          args[0].indexOf("cdn.tailwindcss.com") !== -1 || 
+          args[0].indexOf("browser Babel transformer") !== -1
+        )) {
+          return;
+        }
+        originalWarn.apply(console, args);
+      };
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AutoStitch Studio — AI-Powered Video Composer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
