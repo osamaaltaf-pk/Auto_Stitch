@@ -37,14 +37,18 @@ REM 3. If Python is completely missing, download and install it
 echo   Python not found. Bootstrapping Python 3.12.10...
 if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
 
-echo   Downloading Python 3.12.10 installer...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile '%ROOT%\bin\python-3.12.10-amd64.exe'"
+if exist "%ROOT%\bin\python-3.12.10-amd64.exe" (
+    echo   [OK] Python installer already present at bin\python-3.12.10-amd64.exe - skipping download.
+) else (
+    echo   Downloading Python 3.12.10 installer...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile '%ROOT%\bin\python-3.12.10-amd64.exe'"
 
-if errorlevel 1 (
-    echo   [!!] ERROR: Failed to download Python. Check internet connection.
-    pause
-    exit /b 1
+    if errorlevel 1 (
+        echo   [!!] ERROR: Failed to download Python. Check internet connection.
+        pause
+        exit /b 1
+    )
 )
 
 echo   Installing Python 3.12.10 silently...
@@ -93,7 +97,7 @@ echo.
 REM ── PHASE 2: Install Hugging Face CLI ──────────────────────────────────────
 echo [2/8] Setting up Hugging Face CLI...
 %PYTHON_CMD% -m pip install --upgrade pip --quiet
-%PYTHON_CMD% -m pip install -U "huggingface_hub[cli]" --quiet
+%PYTHON_CMD% -m pip install -U huggingface_hub --quiet
 if errorlevel 1 (
     echo   [!!] WARNING: pip installation of huggingface_hub failed.
     echo        Trying direct PowerShell installer...
@@ -105,17 +109,43 @@ for /f "delims=" %%I in ('%PYTHON_CMD% -c "import sys, os; print(os.path.dirname
 set "PATH=!PY_DIR!;!PY_DIR!\Scripts;%PATH%"
 
 REM Determine the correct HF CLI command
-set "HF_CMD=hf"
-where hf >nul 2>&1
-if errorlevel 1 (
+set "HF_CMD="
+
+REM 1. Check if hf.exe exists in python Scripts folder
+if exist "!PY_DIR!\Scripts\hf.exe" (
+    set "HF_CMD=!PY_DIR!\Scripts\hf.exe"
+)
+
+REM 2. Check if hf is in PATH
+if not defined HF_CMD (
+    where hf >nul 2>&1
+    if not errorlevel 1 (
+        set "HF_CMD=hf"
+    )
+)
+
+REM 3. Check if huggingface-cli is in PATH (even though deprecated, check as last resort)
+if not defined HF_CMD (
     where huggingface-cli >nul 2>&1
     if not errorlevel 1 (
         set "HF_CMD=huggingface-cli"
-    ) else (
-        echo   [!!] ERROR: Hugging Face CLI (hf) was not found after installation.
-        pause
-        exit /b 1
     )
+)
+
+REM 4. Check if it's installed in the user cargo bin or other common locations
+if not defined HF_CMD (
+    if exist "%USERPROFILE%\.cargo\bin\hf.exe" (
+        set "HF_CMD=%USERPROFILE%\.cargo\bin\hf.exe"
+    )
+)
+
+REM 5. If still not found, print error and exit
+if not defined HF_CMD (
+    echo   [!!] ERROR: Hugging Face CLI (hf) was not found after installation.
+    echo        Please try running this command manually to install it:
+    echo        python -m pip install -U huggingface_hub
+    pause
+    exit /b 1
 )
 echo   [OK] Hugging Face CLI ready: %HF_CMD%
 echo.
