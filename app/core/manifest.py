@@ -88,6 +88,18 @@ class VideoBlock:
     overlay_effect: str = "none"
     canvas_fit_mode: str = "letterbox"
     color_grading: str = "none"
+    text_overlay: str = ""
+    text_overlay_font: str = "arial"
+    text_overlay_size: int = 40
+    text_overlay_color: str = "white"
+    text_overlay_placement_y: int = 50
+    text_overlay_placement_x: int = 50
+    text_overlay_box_enabled: bool = False
+    text_overlay_outline_width: int = 3
+    sticker: str = "none"
+    sticker_placement_x: int = 85
+    sticker_placement_y: int = 15
+    text_overlay_template: str = "none"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -108,7 +120,19 @@ class VideoBlock:
             lip_sync_character_profile_id=d.get("lip_sync_character_profile_id"),
             overlay_effect=d.get("overlay_effect", "none"),
             canvas_fit_mode=d.get("canvas_fit_mode", "letterbox"),
-            color_grading=d.get("color_grading", "none")
+            color_grading=d.get("color_grading", "none"),
+            text_overlay=d.get("text_overlay", ""),
+            text_overlay_font=d.get("text_overlay_font", "arial"),
+            text_overlay_size=int(d.get("text_overlay_size", 40)),
+            text_overlay_color=d.get("text_overlay_color", "white"),
+            text_overlay_placement_y=int(d.get("text_overlay_placement_y", 50)),
+            text_overlay_placement_x=int(d.get("text_overlay_placement_x", 50)),
+            text_overlay_box_enabled=bool(d.get("text_overlay_box_enabled", False)),
+            text_overlay_outline_width=int(d.get("text_overlay_outline_width", 3)),
+            sticker=d.get("sticker", "none"),
+            sticker_placement_x=int(d.get("sticker_placement_x", 85)),
+            sticker_placement_y=int(d.get("sticker_placement_y", 15)),
+            text_overlay_template=d.get("text_overlay_template", "none")
         )
 
 @dataclass

@@ -39,14 +39,35 @@ class TTSEngine:
         
         # Load model with optimized parameters
         try:
-            # Login to HF Hub for gated model access
-            token_path = Path(__file__).parent / "hf token.txt"
-            if token_path.exists():
-                token = token_path.read_text().strip()
-                if token:
-                    print(f"Found token, logging in...")
-                    from huggingface_hub import login
-                    login(token=token)
+            # Check if model is already in local cache. If it is, bypass login and enable offline mode.
+            cache_dir = Path(os.environ["HF_HOME"]) / "hub"
+            has_local = False
+            if cache_dir.exists():
+                for folder in cache_dir.glob("*pocket-tts*"):
+                    snapshots_dir = folder / "snapshots"
+                    if snapshots_dir.exists() and any(snapshots_dir.iterdir()):
+                        has_local = True
+                        break
+
+            if has_local:
+                print("[INFO] Local cached TTS model found. Enabling offline mode and skipping HF login.")
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+            else:
+                print("[INFO] Local cached TTS model NOT found. Enabling online mode for login/download.")
+                os.environ["HF_HUB_OFFLINE"] = "0"
+                os.environ["TRANSFORMERS_OFFLINE"] = "0"
+                # Login to HF Hub for gated model access
+                token_path = Path(__file__).parent / "hf token.txt"
+                if token_path.exists():
+                    token = token_path.read_text().strip()
+                    if token:
+                        print(f"Found token, logging in...")
+                        from huggingface_hub import login
+                        try:
+                            login(token=token)
+                        except Exception as login_err:
+                            print(f"[WARNING] HF login failed: {login_err}. Attempting online download anyway...")
             
             # Load full model with cloning
             print("Loading standard model with dynamic cloning (first run may download weights)...")

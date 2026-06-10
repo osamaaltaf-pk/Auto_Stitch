@@ -9,23 +9,32 @@ echo.
 
 REM ── Check Python ────────────────────────────────────
 echo [1/5] Checking Python...
-python --version >nul 2>&1
+python -c "import socket; import venv" >nul 2>&1
 if errorlevel 1 goto check_local_python
 set PYTHON_CMD=python
+set USE_FALLBACK_VENV=N
 echo       System Python found.
 goto python_ok
 
 :check_local_python
 if exist "bin\python_portable\python.exe" (
     set PYTHON_CMD=bin\python_portable\python.exe
+    set USE_FALLBACK_VENV=Y
     echo       Portable Python found at bin\python_portable\python.exe.
     goto python_ok
+)
+if not exist "bin\python-3.12.10-embed-amd64.zip" (
+    echo       Portable Python not found. Downloading from python.org...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; mkdir bin -Force | Out-Null; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.1/python-3.12.1-embed-amd64.zip' -OutFile 'bin\python-3.12.10-embed-amd64.zip'; Write-Host '      Python download complete.' } catch { Write-Host 'ERROR: Python download failed: ' $_.Exception.Message; exit 1 }"
+    if errorlevel 1 goto python_fail
 )
 if exist "bin\python-3.12.10-embed-amd64.zip" (
     echo       Local Python zip found. Extracting to bin\python_portable...
     powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path bin\python-3.12.10-embed-amd64.zip -DestinationPath bin\python_portable -Force"
     if exist "bin\python_portable\python.exe" (
         set PYTHON_CMD=bin\python_portable\python.exe
+        set USE_FALLBACK_VENV=Y
         echo       Successfully extracted portable Python.
         
         REM Enable site-packages inside embedded python
@@ -79,12 +88,26 @@ set INSTALL_SFX=Y
 REM ── Create Main App Virtual Environment ─────────────
 echo.
 echo [2/5] Setting up main application virtual environment...
-if exist "venv" goto venv_exists
-%PYTHON_CMD% -m venv venv
-if errorlevel 1 (
-    echo       venv creation failed. Retrying with portable fallback...
+if exist "venv" (
+    venv\Scripts\python -c "import socket" >nul 2>&1
+    if errorlevel 1 (
+        echo       Existing venv is broken. Cleaning up and recreating...
+        rmdir /s /q venv >nul 2>&1
+    ) else (
+        goto venv_exists
+    )
+)
+if "%USE_FALLBACK_VENV%"=="Y" (
+    echo       Using portable fallback wrapper for main environment...
     call :create_fallback_venv venv "..\.."
     if errorlevel 1 goto venv_fail
+) else (
+    %PYTHON_CMD% -m venv venv
+    if errorlevel 1 (
+        echo       venv creation failed. Retrying with portable fallback...
+        call :create_fallback_venv venv "..\.."
+        if errorlevel 1 goto venv_fail
+    )
 )
 echo       venv created successfully.
 goto venv_ok
@@ -119,12 +142,26 @@ if /i "!INSTALL_TTS!"=="N" goto skip_tts
 
 echo.
 echo [3/5] Setting up Text-to-Speech ^(text_to_speech_server\venv^)...
-if exist "text_to_speech_server\venv" goto tts_venv_exists
-%PYTHON_CMD% -m venv text_to_speech_server\venv
-if errorlevel 1 (
-    echo       TTS venv creation failed. Retrying with portable fallback...
+if exist "text_to_speech_server\venv" (
+    text_to_speech_server\venv\Scripts\python -c "import socket" >nul 2>&1
+    if errorlevel 1 (
+        echo       Existing TTS venv is broken. Cleaning up and recreating...
+        rmdir /s /q text_to_speech_server\venv >nul 2>&1
+    ) else (
+        goto tts_venv_exists
+    )
+)
+if "%USE_FALLBACK_VENV%"=="Y" (
+    echo       Using portable fallback wrapper for TTS environment...
     call :create_fallback_venv text_to_speech_server\venv "..\..\.."
     if errorlevel 1 goto tts_venv_fail
+) else (
+    %PYTHON_CMD% -m venv text_to_speech_server\venv
+    if errorlevel 1 (
+        echo       TTS venv creation failed. Retrying with portable fallback...
+        call :create_fallback_venv text_to_speech_server\venv "..\..\.."
+        if errorlevel 1 goto tts_venv_fail
+    )
 )
 goto tts_venv_ok
 
@@ -170,12 +207,26 @@ if /i "!INSTALL_SFX!"=="N" goto skip_sfx
 
 echo.
 echo [4/5] Setting up Sound ^& Music Server ^(sfx_and_music_server\venv^)...
-if exist "sfx_and_music_server\venv" goto sfx_venv_exists
-%PYTHON_CMD% -m venv sfx_and_music_server\venv
-if errorlevel 1 (
-    echo       Sound & Music venv creation failed. Retrying with portable fallback...
+if exist "sfx_and_music_server\venv" (
+    sfx_and_music_server\venv\Scripts\python -c "import socket" >nul 2>&1
+    if errorlevel 1 (
+        echo       Existing Sound & Music venv is broken. Cleaning up and recreating...
+        rmdir /s /q sfx_and_music_server\venv >nul 2>&1
+    ) else (
+        goto sfx_venv_exists
+    )
+)
+if "%USE_FALLBACK_VENV%"=="Y" (
+    echo       Using portable fallback wrapper for Sound & Music environment...
     call :create_fallback_venv sfx_and_music_server\venv "..\..\.."
     if errorlevel 1 goto sfx_venv_fail
+) else (
+    %PYTHON_CMD% -m venv sfx_and_music_server\venv
+    if errorlevel 1 (
+        echo       Sound & Music venv creation failed. Retrying with portable fallback...
+        call :create_fallback_venv sfx_and_music_server\venv "..\..\.."
+        if errorlevel 1 goto sfx_venv_fail
+    )
 )
 goto sfx_venv_ok
 

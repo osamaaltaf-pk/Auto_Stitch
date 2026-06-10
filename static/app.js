@@ -186,6 +186,71 @@ const normalizeProjectManifest = (data) => {
   return data;
 };
 
+const effectsPresets = [
+  { id: "none", name: "None" },
+  { id: "vhs_glitch", name: "VHS Glitch" },
+  { id: "film_grain", name: "Film Grain" },
+  { id: "light_leak", name: "Light Leak" },
+  { id: "vignette", name: "Vignette" },
+  { id: "film_burn", name: "Film Burn" },
+  { id: "glitch_digital", name: "Digital Glitch" },
+  { id: "dust", name: "Dust" },
+  { id: "bw_classic", name: "Black & White Classic" }
+];
+
+const filtersPresets = [
+  { id: "none", name: "None (Standard)" },
+  { id: "cinematic", name: "Cinematic" },
+  { id: "cool_blue", name: "Cool Blue" },
+  { id: "warm_gold", name: "Warm Gold" },
+  { id: "vintage", name: "Vintage Sepia" },
+  { id: "high_contrast", name: "High Contrast" },
+  { id: "cyberpunk", name: "Cyberpunk" },
+  { id: "bleach_bypass", name: "Bleach Bypass" },
+  { id: "bw_classic", name: "Black & White" },
+  { id: "teal_orange", name: "Teal & Orange" },
+  { id: "indie_warm", name: "Indie Warm" },
+  { id: "retro_90s", name: "Retro 90s" }
+];
+
+const stickersPresets = [
+  { id: "none", name: "None", emoji: "🚫" },
+  { id: "fire", name: "Fire", emoji: "🔥" },
+  { id: "like", name: "Like", emoji: "❤️" },
+  { id: "subscribe", name: "Subscribe", emoji: "🔔" },
+  { id: "warning", name: "Warning", emoji: "⚠️" },
+  { id: "boom", name: "Boom", emoji: "💥" },
+  { id: "idea", name: "Idea", emoji: "💡" },
+  { id: "viral", name: "Viral", emoji: "📈" },
+  { id: "star", name: "Star", emoji: "⭐" }
+];
+
+const transitionsPresets = [
+  { id: "none", name: "None (Cut)" },
+  { id: "fade", name: "Cross Dissolve" },
+  { id: "slide_left", name: "Slide Left" },
+  { id: "slide_right", name: "Slide Right" },
+  { id: "zoom_blur", name: "Zoom Blur" },
+  { id: "wipe", name: "Wipe" }
+];
+
+const getFilterCss = (filterId) => {
+  const filters = {
+    cinematic: "contrast(1.15) saturate(0.85) sepia(0.1)",
+    cool_blue: "hue-rotate(20deg) saturate(1.2) brightness(1.05)",
+    warm_gold: "sepia(0.3) saturate(1.4) brightness(1.02)",
+    vintage: "sepia(0.4) contrast(0.9) brightness(0.95)",
+    high_contrast: "contrast(1.5) saturate(1.1)",
+    cyberpunk: "hue-rotate(270deg) saturate(2) contrast(1.1)",
+    bleach_bypass: "contrast(1.2) saturate(0.6) brightness(1.1)",
+    bw_classic: "grayscale(1) contrast(1.1)",
+    teal_orange: "saturate(1.4) hue-rotate(-15deg) contrast(1.1)",
+    indie_warm: "sepia(0.2) saturate(1.3) brightness(1.04) contrast(1.05)",
+    retro_90s: "sepia(0.45) contrast(1.1) saturate(0.85) brightness(1.03)"
+  };
+  return filters[filterId] || "none";
+};
+
 function App() {
   // Application State
   const [project, setProject] = useState({
@@ -241,6 +306,7 @@ function App() {
   const [rightPanelWidth, setRightPanelWidth] = useState(320); // Default right panel width in px (w-80)
   const [previewSectionHeight, setPreviewSectionHeight] = useState(420); // Draggable preview section height in px
   const [activeTab, setActiveTab] = useState("video"); // left panel tabs: 'video', 'sfx', 'voice'
+  const [activeRailTab, setActiveRailTab] = useState("media"); // CapCut V2 rail tabs: 'media', 'effects', 'filters', 'text', 'stickers', 'transitions'
   // Stable timestamp for master video URL — only updated when a new render finishes, NOT on every render cycle
   const [masterVideoTs, setMasterVideoTs] = useState(() => Date.now());
   const [licenseStatus, setLicenseStatus] = useState({ valid: true, message: "", gmail: "", expiry_date: "", license_key: "" });
@@ -295,6 +361,14 @@ function App() {
   const [audioCacheBuster, setAudioCacheBuster] = useState(Date.now());
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [dragOverSlot, setDragOverSlot] = useState(null);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, asset: null, type: null });
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(prev => ({ ...prev, visible: false }));
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
 
   const currentVideoVolume = selectedBlock !== null ? (project.video_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
   const currentVoiceVolume = selectedBlock !== null ? (project.voice_blocks[selectedBlock.index]?.volume ?? 1.0) : 1.0;
@@ -1213,24 +1287,70 @@ function App() {
     }
   };
 
-  const updateVideoBlockField = (index, fieldName, value) => {
-    const updated = [...project.video_blocks];
-    if (updated[index]) {
-      updated[index] = { ...updated[index], [fieldName]: value };
+  const updateBlockField = (lane, index, fieldName, value) => {
+    const updatedManifest = { ...project };
+    if (lane === 'video') {
+      const updated = [...project.video_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], [fieldName]: value };
+      updatedManifest.video_blocks = updated;
+    } else if (lane === 'sfx') {
+      const updated = [...project.sfx_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], [fieldName]: value };
+      updatedManifest.sfx_blocks = updated;
+    } else if (lane === 'voice') {
+      const updated = [...project.voice_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], [fieldName]: value };
+      updatedManifest.voice_blocks = updated;
+    } else if (lane === 'music') {
+      const updated = [...(project.music_blocks || [])];
+      if (updated[index]) updated[index] = { ...updated[index], [fieldName]: value };
+      updatedManifest.music_blocks = updated;
     }
-    const newManifest = { ...project, video_blocks: updated };
-    setProject(newManifest);
+    setProject(updatedManifest);
     setTimelineLayers(prev => prev.map(l => {
-      if (l.type === 'video') {
+      if (l.type === lane) {
         const newBlocks = [...l.blocks];
-        if (newBlocks[index]) {
-          newBlocks[index] = { ...newBlocks[index], [fieldName]: value };
-        }
+        if (newBlocks[index]) newBlocks[index] = { ...newBlocks[index], [fieldName]: value };
         return { ...l, blocks: newBlocks };
       }
       return l;
     }));
-    saveProject(newManifest);
+    saveProject(updatedManifest);
+  };
+
+  const updateBlockFields = (lane, index, fieldsObj) => {
+    const updatedManifest = { ...project };
+    if (lane === 'video') {
+      const updated = [...project.video_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], ...fieldsObj };
+      updatedManifest.video_blocks = updated;
+    } else if (lane === 'sfx') {
+      const updated = [...project.sfx_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], ...fieldsObj };
+      updatedManifest.sfx_blocks = updated;
+    } else if (lane === 'voice') {
+      const updated = [...project.voice_blocks];
+      if (updated[index]) updated[index] = { ...updated[index], ...fieldsObj };
+      updatedManifest.voice_blocks = updated;
+    } else if (lane === 'music') {
+      const updated = [...(project.music_blocks || [])];
+      if (updated[index]) updated[index] = { ...updated[index], ...fieldsObj };
+      updatedManifest.music_blocks = updated;
+    }
+    setProject(updatedManifest);
+    setTimelineLayers(prev => prev.map(l => {
+      if (l.type === lane) {
+        const newBlocks = [...l.blocks];
+        if (newBlocks[index]) newBlocks[index] = { ...newBlocks[index], ...fieldsObj };
+        return { ...l, blocks: newBlocks };
+      }
+      return l;
+    }));
+    saveProject(updatedManifest);
+  };
+
+  const updateVideoBlockField = (index, fieldName, value) => {
+    updateBlockField('video', index, fieldName, value);
   };
 
   const updateCharConfig = (cIdx, fieldName, value) => {
@@ -1577,6 +1697,192 @@ function App() {
     setProject(updated);
     addLog(`Added a new blank timeline slot (Index ${newIdx}).`, "success");
     saveProject(updated);
+  };
+  const insertAssetAtEnd = (type, asset) => {
+    const newIdx = project.video_blocks.length;
+    const v_id = `v_${String(newIdx).padStart(2, '0')}`;
+    const sfx_id = `sfx_${String(newIdx).padStart(2, '0')}`;
+    const vo_id = `vo_${String(newIdx).padStart(2, '0')}`;
+    const mu_id = `mu_${String(newIdx).padStart(2, '0')}`;
+
+    const newVideo = [
+      ...project.video_blocks,
+      {
+        id: v_id,
+        file_path: type === 'video' ? asset.file_path : "",
+        filename: type === 'video' ? asset.filename : `Clip_${String(newIdx + 1).padStart(2, '0')}.mp4`,
+        duration_s: type === 'video' ? asset.duration_s : 5.0,
+        thumbnail_path: type === 'video' ? asset.thumbnail_path || "/static/thumbnails/placeholder.jpg" : "/static/thumbnails/placeholder.jpg",
+        order: newIdx,
+        volume: 1.0,
+        transition: "none",
+        overlay_effect: "none",
+        color_grading: "none",
+        text_overlay: "",
+        text_overlay_font: "arial",
+        text_overlay_size: 40,
+        text_overlay_color: "white",
+        text_overlay_placement_y: 50,
+        text_overlay_box_enabled: false,
+        text_overlay_outline_width: 3,
+        sticker: "none",
+        text_overlay_template: "none"
+      }
+    ];
+
+    const newSfx = [
+      ...project.sfx_blocks,
+      {
+        id: sfx_id,
+        prompt: type === 'sfx' ? asset.prompt : "",
+        order: newIdx,
+        status: "idle",
+        file_path: null,
+        volume: 1.0
+      }
+    ];
+
+    const newVoice = [
+      ...project.voice_blocks,
+      {
+        id: vo_id,
+        order: newIdx,
+        status: "idle",
+        prompt: type === 'voice' ? asset.prompt || "" : "",
+        file_path: null,
+        voice: type === 'voice' ? asset.voice : "alba",
+        volume: 1.0
+      }
+    ];
+
+    const newMusic = [
+      ...(project.music_blocks || []),
+      {
+        id: mu_id,
+        order: newIdx,
+        status: "idle",
+        prompt: type === 'music' ? asset.prompt : "",
+        file_path: null,
+        volume: 1.0
+      }
+    ];
+
+    const newManifest = {
+      ...project,
+      video_blocks: newVideo,
+      sfx_blocks: newSfx,
+      voice_blocks: newVoice,
+      music_blocks: newMusic
+    };
+
+    setProject(newManifest);
+    setTimelineLayers(prev => prev.map(l => {
+      if (l.type === 'video') return { ...l, blocks: newVideo };
+      if (l.type === 'sfx') return { ...l, blocks: newSfx };
+      if (l.type === 'voice') return { ...l, blocks: newVoice };
+      if (l.type === 'music') return { ...l, blocks: newMusic };
+      return l;
+    }));
+    saveProject(newManifest);
+    addLog(`Inserted new slot at end with ${type} asset.`, "success");
+  };
+
+  const handleSlotDrop = (e, lane, index) => {
+    e.preventDefault();
+    setDragOverSlot(null);
+    try {
+      const rawData = e.dataTransfer.getData("application/json");
+      if (!rawData) return;
+      const dragData = JSON.parse(rawData);
+      if (!dragData || !dragData.type) return;
+
+      if (dragData.type === 'video' && lane === 'video') {
+        updateBlockField('video', index, 'file_path', dragData.file_path);
+        updateBlockField('video', index, 'filename', dragData.filename);
+        updateBlockField('video', index, 'duration_s', dragData.duration_s);
+        updateBlockField('video', index, 'thumbnail_path', dragData.thumbnail_path);
+        addLog(`Dropped video '${dragData.filename}' into slot ${index}`, "success");
+      } else if (dragData.type === 'voice' && lane === 'voice') {
+        updateBlockField('voice', index, 'voice', dragData.voice);
+        addLog(`Dropped voice '${dragData.voice}' into slot ${index}`, "success");
+      } else if (dragData.type === 'sfx' && lane === 'sfx') {
+        updateBlockField('sfx', index, 'prompt', dragData.prompt);
+        addLog(`Dropped SFX prompt into slot ${index}`, "success");
+      } else if (dragData.type === 'music' && lane === 'music') {
+        updateBlockField('music', index, 'prompt', dragData.prompt);
+        addLog(`Dropped music prompt into slot ${index}`, "success");
+      } else {
+        addLog(`Cannot drop ${dragData.type} asset onto a ${lane} slot.`, "warning");
+      }
+    } catch (err) {
+      console.error("Error handling slot drop:", err);
+    }
+  };
+
+  const handleApplyToSelectedSlot = () => {
+    const { type, asset } = contextMenu;
+    if (!asset) return;
+    if (!selectedBlock) {
+      addLog(`Please select a timeline slot first to apply this asset.`, "warning");
+      return;
+    }
+
+    if (type === 'video') {
+      if (selectedBlock.lane !== 'video') {
+        addLog(`Cannot apply video asset to a ${selectedBlock.lane} slot.`, "warning");
+        return;
+      }
+      updateBlockField('video', selectedBlock.index, 'file_path', asset.file_path);
+      updateBlockField('video', selectedBlock.index, 'filename', asset.filename);
+      updateBlockField('video', selectedBlock.index, 'duration_s', asset.duration_s);
+      updateBlockField('video', selectedBlock.index, 'thumbnail_path', asset.thumbnail_path);
+      addLog(`Applied video '${asset.filename}' to selected video slot`, "success");
+    } else if (type === 'voice') {
+      if (selectedBlock.lane !== 'voice') {
+        addLog(`Cannot apply voice asset to a ${selectedBlock.lane} slot.`, "warning");
+        return;
+      }
+      updateBlockField('voice', selectedBlock.index, 'voice', asset.voice);
+      addLog(`Applied voice '${asset.voice}' to selected voice slot`, "success");
+    } else if (type === 'sfx') {
+      if (selectedBlock.lane !== 'sfx') {
+        addLog(`Cannot apply SFX preset to a ${selectedBlock.lane} slot.`, "warning");
+        return;
+      }
+      updateBlockField('sfx', selectedBlock.index, 'prompt', asset.prompt);
+      addLog(`Applied SFX prompt to selected SFX slot`, "success");
+    } else if (type === 'music') {
+      if (selectedBlock.lane !== 'music') {
+        addLog(`Cannot apply music preset to a ${selectedBlock.lane} slot.`, "warning");
+        return;
+      }
+      updateBlockField('music', selectedBlock.index, 'prompt', asset.prompt);
+      addLog(`Applied music prompt to selected music slot`, "success");
+    }
+  };
+
+  const handleInsertAtEnd = () => {
+    const { type, asset } = contextMenu;
+    if (!asset) return;
+    insertAssetAtEnd(type, asset);
+  };
+
+  const handleDeleteAsset = () => {
+    const { type, asset } = contextMenu;
+    if (!asset) return;
+
+    if (type === 'voice') {
+      deleteVoice(asset.voice);
+    } else if (type === 'video') {
+      const idx = project.video_blocks.findIndex(b => b.id === asset.id);
+      if (idx !== -1) {
+        deleteSlot(idx);
+      } else {
+        addLog(`Cannot delete scanned asset file listing from disk.`, "info");
+      }
+    } else if (type === 'sfx' || type === 'music') {
+      addLog(`Default presets are read-only and cannot be physically deleted.`, "info");
+    }
   };
 
   const deleteSlot = (index) => {
@@ -2482,6 +2788,7 @@ function App() {
 
   // Selected Detail Element Data
   const blockData = getSelectedBlockData();
+  const activeVideoBlock = (selectedBlock && project.video_blocks) ? project.video_blocks[selectedBlock.index] : null;
 
   if (!licenseStatus.valid) {
     return (
@@ -3325,63 +3632,7 @@ function App() {
         </button>
 
         <div style={{ width:'1px', height:'20px', background:'rgba(255,255,255,0.1)', margin:'0 4px' }} />
-
-        {/* MEDIA TAB */}
-        <button
-          onClick={() => { setActiveTab('video'); setIsLeftSidebarOpen(true); }}
-          style={{
-            height:'28px', padding:'0 14px', borderRadius:'6px', fontSize:'11px',
-            fontWeight:'bold', textTransform:'uppercase', letterSpacing:'0.06em',
-            cursor:'pointer', border:'1px solid',
-            borderColor:(activeTab==='video' && isLeftSidebarOpen) ? '#7c6cff' : 'transparent',
-            background:(activeTab==='video' && isLeftSidebarOpen) ? 'rgba(124,108,255,0.18)' : 'transparent',
-            color:(activeTab==='video' && isLeftSidebarOpen) ? '#a89fff' : '#aaa'
-          }}
-          title="Media / Video Browser"
-        >MEDIA</button>
-
-        {/* SFX TAB */}
-        <button
-          onClick={() => { setActiveTab('sfx'); setIsLeftSidebarOpen(true); }}
-          style={{
-            height:'28px', padding:'0 14px', borderRadius:'6px', fontSize:'11px',
-            fontWeight:'bold', textTransform:'uppercase', letterSpacing:'0.06em',
-            cursor:'pointer', border:'1px solid',
-            borderColor:(activeTab==='sfx' && isLeftSidebarOpen) ? '#ff6c9d' : 'transparent',
-            background:(activeTab==='sfx' && isLeftSidebarOpen) ? 'rgba(255,108,157,0.18)' : 'transparent',
-            color:(activeTab==='sfx' && isLeftSidebarOpen) ? '#ff9dbf' : '#aaa'
-          }}
-          title="Sound Effects Browser"
-        >SFX</button>
-
-        {/* VOICE TAB */}
-        <button
-          onClick={() => { setActiveTab('voice'); setIsLeftSidebarOpen(true); }}
-          style={{
-            height:'28px', padding:'0 14px', borderRadius:'6px', fontSize:'11px',
-            fontWeight:'bold', textTransform:'uppercase', letterSpacing:'0.06em',
-            cursor:'pointer', border:'1px solid',
-            borderColor:(activeTab==='voice' && isLeftSidebarOpen) ? '#6cffcc' : 'transparent',
-            background:(activeTab==='voice' && isLeftSidebarOpen) ? 'rgba(108,255,204,0.18)' : 'transparent',
-            color:(activeTab==='voice' && isLeftSidebarOpen) ? '#6cffcc' : '#aaa'
-          }}
-          title="Voice Over Browser"
-        >VOICE</button>
-
-        {/* MUSIC TAB */}
-        <button
-          onClick={() => { setActiveTab('music'); setIsLeftSidebarOpen(true); }}
-          style={{
-            height:'28px', padding:'0 14px', borderRadius:'6px', fontSize:'11px',
-            fontWeight:'bold', textTransform:'uppercase', letterSpacing:'0.06em',
-            cursor:'pointer', border:'1px solid',
-            borderColor:(activeTab==='music' && isLeftSidebarOpen) ? '#ec4899' : 'transparent',
-            background:(activeTab==='music' && isLeftSidebarOpen) ? 'rgba(236,72,153,0.18)' : 'transparent',
-            color:(activeTab==='music' && isLeftSidebarOpen) ? '#f472b6' : '#aaa'
-          }}
-          title="Background Music Browser"
-        >MUSIC</button>
-
+        <span style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.05em', color: '#7c6cff', marginLeft: '6px' }} className="font-mono">AUTOSTITCH V2</span>
         <div style={{ flex:1 }} />
 
 
@@ -3406,11 +3657,106 @@ function App() {
       {/* ── WORKSPACE CORE LAYOUT ── */}
       <div className="flex-1 flex overflow-hidden relative">
 
+        {/* CapCut Redesign: Far Left Vertical Tab Rail */}
+        <div className="redesign-left-rail">
+          <button
+            onClick={() => {
+              if (activeRailTab === 'media') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('media');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'media' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Media (Video, Audio, Prompts)"
+          >
+            <span className="redesign-rail-icon">⊞</span>
+            <span className="redesign-rail-label">Media</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeRailTab === 'effects') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('effects');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'effects' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Visual Effects Overlays"
+          >
+            <span className="redesign-rail-icon">✦</span>
+            <span className="redesign-rail-label">Effects</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeRailTab === 'filters') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('filters');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'filters' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Color Grading Filters"
+          >
+            <span className="redesign-rail-icon">◑</span>
+            <span className="redesign-rail-label">Filters</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeRailTab === 'text') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('text');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'text' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Captions & Text Overlay"
+          >
+            <span className="redesign-rail-icon">T</span>
+            <span className="redesign-rail-label">Text</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeRailTab === 'stickers') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('stickers');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'stickers' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Stickers"
+          >
+            <span className="redesign-rail-icon">★</span>
+            <span className="redesign-rail-label">Stickers</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeRailTab === 'transitions') {
+                setIsLeftSidebarOpen(!isLeftSidebarOpen);
+              } else {
+                setActiveRailTab('transitions');
+                setIsLeftSidebarOpen(true);
+              }
+            }}
+            className={`redesign-rail-btn ${activeRailTab === 'transitions' && isLeftSidebarOpen ? 'active' : ''}`}
+            title="Transitions"
+          >
+            <span className="redesign-rail-icon">⇄</span>
+            <span className="redesign-rail-label">Transitions</span>
+          </button>
+        </div>
+
         {/* Floating Side Panel Toggle Buttons */}
         {!isLeftSidebarOpen && (
           <button
             onClick={() => setIsLeftSidebarOpen(true)}
-            className="absolute left-0 top-3 z-40 bg-carbon-panel/90 backdrop-blur border-y border-r border-carbon-border hover:border-accent-primary text-accent-primary hover:text-white px-2.5 py-3 rounded-r-lg transition-all shadow-[0_0_10px_rgba(124,108,255,0.15)] flex items-center justify-center font-bold"
+            className="absolute z-40 bg-carbon-panel/90 backdrop-blur border-y border-r border-carbon-border hover:border-accent-primary text-accent-primary hover:text-white px-2.5 py-3 rounded-r-lg transition-all shadow-[0_0_10px_rgba(124,108,255,0.15)] flex items-center justify-center font-bold"
+            style={{ left: '52px', top: '12px' }}
             title="Expand Asset Browser"
           >
             ▶
@@ -3428,7 +3774,7 @@ function App() {
 
         {/* Expandable Left asset Browser */}
         {isLeftSidebarOpen && (
-          <div style={{ width: `${leftPanelWidth}px`, minWidth: '180px', maxWidth: '420px' }} className="border-r border-carbon-border bg-carbon-panel flex flex-col shrink-0 relative z-[1]">
+          <div style={{ width: `${leftPanelWidth}px`, minWidth: '220px', maxWidth: '450px' }} className="border-r border-carbon-border bg-carbon-panel flex flex-col shrink-0 relative z-[1]">
 
             {/* Left Panel Edge Close Button */}
             <button
@@ -3439,48 +3785,21 @@ function App() {
               ◀
             </button>
 
-            <div className="flex border-b border-carbon-border bg-carbon-card/10">
-              <button
-                onClick={() => setActiveTab("video")}
-                className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'video' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
-                style={{
-                  color: activeTab === 'video' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'video' ? '#7c6cff' : 'transparent'
-                }}
-              >
-                MEDIA
-              </button>
-              <button
-                onClick={() => setActiveTab("sfx")}
-                className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'sfx' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
-                style={{
-                  color: activeTab === 'sfx' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'sfx' ? '#ff6c9d' : 'transparent'
-                }}
-              >
-                SFX
-              </button>
-              <button
-                onClick={() => setActiveTab("voice")}
-                className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'voice' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
-                style={{
-                  color: activeTab === 'voice' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'voice' ? '#6cffcc' : 'transparent'
-                }}
-              >
-                VOICE
-              </button>
-              <button
-                onClick={() => setActiveTab("music")}
-                className={`flex-1 py-3 text-center text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === 'music' ? 'bg-carbon-card/30 border-b-2' : 'hover:bg-carbon-card/10'}`}
-                style={{
-                  color: activeTab === 'music' ? 'var(--text-bright)' : 'var(--text-muted)',
-                  borderBottomColor: activeTab === 'music' ? '#ec4899' : 'transparent'
-                }}
-              >
-                MUSIC
-              </button>
-            </div>
+            {/* Sub-tabs header for Media Bin */}
+            {activeRailTab === 'media' && (
+              <div className="flex border-b border-carbon-border bg-carbon-card/10 flex-wrap shrink-0">
+                {['all', 'video', 'voice', 'sfx', 'music'].map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setActiveTab(t)}
+                    className={`flex-1 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === t ? 'border-accent-primary text-accent-primary bg-carbon-card/30' : 'border-transparent text-gray-400 hover:bg-carbon-card/10 hover:text-gray-200'}`}
+                  >
+                    {t === 'all' ? 'All' : (t === 'video' ? 'Videos' : (t === 'voice' ? 'Voice' : t.toUpperCase()))}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Left Panel Resize Handle */}
             <div
               onMouseDown={(e) => {
@@ -3488,7 +3807,7 @@ function App() {
                 const startX = e.clientX;
                 const startW = leftPanelWidth;
                 const doDrag = (mv) => {
-                  const newW = Math.max(180, Math.min(420, startW + (mv.clientX - startX)));
+                  const newW = Math.max(220, Math.min(450, startW + (mv.clientX - startX)));
                   setLeftPanelWidth(newW);
                 };
                 const stopDrag = () => {
@@ -3506,340 +3825,606 @@ function App() {
 
             <div className="flex-1 overflow-y-auto p-4">
 
-              {/* Tab: Videos Scan */}
-              {activeTab === 'video' && (
+              {/* MEDIA TAB CONTENT */}
+              {activeRailTab === 'media' && (
                 <div className="flex flex-col gap-4">
-                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2.5">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">SCAN LOCAL FOLDER</h3>
 
-                    {/* Browse Button */}
-                    <button
-                      onClick={async () => {
-                        addLog("Opening native directory picker...", "info");
-                        try {
-                          const resp = await fetch("/api/videos/select-folder", { method: "POST" });
-                          if (resp.ok) {
-                            const data = await resp.json();
-                            if (data.status === 'ok' && data.folder) {
-                              setVideoFolderInput(data.folder);
-                              addLog(`Selected videos directory: "${data.folder}"`, "success");
-                            } else {
-                              addLog("Folder selection cancelled.", "info");
-                            }
-                          }
-                        } catch (e) {
-                          addLog("Failed loading native directory picker.", "error");
-                        }
-                      }}
-                      className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-primary text-xs text-gray-300 py-2.5 rounded-lg transition-all font-semibold font-mono"
-                      title="Open Windows directory selection dialog"
-                    >
-                      <Icon name="folder-search" className="w-4 h-4 text-accent-primary" />
-                      <span>BROWSE FOLDER 📂</span>
-                    </button>
-
-                    {/* Subtle path display */}
-                    {videoFolderInput && (
-                      <div className="text-[10px] font-mono text-gray-500 truncate text-center my-0.5 select-text" title={videoFolderInput}>
-                        Selected: <span className="text-gray-300">{videoFolderInput}</span>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={scanVideos}
-                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary/20 to-purple-600/20 border border-accent-primary/40 hover:border-accent-primary text-xs text-white hover:text-white py-2.5 rounded-lg transition-all font-bold font-mono"
-                    >
-                      <Icon name="sparkles" className="w-3.5 h-3.5" />
-                      <span>SCAN VIDEOS ⚡</span>
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-500">CLIPS ({project.video_blocks.length})</h3>
-                    {project.video_blocks.length === 0 ? (
-                      <span className="text-xs text-gray-600 italic">No clips scanned yet.</span>
-                    ) : (
-                      project.video_blocks.map((v, i) => (
-                        <div
-                          key={v.id}
-                          onClick={() => setSelectedBlock({ lane: 'video', index: i })}
-                          className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-all ${selectedBlock?.lane === 'video' && selectedBlock?.index === i ? 'bg-accent-primary/10 border-accent-primary text-white' : 'bg-carbon-card/20 border-carbon-border/50 hover:border-carbon-border hover:bg-carbon-card/40'}`}
-                        >
-                          {v.thumbnail_path ? (
-                            <img src={v.thumbnail_path} className="w-10 h-7 rounded object-cover" />
-                          ) : (
-                            <div className="w-10 h-7 rounded bg-carbon-card/60 flex items-center justify-center text-[10px] text-gray-500">🎥</div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate text-gray-300">{v.filename}</p>
-                            <span className="text-[10px] text-gray-500 font-mono">{v.duration_s.toFixed(1)}s</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: SFX guide presets */}
-              {activeTab === 'sfx' && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">LOAD PROMPTS TXT</h3>
-                    <input
-                      type="file"
-                      accept=".txt"
-                      onChange={(e) => {
-                        importTextFile('sfx', e.target.files[0]);
-                        e.target.value = ''; // Reset input to allow re-import
-                      }}
-                      className="hidden"
-                      id="sfx-txt-import"
-                    />
-                    <label
-                      htmlFor="sfx-txt-import"
-                      className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-secondary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all"
-                    >
-                      <Icon name="file-text" className="w-3.5 h-3.5 text-accent-secondary" />
-                      <span>SELECT PROMPTS TXT</span>
-                    </label>
-                  </div>
-
-
-
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">PROMPT PRESETS</h3>
-                    <p className="text-[11px] text-gray-500">Click any preset to copy text.</p>
-
-                    {[
-                      "TrackType: SFX. Thunder crack followed by rain",
-                      "TrackType: SFX. Satisfying mechanical keyboard key press",
-                      "TrackType: SFX. Mobile application swipe transition whoosh",
-                      "TrackType: SFX. Deep cinematic rumble bass drop"
-                    ].map(preset => (
-                      <div
-                        key={preset}
-                        onClick={() => {
-                          navigator.clipboard.writeText(preset);
-                          addLog(`Copied prompt preset: "${preset}"`, "info");
-                          if (selectedBlock && selectedBlock.lane === 'sfx') {
-                            const updated = [...project.sfx_blocks];
-                            if (updated[selectedBlock.index]) {
-                              updated[selectedBlock.index] = { ...updated[selectedBlock.index], prompt: preset, status: 'idle' };
-                            }
-                            const newManifest = { ...project, sfx_blocks: updated };
-                            setProject(newManifest);
-                            saveProject(newManifest);
-                            addLog(`Pasted preset into SFX slot ${selectedBlock.index}`, "success");
-                          }
-                        }}
-                        className="p-2 border border-carbon-border/50 hover:border-accent-secondary bg-carbon-card/20 hover:bg-carbon-card/40 rounded-lg text-xs cursor-pointer select-text text-gray-400 transition-all font-mono"
-                      >
-                        {preset}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: Voice / TTS Info */}
-              {activeTab === 'voice' && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">LOAD SCRIPTS TXT</h3>
-                    <input
-                      type="file"
-                      accept=".txt"
-                      onChange={(e) => {
-                        importTextFile('voice', e.target.files[0]);
-                        e.target.value = ''; // Reset input to allow re-import
-                      }}
-                      className="hidden"
-                      id="voice-txt-import"
-                    />
-                    <label
-                      htmlFor="voice-txt-import"
-                      className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-tertiary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all"
-                    >
-                      <Icon name="file-text" className="w-3.5 h-3.5 text-accent-tertiary" />
-                      <span>SELECT SCRIPTS TXT</span>
-                    </label>
-                  </div>
-
-
-
-                  {/* 🎙️ CLONE CUSTOM VOICE INSTEAD OF PRESETS */}
-                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">🎙️ CLONE CUSTOM VOICE</h3>
-                    <p className="text-[10px] text-gray-500 font-mono leading-relaxed">
-                      Upload a short audio sample (.wav, .mp3, etc.) to clone the voice instantly using the TTS engine!
-                    </p>
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={handleCloneVoiceUpload}
-                      className="hidden"
-                      id="voice-clone-upload"
-                    />
-                    <label
-                      htmlFor="voice-clone-upload"
-                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-tertiary/10 to-teal-500/10 border border-accent-tertiary/30 hover:border-accent-tertiary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
-                    >
-                      <span>{isCloning ? "CLONING VOICE... 🔄" : "CLONE VOICE SAMPLE 📂"}</span>
-                    </label>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold font-mono text-gray-400">VOICES AVAILABLE</h3>
-                      <button
-                        onClick={() => {
-                          const activeVoice = (selectedBlock && selectedBlock.lane === 'voice')
-                            ? (project.voice_blocks[selectedBlock.index]?.voice || "alba")
-                            : globalDefaultVoice;
-                          if (confirm(`Are you sure you want to apply the voice '${activeVoice}' to all timeline slots?`)) {
-                            const updated = project.voice_blocks.map(b => ({ ...b, voice: activeVoice }));
-                            const newManifest = { ...project, voice_blocks: updated };
-                            setProject(newManifest);
-                            setTimelineLayers(prev => prev.map(l => {
-                              if (l.type === 'voice') {
-                                const newBlocks = l.blocks.map(b => ({ ...b, voice: activeVoice }));
-                                return { ...l, blocks: newBlocks };
-                              }
-                              return l;
-                            }));
-                            saveProject(newManifest);
-                            addLog(`Applied voice '${activeVoice}' to all voice slots.`, "success");
-                          }
-                        }}
-                        className="px-2 py-1 bg-accent-tertiary/20 hover:bg-accent-tertiary/40 border border-accent-tertiary/40 text-[9px] font-bold font-mono rounded text-accent-tertiary transition-all cursor-pointer"
-                        title="Assign the currently active voice to all slots in the project"
-                      >
-                        APPLY TO ALL SLOTS 🗣️
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-gray-500">Click a voice to select it globally or assign to the active track block.</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableVoices.map(voice => {
-                        const activeVoice = (selectedBlock && selectedBlock.lane === 'voice')
-                          ? (project.voice_blocks[selectedBlock.index]?.voice || "alba")
-                          : globalDefaultVoice;
-                        const isVoiceSelected = voice === activeVoice;
-
-                        return (
-                          <div
-                            key={voice}
-                            onClick={() => {
-                              if (selectedBlock && selectedBlock.lane === 'voice') {
-                                // Update project.voice_blocks
-                                const updated = [...project.voice_blocks];
-                                if (updated[selectedBlock.index]) {
-                                  updated[selectedBlock.index] = { ...updated[selectedBlock.index], voice };
+                  {/* 1. VIDEOS SECTION */}
+                  {(activeTab === 'all' || activeTab === 'video') && (
+                    <div className="flex flex-col gap-3">
+                      <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2.5">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">SCAN LOCAL FOLDER</h3>
+                        <button
+                          onClick={async () => {
+                            addLog("Opening native directory picker...", "info");
+                            try {
+                              const resp = await fetch("/api/videos/select-folder", { method: "POST" });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                if (data.status === 'ok' && data.folder) {
+                                  setVideoFolderInput(data.folder);
+                                  addLog(`Selected videos directory: "${data.folder}"`, "success");
+                                } else {
+                                  addLog("Folder selection cancelled.", "info");
                                 }
-                                const newManifest = { ...project, voice_blocks: updated };
-                                setProject(newManifest);
-                                // Also sync into timelineLayers so getMergedManifest picks it up
-                                setTimelineLayers(prev => prev.map(l => {
-                                  if (l.type === 'voice') {
-                                    const newBlocks = [...l.blocks];
-                                    if (newBlocks[selectedBlock.index]) {
-                                      newBlocks[selectedBlock.index] = { ...newBlocks[selectedBlock.index], voice };
-                                    }
-                                    return { ...l, blocks: newBlocks };
-                                  }
-                                  return l;
-                                }));
-                                saveProject(newManifest);
-                                addLog(`Applied voice '${voice}' to voice slot ${selectedBlock.index}`, "success");
-                              } else {
-                                setGlobalDefaultVoice(voice);
-                                try { localStorage.setItem('as_default_voice', voice); } catch { }
-                                addLog(`Set global default voice to '${voice}'`, "success");
                               }
-                            }}
-                            className={`flex items-center gap-1.5 p-2 rounded-lg cursor-pointer transition-all border-2 relative group ${isVoiceSelected
-                                ? 'bg-accent-tertiary/10 border-accent-tertiary text-white shadow-[0_0_8px_rgba(108,255,204,0.2)]'
-                                : 'bg-carbon-card/30 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/50 hover:bg-carbon-card/50'
-                              }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isVoiceSelected ? 'bg-accent-tertiary shadow-[0_0_6px_#6cffcc]' : 'bg-gray-600'}`}></span>
-                            <span className="text-xs font-mono font-semibold truncate flex-1" title={voice}>{voice}</span>
-                            {!["alba", "marius", "fantine", "cosette", "jean", "eponine"].includes(voice) && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteVoice(voice);
-                                }}
-                                className="text-gray-500 hover:text-red-500 hover:scale-110 p-0.5 rounded transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 font-bold leading-none shrink-0"
-                                title={`Delete custom voice ${voice}`}
-                              >
-                                ✕
-                              </button>
-                            )}
+                            } catch (e) {
+                              addLog("Failed loading native directory picker.", "error");
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-primary text-xs text-gray-300 py-2.5 rounded-lg transition-all font-semibold font-mono"
+                          title="Open Windows directory selection dialog"
+                        >
+                          <Icon name="folder-search" className="w-4 h-4 text-accent-primary" />
+                          <span>BROWSE FOLDER 📂</span>
+                        </button>
+
+                        {videoFolderInput && (
+                          <div className="text-[10px] font-mono text-gray-500 truncate text-center my-0.5 select-text" title={videoFolderInput}>
+                            Selected: <span className="text-gray-300">{videoFolderInput}</span>
                           </div>
+                        )}
+
+                        <button
+                          onClick={scanVideos}
+                          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary/20 to-purple-600/20 border border-accent-primary/40 hover:border-accent-primary text-xs text-white hover:text-white py-2.5 rounded-lg transition-all font-bold font-mono"
+                        >
+                          <Icon name="sparkles" className="w-3.5 h-3.5" />
+                          <span>SCAN VIDEOS ⚡</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-500">CLIPS ({project.video_blocks.length})</h3>
+                        {project.video_blocks.length === 0 ? (
+                          <span className="text-xs text-gray-600 italic">No clips scanned yet.</span>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {project.video_blocks.map((v, i) => (
+                              <div
+                                key={v.id}
+                                draggable={true}
+                                onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ type: 'video', file_path: v.file_path, filename: v.filename, duration_s: v.duration_s, thumbnail_path: v.thumbnail_path }))}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setContextMenu({ visible: true, x: e.clientX, y: e.clientY, asset: v, type: 'video' });
+                                }}
+                                onClick={() => setSelectedBlock({ lane: 'video', index: i })}
+                                className={`flex items-center gap-2 p-2 border rounded-lg cursor-grab active:cursor-grabbing transition-all ${selectedBlock?.lane === 'video' && selectedBlock?.index === i ? 'bg-accent-primary/10 border-accent-primary text-white' : 'bg-carbon-card/20 border-carbon-border/50 hover:border-carbon-border hover:bg-carbon-card/40'}`}
+                              >
+                                {v.thumbnail_path ? (
+                                  <img src={v.thumbnail_path} className="w-10 h-7 rounded object-cover shrink-0" />
+                                ) : (
+                                  <div className="w-10 h-7 rounded bg-carbon-card/60 flex items-center justify-center text-[10px] text-gray-500 shrink-0">🎥</div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold truncate text-gray-300">{v.filename}</p>
+                                  <span className="text-[10px] text-gray-500 font-mono">{v.duration_s.toFixed(1)}s</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. VOICE OVER SECTION */}
+                  {(activeTab === 'all' || activeTab === 'voice') && (
+                    <div className="flex flex-col gap-3 border-t border-carbon-border/20 pt-4">
+                      <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">LOAD SCRIPTS TXT</h3>
+                        <input
+                          type="file"
+                          accept=".txt"
+                          onChange={(e) => {
+                            importTextFile('voice', e.target.files[0]);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                          id="voice-txt-import"
+                        />
+                        <label
+                          htmlFor="voice-txt-import"
+                          className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-tertiary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all"
+                        >
+                          <Icon name="file-text" className="w-3.5 h-3.5 text-accent-tertiary" />
+                          <span>SELECT SCRIPTS TXT</span>
+                        </label>
+                      </div>
+
+                      <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">🎙️ CLONE CUSTOM VOICE</h3>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={handleCloneVoiceUpload}
+                          className="hidden"
+                          id="voice-clone-upload"
+                        />
+                        <label
+                          htmlFor="voice-clone-upload"
+                          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-tertiary/10 to-teal-500/10 border border-accent-tertiary/30 hover:border-accent-tertiary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
+                        >
+                          <span>{isCloning ? "CLONING VOICE... 🔄" : "CLONE VOICE SAMPLE 📂"}</span>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold font-mono text-gray-400">VOICES ({availableVoices.length})</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {availableVoices.map(voice => {
+                            const activeVoice = (selectedBlock && selectedBlock.lane === 'voice')
+                              ? (project.voice_blocks[selectedBlock.index]?.voice || "alba")
+                              : globalDefaultVoice;
+                            const isVoiceSelected = voice === activeVoice;
+
+                            return (
+                              <div
+                                key={voice}
+                                draggable={true}
+                                onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ type: 'voice', voice: voice }))}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setContextMenu({ visible: true, x: e.clientX, y: e.clientY, asset: { voice }, type: 'voice' });
+                                }}
+                                onClick={() => {
+                                  if (selectedBlock && selectedBlock.lane === 'voice') {
+                                    updateBlockField('voice', selectedBlock.index, 'voice', voice);
+                                    addLog(`Applied voice '${voice}' to voice slot ${selectedBlock.index}`, "success");
+                                  } else {
+                                    setGlobalDefaultVoice(voice);
+                                    try { localStorage.setItem('as_default_voice', voice); } catch { }
+                                    addLog(`Set global default voice to '${voice}'`, "success");
+                                  }
+                                }}
+                                className={`flex items-center gap-1.5 p-2 rounded-lg cursor-grab transition-all border-2 relative group ${isVoiceSelected ? 'bg-accent-tertiary/10 border-accent-tertiary text-white shadow-[0_0_8px_rgba(108,255,204,0.2)]' : 'bg-carbon-card/30 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/50 hover:bg-carbon-card/50'}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isVoiceSelected ? 'bg-accent-tertiary shadow-[0_0_6px_#6cffcc]' : 'bg-gray-600'}`}></span>
+                                <span className="text-[11px] font-mono font-semibold truncate flex-1" title={voice}>{voice}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. SFX PRESETS SECTION */}
+                  {(activeTab === 'all' || activeTab === 'sfx') && (
+                    <div className="flex flex-col gap-3 border-t border-carbon-border/20 pt-4">
+                      <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">LOAD PROMPTS TXT (SFX)</h3>
+                        <input
+                          type="file"
+                          accept=".txt"
+                          onChange={(e) => {
+                            importTextFile('sfx', e.target.files[0]);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                          id="sfx-txt-import"
+                        />
+                        <label
+                          htmlFor="sfx-txt-import"
+                          className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-accent-secondary text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all"
+                        >
+                          <Icon name="file-text" className="w-3.5 h-3.5 text-accent-secondary" />
+                          <span>SELECT PROMPTS TXT</span>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">SFX PRESETS</h3>
+                        <div className="flex flex-col gap-1.5">
+                          {[
+                            "TrackType: SFX. Thunder crack followed by rain",
+                            "TrackType: SFX. Satisfying mechanical keyboard key press",
+                            "TrackType: SFX. Mobile application swipe transition whoosh",
+                            "TrackType: SFX. Deep cinematic rumble bass drop"
+                          ].map(preset => (
+                            <div
+                              key={preset}
+                              draggable={true}
+                              onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ type: 'sfx', prompt: preset }))}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setContextMenu({ visible: true, x: e.clientX, y: e.clientY, asset: { prompt: preset }, type: 'sfx' });
+                              }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(preset);
+                                addLog(`Copied prompt preset: "${preset}"`, "info");
+                                if (selectedBlock && selectedBlock.lane === 'sfx') {
+                                  updateBlockField('sfx', selectedBlock.index, 'prompt', preset);
+                                  addLog(`Pasted preset into SFX slot ${selectedBlock.index}`, "success");
+                                }
+                              }}
+                              className="p-2 border border-carbon-border/50 hover:border-accent-secondary bg-carbon-card/20 hover:bg-carbon-card/40 rounded-lg text-[10px] cursor-grab text-gray-400 transition-all font-mono truncate"
+                              title={preset}
+                            >
+                              {preset}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. MUSIC SECTION */}
+                  {(activeTab === 'all' || activeTab === 'music') && (
+                    <div className="flex flex-col gap-3 border-t border-carbon-border/20 pt-4">
+                      <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">LOAD PROMPTS TXT (MUSIC)</h3>
+                        <input
+                          type="file"
+                          accept=".txt"
+                          onChange={(e) => {
+                            importTextFile('music', e.target.files[0]);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                          id="music-txt-import"
+                        />
+                        <label
+                          htmlFor="music-txt-import"
+                          className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-pink-500 text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
+                        >
+                          <Icon name="file-text" className="w-3.5 h-3.5 text-pink-400" />
+                          <span>SELECT PROMPTS TXT</span>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-bold font-mono text-gray-400">MUSIC PRESETS</h3>
+                        <div className="flex flex-col gap-1.5">
+                          {[
+                            "TrackType: MUSIC. Soft cinematic piano ambient background",
+                            "TrackType: MUSIC. Upbeat acoustic guitar travel vlog track",
+                            "TrackType: MUSIC. Retro synthwave background music",
+                            "TrackType: MUSIC. Deep focus lofi hiphop beat background"
+                          ].map(preset => (
+                            <div
+                              key={preset}
+                              draggable={true}
+                              onDragStart={(e) => e.dataTransfer.setData("application/json", JSON.stringify({ type: 'music', prompt: preset }))}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setContextMenu({ visible: true, x: e.clientX, y: e.clientY, asset: { prompt: preset }, type: 'music' });
+                              }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(preset);
+                                addLog(`Copied music preset: "${preset}"`, "info");
+                                if (selectedBlock && selectedBlock.lane === 'music') {
+                                  updateBlockField('music', selectedBlock.index, 'prompt', preset);
+                                  addLog(`Pasted preset into Music slot ${selectedBlock.index}`, "success");
+                                }
+                              }}
+                              className="p-2 border border-carbon-border/50 hover:border-pink-500 bg-carbon-card/20 hover:bg-carbon-card/40 rounded-lg text-[10px] cursor-grab text-gray-400 transition-all font-mono truncate"
+                              title={preset}
+                            >
+                              {preset}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* EFFECTS TAB CONTENT */}
+              {activeRailTab === 'effects' && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-xs font-bold font-mono text-gray-400 mb-1">OVERLAY EFFECTS</h3>
+                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (
+                    <div className="redesign-grid">
+                      {effectsPresets.map(ef => {
+                        const isActive = activeVideoBlock && activeVideoBlock.overlay_effect === ef.id;
+                        return (
+                          <button
+                            key={ef.id}
+                            onClick={() => {
+                              updateBlockField('video', selectedBlock.index, 'overlay_effect', ef.id);
+                              addLog(`Applied overlay effect "${ef.name}"`, "success");
+                            }}
+                            className={`redesign-tile ${isActive ? 'active' : ''}`}
+                          >
+                            <span className="redesign-tile-label">{ef.name}</span>
+                          </button>
                         );
                       })}
                     </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic font-mono">Select a video timeline slot to apply overlay effects.</p>
+                  )}
+                </div>
+              )}
+
+              {/* FILTERS TAB CONTENT */}
+              {activeRailTab === 'filters' && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-xs font-bold font-mono text-gray-400 mb-1">COLOR GRADING FILTERS</h3>
+                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (
+                    <div className="redesign-grid">
+                      {filtersPresets.map(f => {
+                        const isActive = activeVideoBlock && activeVideoBlock.color_grading === f.id;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => {
+                              updateBlockField('video', selectedBlock.index, 'color_grading', f.id);
+                              addLog(`Applied color grading filter "${f.name}"`, "success");
+                            }}
+                            className={`redesign-tile ${isActive ? 'active' : ''}`}
+                          >
+                            <span className="redesign-tile-label">{f.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic font-mono">Select a video timeline slot to apply color grading filters.</p>
+                  )}
+                </div>
+              )}
+
+              {/* TEXT TAB CONTENT */}
+              {activeRailTab === 'text' && (
+                <div className="flex flex-col gap-4">
+                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
+                    <h3 className="text-xs font-bold font-mono text-gray-400">GLOBAL AUTO-CAPTIONS</h3>
+                    <p className="text-[10px] text-gray-500 leading-relaxed mb-1">Configures global captions styles for render.</p>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-500">CAPTION FONT COLOR</label>
+                        <select
+                          value={project.caption_font_color || "yellow"}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newManifest = { ...project, caption_font_color: val };
+                            setProject(newManifest);
+                            saveProject(newManifest);
+                          }}
+                          className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer"
+                        >
+                          <option value="yellow">Yellow</option>
+                          <option value="white">White</option>
+                          <option value="green">Green</option>
+                          <option value="cyan">Cyan</option>
+                          <option value="magenta">Magenta</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-500">CAPTION PLACEMENT</label>
+                        <select
+                          value={project.caption_placement || "bottom"}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newManifest = { ...project, caption_placement: val };
+                            setProject(newManifest);
+                            saveProject(newManifest);
+                          }}
+                          className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer"
+                        >
+                          <option value="bottom">Bottom</option>
+                          <option value="top">Top</option>
+                          <option value="center">Center</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2.5">
+                    <h3 className="text-xs font-bold font-mono text-gray-400">SLOT TEXT OVERLAY</h3>
+                    {selectedBlock && activeVideoBlock ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500">OVERLAY SCRIPT</label>
+                          <textarea
+                            value={activeVideoBlock.text_overlay || ""}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay', e.target.value)}
+                            placeholder="Enter overlay text..."
+                            className="w-full h-16 bg-carbon border border-carbon-border/50 focus:border-accent-primary outline-none p-2 rounded-lg text-white font-sans text-xs resize-none"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500">FONT FAMILY</label>
+                          <select
+                            value={activeVideoBlock.text_overlay_font || "arial"}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_font', e.target.value)}
+                            className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer"
+                          >
+                            <option value="arial">Arial</option>
+                            <option value="courier">Courier</option>
+                            <option value="georgia">Georgia</option>
+                            <option value="impact">Impact</option>
+                            <option value="times">Times New Roman</option>
+                            <option value="outfit">Outfit</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center text-[10px] text-gray-500">
+                            <span>FONT SIZE</span>
+                            <span className="text-accent-primary font-bold">{activeVideoBlock.text_overlay_size || 40}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="12"
+                            max="120"
+                            step="1"
+                            value={activeVideoBlock.text_overlay_size || 40}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_size', parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500">TEXT COLOR</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {['white', 'yellow', '#2dd4bf', '#ef4444', '#22c55e', '#f97316', '#a855f7'].map(color => (
+                              <button
+                                key={color}
+                                onClick={() => updateBlockField('video', selectedBlock.index, 'text_overlay_color', color)}
+                                className={`w-6 h-6 rounded-full border ${activeVideoBlock.text_overlay_color === color ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                            ))}
+                            <input
+                              type="color"
+                              value={activeVideoBlock.text_overlay_color && activeVideoBlock.text_overlay_color.startsWith('#') ? activeVideoBlock.text_overlay_color : '#ffffff'}
+                              onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_color', e.target.value)}
+                              className="w-6 h-6 p-0 rounded-full border-0 cursor-pointer overflow-hidden"
+                              title="Custom color"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center text-[10px] text-gray-500">
+                            <span>OUTLINE WIDTH</span>
+                            <span className="text-accent-primary font-bold">{activeVideoBlock.text_overlay_outline_width || 0}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            step="1"
+                            value={activeVideoBlock.text_overlay_outline_width || 0}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_outline_width', parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between py-1">
+                          <span className="text-[10px] text-gray-500 font-mono">BACKGROUND BOX</span>
+                          <input
+                            type="checkbox"
+                            checked={!!activeVideoBlock.text_overlay_box_enabled}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_box_enabled', e.target.checked)}
+                            className="rounded border-carbon-border bg-carbon text-accent-primary focus:ring-0 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500 font-mono">ANIMATION TEMPLATE</label>
+                          <select
+                            value={activeVideoBlock.text_overlay_template || "none"}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_template', e.target.value)}
+                            className="bg-carbon border border-carbon-border/50 text-white text-xs p-2 rounded-lg outline-none cursor-pointer font-mono"
+                          >
+                            <option value="none">None</option>
+                            <option value="fade">Fade In</option>
+                            <option value="slide_up">Slide Up Bounce</option>
+                            <option value="pulse">Heartbeat Pulse</option>
+                            <option value="alert">Flashing Alert</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                            <span>X-PLACEMENT</span>
+                            <span className="text-accent-primary font-bold">{activeVideoBlock.text_overlay_placement_x || 50}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={activeVideoBlock.text_overlay_placement_x || 50}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_placement_x', parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                            <span>Y-PLACEMENT</span>
+                            <span className="text-accent-primary font-bold">{activeVideoBlock.text_overlay_placement_y || 50}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={activeVideoBlock.text_overlay_placement_y || 50}
+                            onChange={(e) => updateBlockField('video', selectedBlock.index, 'text_overlay_placement_y', parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-carbon rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-500 italic font-mono">Select a timeline slot to edit its text overlay.</p>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Tab: MUSIC presets */}
-              {activeTab === 'music' && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-carbon-card/30 border border-carbon-border p-3 rounded-lg flex flex-col gap-2">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">LOAD PROMPTS TXT</h3>
-                    <input
-                      type="file"
-                      accept=".txt"
-                      onChange={(e) => {
-                        importTextFile('music', e.target.files[0]);
-                        e.target.value = ''; // Reset input to allow re-import
-                      }}
-                      className="hidden"
-                      id="music-txt-import"
-                    />
-                    <label
-                      htmlFor="music-txt-import"
-                      className="w-full flex items-center justify-center gap-2 bg-carbon border border-carbon-border hover:border-pink-500 text-xs hover:text-white py-2 rounded-lg cursor-pointer transition-all font-semibold font-mono"
-                    >
-                      <Icon name="file-text" className="w-3.5 h-3.5 text-pink-400" />
-                      <span>SELECT PROMPTS TXT</span>
-                    </label>
-                  </div>
+              {/* STICKERS TAB CONTENT */}
+              {activeRailTab === 'stickers' && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-xs font-bold font-mono text-gray-400 mb-1">Stickers Presets</h3>
+                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (
+                    <div className="redesign-grid">
+                      {stickersPresets.map(st => {
+                        const isActive = activeVideoBlock && activeVideoBlock.sticker === st.id;
+                        return (
+                          <button
+                            key={st.id}
+                            onClick={() => {
+                              updateBlockField('video', selectedBlock.index, 'sticker', st.id);
+                              addLog(`Applied sticker badge "${st.name}"`, "success");
+                            }}
+                            className={`redesign-tile ${isActive ? 'active' : ''}`}
+                            style={{ height: '62px' }}
+                          >
+                            <span className="text-xl mb-0.5">{st.emoji}</span>
+                            <span className="text-[9px] text-gray-400">{st.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic font-mono">Select a video timeline slot to apply stickers.</p>
+                  )}
+                </div>
+              )}
 
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-xs font-bold font-mono text-gray-400">MUSIC PROMPT PRESETS</h3>
-                    <p className="text-[11px] text-gray-500">Click any preset to copy text.</p>
-
-                    {[
-                      "TrackType: MUSIC. Soft cinematic piano ambient background",
-                      "TrackType: MUSIC. Upbeat acoustic guitar travel vlog track",
-                      "TrackType: MUSIC. Retro synthwave background music",
-                      "TrackType: MUSIC. Deep focus lofi hiphop beat background"
-                    ].map(preset => (
-                      <div
-                        key={preset}
-                        onClick={() => {
-                          navigator.clipboard.writeText(preset);
-                          addLog(`Copied music preset: "${preset}"`, "info");
-                          if (selectedBlock && selectedBlock.lane === 'music') {
-                            const updated = [...(project.music_blocks || [])];
-                            if (updated[selectedBlock.index]) {
-                              updated[selectedBlock.index] = { ...updated[selectedBlock.index], prompt: preset, status: 'idle' };
-                            }
-                            const newManifest = { ...project, music_blocks: updated };
-                            setProject(newManifest);
-                            saveProject(newManifest);
-                            addLog(`Pasted preset into Music slot ${selectedBlock.index}`, "success");
-                          }
-                        }}
-                        className="p-2 border border-carbon-border/50 hover:border-pink-500 bg-carbon-card/20 hover:bg-carbon-card/40 rounded-lg text-xs cursor-pointer select-text text-gray-400 transition-all font-mono"
-                      >
-                        {preset}
-                      </div>
-                    ))}
-                  </div>
+              {/* TRANSITIONS TAB CONTENT */}
+              {activeRailTab === 'transitions' && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-xs font-bold font-mono text-gray-400 mb-1">Transitions Presets</h3>
+                  {selectedBlock && project.video_blocks[selectedBlock.index] ? (
+                    <div className="redesign-list">
+                      {transitionsPresets.map(tr => {
+                        const isActive = activeVideoBlock && activeVideoBlock.transition === tr.id;
+                        return (
+                          <button
+                            key={tr.id}
+                            onClick={() => {
+                              updateBlockField('video', selectedBlock.index, 'transition', tr.id);
+                              addLog(`Applied transition "${tr.name}" to slot ${selectedBlock.index}`, "success");
+                            }}
+                            className={`redesign-list-item ${isActive ? 'active' : ''}`}
+                          >
+                            <span>{tr.name}</span>
+                            {isActive && <span className="text-accent-primary font-bold">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic font-mono">Select a video timeline slot to apply transitions.</p>
+                  )}
                 </div>
               )}
 
@@ -3861,26 +4446,148 @@ function App() {
                 selectedBlock !== null && project.video_blocks[selectedBlock.index] ? (
                   project.video_blocks[selectedBlock.index].file_path ? (
                     (() => {
-                      const filePath = project.video_blocks[selectedBlock.index].file_path.toLowerCase();
-                      const isImage = filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.webp') || project.video_blocks[selectedBlock.index].media_type === 'image';
+                      const block = project.video_blocks[selectedBlock.index];
+                      const filePath = block.file_path.toLowerCase();
+                      const isImage = filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.webp') || block.media_type === 'image';
+                      const filterStyle = { filter: getFilterCss(block.color_grading) };
+                      const activeSticker = stickersPresets.find(s => s.id === block.sticker);
                       return (
                         <div className="relative w-full h-full">
                           {isImage ? (
                             <img
-                              src={`/api/video/serve?path=${encodeURIComponent(project.video_blocks[selectedBlock.index].file_path)}`}
+                              src={`/api/video/serve?path=${encodeURIComponent(block.file_path)}`}
                               className="w-full h-full object-contain"
+                              style={filterStyle}
                               onClick={togglePlayAll}
                             />
                           ) : (
                             <video
                               ref={videoRef}
-                              src={`/api/video/serve?path=${encodeURIComponent(project.video_blocks[selectedBlock.index].file_path)}`}
+                              src={`/api/video/serve?path=${encodeURIComponent(block.file_path)}`}
                               className="w-full h-full object-contain"
+                              style={filterStyle}
                               onTimeUpdate={handleVideoSeek}
                               onEnded={() => setIsPlaying(false)}
                               onClick={togglePlayAll}
                             />
                           )}
+
+                          {/* Hover Overlay Play button */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer" onClick={togglePlayAll}>
+                            <div className="w-14 h-14 rounded-full bg-accent-primary/95 text-white flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all">
+                              {isPlaying ? <span className="text-xl font-bold">||</span> : <Icon name="play" className="w-7 h-7 fill-current ml-1" />}
+                            </div>
+                          </div>
+
+                          {/* Live Video Overlay System */}
+                          {block.overlay_effect && block.overlay_effect !== 'none' && (
+                            <div className="effect-overlay-container">
+                              {block.overlay_effect === 'vhs_glitch' && (
+                                <>
+                                  <div className="effect-vhs-glitch-line" />
+                                  <div className="effect-vhs-glitch-screen" />
+                                </>
+                              )}
+                              {block.overlay_effect === 'film_grain' && <div className="effect-film-grain" />}
+                              {block.overlay_effect === 'light_leak' && <div className="effect-light-leak" />}
+                              {block.overlay_effect === 'vignette' && <div className="effect-vignette" />}
+                              {block.overlay_effect === 'film_burn' && <div className="effect-film-burn" />}
+                              {block.overlay_effect === 'glitch_digital' && (
+                                <>
+                                  <div className="effect-digital-stripes" />
+                                  <div className="effect-digital-bar" />
+                                </>
+                              )}
+                              {block.overlay_effect === 'dust' && <div className="effect-dust" />}
+                              {block.overlay_effect === 'bw_classic' && (
+                                <div className="w-full h-full absolute inset-0 bg-black/10 mix-blend-overlay" />
+                              )}
+                            </div>
+                          )}
+
+                           {/* Bouncing Sticker Badge */}
+                           {activeSticker && activeSticker.id !== 'none' && (
+                             <div
+                               className="bouncing-sticker-badge animate-none"
+                               style={{
+                                 left: `${block.sticker_placement_x ?? 85}%`,
+                                 top: `${block.sticker_placement_y ?? 15}%`,
+                                 transform: 'translate(-50%, -50%)',
+                                 position: 'absolute',
+                                 pointerEvents: 'auto',
+                                 cursor: 'move',
+                               }}
+                               onMouseDown={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                                 const onMouseMove = (moveEvent) => {
+                                   const relativeX = moveEvent.clientX - rect.left;
+                                   const relativeY = moveEvent.clientY - rect.top;
+                                   const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
+                                   const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
+                                   updateBlockFields('video', selectedBlock.index, {
+                                     sticker_placement_x: newXPercent,
+                                     sticker_placement_y: newYPercent
+                                   });
+                                 };
+                                 const onMouseUp = () => {
+                                   document.removeEventListener('mousemove', onMouseMove);
+                                   document.removeEventListener('mouseup', onMouseUp);
+                                 };
+                                 document.addEventListener('mousemove', onMouseMove);
+                                 document.addEventListener('mouseup', onMouseUp);
+                               }}
+                             >
+                               <div style={{ animation: 'sticker-bounce-anim 1.5s infinite alternate ease-in-out' }}>
+                                 {activeSticker.emoji}
+                               </div>
+                             </div>
+                           )}
+ 
+                           {/* Draggable Text Overlay */}
+                           {block.text_overlay && (
+                             <div
+                               className="preview-text-overlay"
+                               style={{
+                                 left: `${block.text_overlay_placement_x ?? 50}%`,
+                                 top: `${block.text_overlay_placement_y ?? 50}%`,
+                                 transform: 'translate(-50%, -50%)',
+                                 fontFamily: block.text_overlay_font || 'arial',
+                                 fontSize: `${(block.text_overlay_size || 40) * 0.3}px`,
+                                 color: block.text_overlay_color || 'white',
+                                 backgroundColor: block.text_overlay_box_enabled ? 'rgba(0,0,0,0.5)' : 'transparent',
+                                 textShadow: block.text_overlay_outline_width ? `0 0 ${block.text_overlay_outline_width}px black` : 'none',
+                                 pointerEvents: 'auto',
+                                 cursor: 'move',
+                               }}
+                               onMouseDown={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                                 const onMouseMove = (moveEvent) => {
+                                   const relativeX = moveEvent.clientX - rect.left;
+                                   const relativeY = moveEvent.clientY - rect.top;
+                                   const newXPercent = Math.max(0, Math.min(100, Math.round((relativeX / rect.width) * 100)));
+                                   const newYPercent = Math.max(0, Math.min(100, Math.round((relativeY / rect.height) * 100)));
+                                   updateBlockFields('video', selectedBlock.index, {
+                                     text_overlay_placement_x: newXPercent,
+                                     text_overlay_placement_y: newYPercent
+                                   });
+                                 };
+                                 const onMouseUp = () => {
+                                   document.removeEventListener('mousemove', onMouseMove);
+                                   document.removeEventListener('mouseup', onMouseUp);
+                                 };
+                                 document.addEventListener('mousemove', onMouseMove);
+                                 document.addEventListener('mouseup', onMouseUp);
+                               }}
+                             >
+                               <span className={`text-template-${block.text_overlay_template || 'none'}`}>
+                                 {block.text_overlay}
+                               </span>
+                             </div>
+                           )}
 
                           {/* Hidden Audios */}
                           {project.voice_blocks[selectedBlock.index] && (project.voice_blocks[selectedBlock.index].status === 'done' || project.voice_blocks[selectedBlock.index].status === 'provided') && (
@@ -3912,13 +4619,6 @@ function App() {
                               }}
                             />
                           )}
-
-                          {/* Hover Overlay Play button */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer" onClick={togglePlayAll}>
-                            <div className="w-14 h-14 rounded-full bg-accent-primary/95 text-white flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all">
-                              {isPlaying ? <span className="text-xl font-bold">||</span> : <Icon name="play" className="w-7 h-7 fill-current ml-1" />}
-                            </div>
-                          </div>
                         </div>
                       );
                     })()
@@ -4453,6 +5153,7 @@ function App() {
 
                           // Render Video block
                           if (layer.type === 'video') {
+                            const isDragOverThisSlot = dragOverSlot && dragOverSlot.lane === 'video' && dragOverSlot.index === i;
                             return (
                               <div
                                 key={block.id}
@@ -4464,12 +5165,21 @@ function App() {
                                     setSelectedBlock({ lane: 'video', index: i, layerId: layer.id });
                                   }
                                 }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDragEnter={(e) => {
+                                  e.preventDefault();
+                                  setDragOverSlot({ lane: 'video', index: i });
+                                }}
+                                onDragLeave={() => setDragOverSlot(null)}
+                                onDrop={(e) => handleSlotDrop(e, 'video', i)}
                                 style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
-                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isBlockSelected
-                                    ? 'bg-accent-primary/10 border-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)] text-white'
-                                    : (isColSelected
-                                      ? 'bg-carbon-card/40 border-accent-primary/60 text-gray-300'
-                                      : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-primary/40 hover:bg-carbon-card/35')
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isDragOverThisSlot
+                                    ? 'border-dashed border-accent-primary bg-accent-primary/20 scale-[1.02] shadow-[0_0_12px_rgba(124,108,255,0.4)] text-white'
+                                    : isBlockSelected
+                                      ? 'bg-accent-primary/10 border-accent-primary shadow-[0_0_8px_rgba(124,108,255,0.2)] text-white'
+                                      : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-primary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-primary/40 hover:bg-carbon-card/35')
                                   }`}
                               >
                                 {block.thumbnail_path ? (
@@ -4499,6 +5209,7 @@ function App() {
 
                           // Render SFX block
                           if (layer.type === 'sfx') {
+                            const isDragOverThisSlot = dragOverSlot && dragOverSlot.lane === 'sfx' && dragOverSlot.index === i;
                             return (
                               <div
                                 key={block.id}
@@ -4510,12 +5221,21 @@ function App() {
                                     setSelectedBlock({ lane: 'sfx', index: i, layerId: layer.id });
                                   }
                                 }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDragEnter={(e) => {
+                                  e.preventDefault();
+                                  setDragOverSlot({ lane: 'sfx', index: i });
+                                }}
+                                onDragLeave={() => setDragOverSlot(null)}
+                                onDrop={(e) => handleSlotDrop(e, 'sfx', i)}
                                 style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
-                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isBlockSelected
-                                    ? 'bg-accent-secondary/15 border-accent-secondary shadow-[0_0_8px_rgba(255,108,157,0.25)] text-white'
-                                    : (isColSelected
-                                      ? 'bg-carbon-card/40 border-accent-secondary/60 text-gray-300'
-                                      : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-secondary/40 hover:bg-carbon-card/35')
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isDragOverThisSlot
+                                    ? 'border-dashed border-accent-secondary bg-accent-secondary/20 scale-[1.02] shadow-[0_0_12px_rgba(255,108,157,0.4)] text-white'
+                                    : isBlockSelected
+                                      ? 'bg-accent-secondary/15 border-accent-secondary shadow-[0_0_8px_rgba(255,108,157,0.25)] text-white'
+                                      : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-secondary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-secondary/40 hover:bg-carbon-card/35')
                                   }`}
                               >
                                 {block.prompt && (
@@ -4579,6 +5299,7 @@ function App() {
 
                           // Render Voice block
                           if (layer.type === 'voice') {
+                            const isDragOverThisSlot = dragOverSlot && dragOverSlot.lane === 'voice' && dragOverSlot.index === i;
                             return (
                               <div
                                 key={block.id}
@@ -4590,12 +5311,21 @@ function App() {
                                     setSelectedBlock({ lane: 'voice', index: i, layerId: layer.id });
                                   }
                                 }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDragEnter={(e) => {
+                                  e.preventDefault();
+                                  setDragOverSlot({ lane: 'voice', index: i });
+                                }}
+                                onDragLeave={() => setDragOverSlot(null)}
+                                onDrop={(e) => handleSlotDrop(e, 'voice', i)}
                                 style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
-                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isBlockSelected
-                                    ? 'bg-accent-tertiary/15 border-accent-tertiary shadow-[0_0_8px_rgba(108,255,204,0.25)] text-white'
-                                    : (isColSelected
-                                      ? 'bg-carbon-card/40 border-accent-tertiary/60 text-gray-300'
-                                      : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/40 hover:bg-carbon-card/35')
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isDragOverThisSlot
+                                    ? 'border-dashed border-accent-tertiary bg-accent-tertiary/20 scale-[1.02] shadow-[0_0_12px_rgba(108,255,204,0.4)] text-white'
+                                    : isBlockSelected
+                                      ? 'bg-accent-tertiary/15 border-accent-tertiary shadow-[0_0_8px_rgba(108,255,204,0.25)] text-white'
+                                      : (isColSelected
+                                        ? 'bg-carbon-card/40 border-accent-tertiary/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-accent-tertiary/40 hover:bg-carbon-card/35')
                                   }`}
                               >
                                 {block.prompt && (
@@ -4666,6 +5396,7 @@ function App() {
 
                           // Render MUSIC block
                           if (layer.type === 'music') {
+                            const isDragOverThisSlot = dragOverSlot && dragOverSlot.lane === 'music' && dragOverSlot.index === i;
                             return (
                               <div
                                 key={block.id}
@@ -4677,12 +5408,21 @@ function App() {
                                     setSelectedBlock({ lane: 'music', index: i, layerId: layer.id });
                                   }
                                 }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDragEnter={(e) => {
+                                  e.preventDefault();
+                                  setDragOverSlot({ lane: 'music', index: i });
+                                }}
+                                onDragLeave={() => setDragOverSlot(null)}
+                                onDrop={(e) => handleSlotDrop(e, 'music', i)}
                                 style={{ width: '140px', minWidth: '140px', marginRight: '0px' }}
-                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isBlockSelected
-                                    ? 'bg-pink-500/15 border-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.25)] text-white'
-                                    : (isColSelected
-                                      ? 'bg-carbon-card/40 border-pink-500/60 text-gray-300'
-                                      : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-pink-500/40 hover:bg-carbon-card/35')
+                                className={`relative h-[68px] rounded-lg p-1.5 flex flex-col justify-between border cursor-pointer select-none transition-all group ${isDragOverThisSlot
+                                    ? 'border-dashed border-pink-500 bg-pink-500/20 scale-[1.02] shadow-[0_0_12px_rgba(236,72,153,0.4)] text-white'
+                                    : isBlockSelected
+                                      ? 'bg-pink-500/15 border-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.25)] text-white'
+                                      : (isColSelected
+                                        ? 'bg-carbon-card/40 border-pink-500/60 text-gray-300'
+                                        : 'bg-carbon-card/25 border-carbon-border/50 text-gray-400 hover:border-pink-500/40 hover:bg-carbon-card/35')
                                   }`}
                               >
                                 {block.prompt && (
@@ -5642,11 +6382,92 @@ function App() {
         </div>
       )}
 
-              chars: updatedChars
-            }));
-            setCalibratingChar(null);
+      {/* ── CONTEXT MENU OVERLAY ── */}
+      {contextMenu.visible && (
+        <div 
+          className="custom-context-menu" 
+          style={{ 
+            position: 'fixed', 
+            top: contextMenu.y, 
+            left: contextMenu.x, 
+            zIndex: 9999,
+            backgroundColor: '#16161a',
+            border: '1px solid #2b2b36',
+            borderRadius: '8px',
+            padding: '4px 0',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.5)',
+            minWidth: '180px',
+            pointerEvents: 'auto'
           }}
-        />
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="context-menu-item" 
+            style={{
+              padding: '8px 12px',
+              cursor: 'pointer',
+              color: '#d1d1e0',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              transition: 'background-color 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#242433'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onClick={() => {
+              handleApplyToSelectedSlot();
+              setContextMenu(prev => ({ ...prev, visible: false }));
+            }}
+          >
+            <span>🎯</span> Apply to Selected Slot
+          </div>
+          <div 
+            className="context-menu-item" 
+            style={{
+              padding: '8px 12px',
+              cursor: 'pointer',
+              color: '#d1d1e0',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              transition: 'background-color 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#242433'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onClick={() => {
+              handleInsertAtEnd();
+              setContextMenu(prev => ({ ...prev, visible: false }));
+            }}
+          >
+            <span>➕</span> Insert at End of Timeline
+          </div>
+          <div 
+            className="context-menu-item" 
+            style={{
+              padding: '8px 12px',
+              cursor: 'pointer',
+              color: '#ff4d4d',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              transition: 'background-color 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 77, 77, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onClick={() => {
+              handleDeleteAsset();
+              setContextMenu(prev => ({ ...prev, visible: false }));
+            }}
+          >
+            <span>🗑️</span> Delete Asset
+          </div>
+        </div>
       )}
 
     </div>

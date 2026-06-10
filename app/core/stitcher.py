@@ -178,7 +178,19 @@ def build_ffmpeg_cmd(
     sfx_label: Optional[str] = None,
     video_has_audio: bool = False,
     video_duration: float = 0.0,
-    sfx_captions_enabled: bool = True
+    sfx_captions_enabled: bool = True,
+    text_overlay: str = "",
+    text_overlay_font: str = "arial",
+    text_overlay_size: int = 40,
+    text_overlay_color: str = "white",
+    text_overlay_placement_y: int = 50,
+    text_overlay_placement_x: int = 50,
+    text_overlay_box_enabled: bool = False,
+    text_overlay_outline_width: int = 3,
+    sticker: str = "none",
+    sticker_placement_x: int = 85,
+    sticker_placement_y: int = 15,
+    text_overlay_template: str = "none"
 ) -> List[str]:
     """
     Builds the exact FFmpeg arguments list based on filters, transitions, aspect ratio and audio tracks.
@@ -294,6 +306,14 @@ def build_ffmpeg_cmd(
         vf_filters.append("colorbalance=rs=0.2:gs=-0.1:bs=0.25,eq=contrast=1.2:saturation=1.3")
     elif color_grading == "bleach_bypass":
         vf_filters.append("eq=contrast=1.3:saturation=0.5")
+    elif color_grading == "bw_classic":
+        vf_filters.append("hue=s=0,eq=contrast=1.1")
+    elif color_grading in ("teal_orange", "teal_and_orange"):
+        vf_filters.append("colorbalance=rs=0.12:gs=0.0:bs=-0.1:rm=0.15:gm=-0.03:bm=-0.15:rh=0.08:gh=0.0:bh=-0.08")
+    elif color_grading == "indie_warm":
+        vf_filters.append("colorbalance=rs=0.1:gs=0.05:bs=-0.05,eq=contrast=1.05:brightness=0.02")
+    elif color_grading == "retro_90s":
+        vf_filters.append("eq=contrast=1.1:saturation=0.85:brightness=0.03,colorbalance=rs=0.05:gs=0.02:bs=-0.04")
 
     # Add overlay effect presets
     if overlay_effect == "film_grain":
@@ -379,6 +399,70 @@ def build_ffmpeg_cmd(
                             f"drawtext={font_arg}text='{escaped_word}':expansion=none:enable='between(t,{start:.3f},{end:.3f})':"
                             f"x={x_expr}:y={y_expr}:fontcolor={caption_font_color}:fontsize={caption_font_size}{box_style_arg}"
                         )
+
+    # Draw slot-level text overlay if provided
+    if text_overlay:
+        escaped_overlay = escape_drawtext(text_overlay)
+        if escaped_overlay:
+            text_font_arg = get_font_file(text_overlay_font)
+            text_box_style_arg = ""
+            if text_overlay_box_enabled:
+                text_box_style_arg = ":box=1:boxcolor=black@0.5:boxborderw=8"
+            elif text_overlay_outline_width > 0:
+                text_box_style_arg = f":borderw={text_overlay_outline_width}:bordercolor=black"
+            
+            x_pos_expr = f"(w-tw)*{text_overlay_placement_x}/100"
+            y_pos_expr = f"(h-th)*{text_overlay_placement_y}/100"
+            alpha_expr = "1"
+            size_expr = str(text_overlay_size)
+            
+            if text_overlay_template == "fade":
+                alpha_expr = "min(1,t/0.5)"
+            elif text_overlay_template == "slide_up":
+                y_pos_expr = f"((h-th)*{text_overlay_placement_y}/100)+if(lt(t,0.4), 120*(1-t/0.4), 0)"
+            elif text_overlay_template == "pulse":
+                size_expr = f"{text_overlay_size}*(1+0.06*sin(2.5*3.14159*t))"
+            elif text_overlay_template == "alert":
+                alpha_expr = "if(eq(mod(int(t*4),2),0),1,0.25)"
+                
+            vf_filters.append(
+                f"drawtext={text_font_arg}text='{escaped_overlay}':expansion=none:"
+                f"x='{x_pos_expr}':y='{y_pos_expr}':fontcolor={text_overlay_color}:fontsize='{size_expr}':alpha='{alpha_expr}'{text_box_style_arg}"
+            )
+
+    # Draw sticker if provided
+    if sticker and sticker != "none":
+        stickers_emojis = {
+            "fire": "🔥",
+            "like": "❤️",
+            "subscribe": "🔔",
+            "warning": "⚠️",
+            "boom": "💥",
+            "idea": "💡",
+            "viral": "📈",
+            "star": "⭐"
+        }
+        emoji_char = stickers_emojis.get(sticker)
+        if emoji_char:
+            escaped_sticker = escape_drawtext(emoji_char)
+            # Use Segoe UI Emoji font on Windows if available
+            emoji_font_path = Path("C:/Windows/Fonts/seguiemj.ttf")
+            if emoji_font_path.exists():
+                escaped_font_path = str(emoji_font_path).replace("\\", "/").replace(":", "\\:")
+                sticker_font_arg = f"fontfile='{escaped_font_path}':"
+            else:
+                sticker_font_arg = get_font_file("arial")
+                
+            sticker_x = f"(w-tw)*{sticker_placement_x}/100"
+            sticker_y = f"(h-th)*{sticker_placement_y}/100"
+            
+            # Simple bouncing template simulation (matches frontend sticker-bounce-anim)
+            sticker_y_expr = f"({sticker_y})-8*abs(sin(2.5*3.14159*t))"
+            
+            vf_filters.append(
+                f"drawtext={sticker_font_arg}text='{escaped_sticker}':expansion=none:"
+                f"x='{sticker_x}':y='{sticker_y_expr}':fontsize=64"
+            )
 
     # Ensure final dimensions are even to prevent libx264 yuv420p errors
     vf_filters.append("scale=trunc(iw/2)*2:trunc(ih/2)*2")
@@ -560,7 +644,19 @@ async def render_all(
             sfx_label=sfx_label,
             video_has_audio=video_has_audio,
             video_duration=v_block.duration_s,
-            sfx_captions_enabled=getattr(manifest, 'sfx_captions_enabled', True)
+            sfx_captions_enabled=getattr(manifest, 'sfx_captions_enabled', True),
+            text_overlay=getattr(v_block, 'text_overlay', ''),
+            text_overlay_font=getattr(v_block, 'text_overlay_font', 'arial'),
+            text_overlay_size=getattr(v_block, 'text_overlay_size', 40),
+            text_overlay_color=getattr(v_block, 'text_overlay_color', 'white'),
+            text_overlay_placement_y=getattr(v_block, 'text_overlay_placement_y', 50),
+            text_overlay_placement_x=getattr(v_block, 'text_overlay_placement_x', 50),
+            text_overlay_box_enabled=getattr(v_block, 'text_overlay_box_enabled', False),
+            text_overlay_outline_width=getattr(v_block, 'text_overlay_outline_width', 3),
+            sticker=getattr(v_block, 'sticker', 'none'),
+            sticker_placement_x=getattr(v_block, 'sticker_placement_x', 85),
+            sticker_placement_y=getattr(v_block, 'sticker_placement_y', 15),
+            text_overlay_template=getattr(v_block, 'text_overlay_template', 'none')
         )
         
         logger.info(f"Rendering slot {i}...")

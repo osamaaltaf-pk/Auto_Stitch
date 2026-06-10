@@ -31,6 +31,25 @@ _switch_state = {"status": "idle", "target": None, "error": None}  # tracks asyn
 # ─── Model Loading ───────────────────────────────────────────────────────────────
 def load_model(model_name: str):
     """Load model once and cache it. Thread-safe."""
+    # Check if target model is already cached locally to enable offline mode and bypass token validation
+    cache_dir = Path(os.environ["HF_HOME"]) / "hub"
+    has_local = False
+    if cache_dir.exists():
+        for folder in cache_dir.glob(f"*stable-audio-3-{model_name}*"):
+            snapshots_dir = folder / "snapshots"
+            if snapshots_dir.exists() and any(snapshots_dir.iterdir()):
+                has_local = True
+                break
+
+    if has_local:
+        print(f"[INFO] Local cache found for '{model_name}'. Enabling offline mode to bypass token verification.")
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    else:
+        print(f"[INFO] Local cache NOT found for '{model_name}'. Enabling online mode for first-time model download.")
+        os.environ["HF_HUB_OFFLINE"] = "0"
+        os.environ["TRANSFORMERS_OFFLINE"] = "0"
+
     with _model_lock:
         if model_name not in _models:
             print(f"[INFO] Loading model '{model_name}'...")
