@@ -2,350 +2,290 @@
 setlocal enabledelayedexpansion
 title AutoStitch Unified Studio Setup
 
+REM ── Root directory (always the folder this .bat lives in) ─────────────────
+set "ROOT=%~dp0"
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+
 echo ====================================================
-echo  AutoStitch v1 - Unified Studio Setup (Stand-alone)
+echo  AutoStitch Unified Studio - Setup
+echo  Root: %ROOT%
 echo ====================================================
 echo.
 
-REM ── Check Python ────────────────────────────────────
-echo [1/5] Checking Python...
-python -c "import socket; import venv" >nul 2>&1
-if errorlevel 1 goto check_local_python
-set PYTHON_CMD=python
-set USE_FALLBACK_VENV=N
-echo       System Python found.
-goto python_ok
+REM ── PHASE 1: Python Detection & Bootstrapping ──────────────────────────────
+echo [1/8] Detecting Python environment...
+set "PYTHON_CMD="
 
-:check_local_python
-if exist "bin\python_portable\python.exe" (
-    set PYTHON_CMD=bin\python_portable\python.exe
-    set USE_FALLBACK_VENV=Y
-    echo       Portable Python found at bin\python_portable\python.exe.
-    goto python_ok
-)
-if not exist "bin\python-3.12.10-embed-amd64.zip" (
-    echo       Portable Python not found. Downloading from python.org...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-      "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; mkdir bin -Force | Out-Null; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.1/python-3.12.1-embed-amd64.zip' -OutFile 'bin\python-3.12.10-embed-amd64.zip'; Write-Host '      Python download complete.' } catch { Write-Host 'ERROR: Python download failed: ' $_.Exception.Message; exit 1 }"
-    if errorlevel 1 goto python_fail
-)
-if exist "bin\python-3.12.10-embed-amd64.zip" (
-    echo       Local Python zip found. Extracting to bin\python_portable...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path bin\python-3.12.10-embed-amd64.zip -DestinationPath bin\python_portable -Force"
-    if exist "bin\python_portable\python.exe" (
-        set PYTHON_CMD=bin\python_portable\python.exe
-        set USE_FALLBACK_VENV=Y
-        echo       Successfully extracted portable Python.
-        
-        REM Enable site-packages inside embedded python
-        if exist "bin\python_portable\python312._pth" (
-            powershell -NoProfile -Command "(Get-Content bin\python_portable\python312._pth) -replace '#import site', 'import site' | Set-Content bin\python_portable\python312._pth"
-        )
-        
-        REM Bootstrap pip if needed
-        if not exist "bin\python_portable\Scripts\pip.exe" (
-            echo       Installing pip for portable Python...
-            powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile 'bin\python_portable\get-pip.py'"
-            bin\python_portable\python.exe bin\python_portable\get-pip.py --quiet
-            del bin\python_portable\get-pip.py
-        )
-        goto python_ok
-    )
+REM 1. Check if python is already in PATH and works
+python --version >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PY_VER=%%V"
+    echo   [OK] System Python found: !PY_VER!
+    set "PYTHON_CMD=python"
+    goto python_ready
 )
 
-:python_fail
-echo ERROR: Python not found. Please install Python 3.11 or 3.12.
-echo Make sure to tick "Add Python to PATH" during installation.
-pause
-exit /b 1
+REM 2. Check default Windows non-admin local install path
+if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" (
+    echo   [OK] Found Python 3.12 in AppData local directory.
+    set "PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python312;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%PATH%"
+    set "PYTHON_CMD=python"
+    goto python_ready
+)
 
-:python_ok
+REM 3. If Python is completely missing, download and install it
+echo   Python not found. Bootstrapping Python 3.12.10...
+if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
 
-REM ── Check/Download FFmpeg ────────────────────────────
-echo.
-echo Checking for FFmpeg...
-if exist "bin\ffmpeg.exe" goto ffmpeg_ok
-
-echo       FFmpeg not found. Downloading from gyan.dev...
+echo   Downloading Python 3.12.10 installer...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try { curl.exe -L 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -o 'ffmpeg.zip'; Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_temp -Force; $folder = Get-ChildItem ffmpeg_temp -Directory | Select-Object -First 1; Move-Item \"$($folder.FullName)/bin/ffmpeg.exe\" bin/ffmpeg.exe -Force; Move-Item \"$($folder.FullName)/bin/ffprobe.exe\" bin/ffprobe.exe -Force; Remove-Item ffmpeg_temp, ffmpeg.zip -Recurse -Force; Write-Host 'FFmpeg download complete.' } catch { Write-Host 'ERROR: FFmpeg download failed: ' $_.Exception.Message; exit 1 }"
-if errorlevel 1 goto ffmpeg_fail
-echo       FFmpeg successfully configured in bin\.
-goto ffmpeg_ok
+  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile '%ROOT%\bin\python-3.12.10-amd64.exe'"
 
-:ffmpeg_fail
-echo.
-echo WARNING: FFmpeg auto-download failed.
-echo          Place ffmpeg.exe and ffprobe.exe in the bin\ folder manually.
-echo          Download from: https://www.gyan.dev/ffmpeg/builds/
-echo.
-
-:ffmpeg_ok
-
-set INSTALL_TTS=Y
-set INSTALL_SFX=Y
-
-REM ── Create Main App Virtual Environment ─────────────
-echo.
-echo [2/5] Setting up main application virtual environment...
-if exist "venv" (
-    venv\Scripts\python -c "import socket" >nul 2>&1
-    if errorlevel 1 (
-        echo       Existing venv is broken. Cleaning up and recreating...
-        rmdir /s /q venv >nul 2>&1
-    ) else (
-        goto venv_exists
-    )
+if errorlevel 1 (
+    echo   [!!] ERROR: Failed to download Python. Check internet connection.
+    pause
+    exit /b 1
 )
-if "%USE_FALLBACK_VENV%"=="Y" (
-    echo       Using portable fallback wrapper for main environment...
-    call :create_fallback_venv venv "..\.."
-    if errorlevel 1 goto venv_fail
-) else (
-    %PYTHON_CMD% -m venv venv
-    if errorlevel 1 (
-        echo       venv creation failed. Retrying with portable fallback...
-        call :create_fallback_venv venv "..\.."
-        if errorlevel 1 goto venv_fail
-    )
+
+echo   Installing Python 3.12.10 silently...
+"%ROOT%\bin\python-3.12.10-amd64.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0 Include_launcher=1
+if errorlevel 1 (
+    echo   [!!] ERROR: Python installation failed.
+    pause
+    exit /b 1
 )
-echo       venv created successfully.
-goto venv_ok
 
-:venv_exists
-echo       venv already exists, skipping creation.
-goto venv_ok
+echo   Waiting for installation to register...
+timeout /t 10 /nobreak >nul
 
-:venv_fail
-echo ERROR: Failed to create venv virtual environment.
+REM Add the expected location of the newly installed Python to session PATH
+set "PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python312;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%PATH%"
+
+REM Reload environment path from HKCU registry just in case
+for /f "tokens=2*" %%A in ('reg query "HKCU\Environment" /v PATH 2^>nul') do set "USERPATH=%%B"
+if defined USERPATH set "PATH=%USERPATH%;%PATH%"
+
+python --version >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PY_VER=%%V"
+    echo   [OK] Python installed successfully: !PY_VER!
+    set "PYTHON_CMD=python"
+    goto python_ready
+)
+
+REM Fallback check for python launcher
+where py >nul 2>&1
+if not errorlevel 1 (
+    echo   [OK] Using Python launcher (py).
+    set "PYTHON_CMD=py"
+    goto python_ready
+)
+
+echo   [!!] ERROR: Python was installed but is still not recognized.
+echo        Please restart this setup window or log out and log back in.
 pause
 exit /b 1
+
+:python_ready
+echo   Using Python Command: %PYTHON_CMD%
+echo.
+
+REM ── PHASE 2: Install Hugging Face CLI ──────────────────────────────────────
+echo [2/8] Setting up Hugging Face CLI...
+%PYTHON_CMD% -m pip install --upgrade pip --quiet
+%PYTHON_CMD% -m pip install -U "huggingface_hub[cli]" --quiet
+if errorlevel 1 (
+    echo   [!!] WARNING: pip installation of huggingface_hub failed.
+    echo        Trying direct PowerShell installer...
+    powershell -ExecutionPolicy ByPass -c "irm https://hf.co/cli/install.ps1 | iex"
+)
+
+REM Dynamically locate the python Scripts directory and add it to session PATH
+for /f "delims=" %%I in ('%PYTHON_CMD% -c "import sys, os; print(os.path.dirname(sys.executable))"') do set "PY_DIR=%%I"
+set "PATH=!PY_DIR!;!PY_DIR!\Scripts;%PATH%"
+
+REM Determine the correct HF CLI command
+set "HF_CMD=hf"
+where hf >nul 2>&1
+if errorlevel 1 (
+    where huggingface-cli >nul 2>&1
+    if not errorlevel 1 (
+        set "HF_CMD=huggingface-cli"
+    ) else (
+        echo   [!!] ERROR: Hugging Face CLI (hf) was not found after installation.
+        pause
+        exit /b 1
+    )
+)
+echo   [OK] Hugging Face CLI ready: %HF_CMD%
+echo.
+
+REM ── PHASE 3: Sync Binaries ─────────────────────────────────────────────────
+echo [3/8] Syncing binaries from Hugging Face bucket...
+if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
+%HF_CMD% sync hf://buckets/deepLEARNING786/YTAuto "%ROOT%\bin"
+if errorlevel 1 (
+    echo   [!!] ERROR: Failed to sync binaries from YTAuto bucket.
+    pause
+    exit /b 1
+)
+set "PATH=%ROOT%\bin;%PATH%"
+echo   [OK] Binaries synced and added to PATH.
+echo.
+
+REM ── PHASE 4: Check FFmpeg ──────────────────────────────────────────────────
+echo [4/8] Verifying FFmpeg...
+if exist "%ROOT%\bin\ffmpeg.exe" (
+    echo   [OK] ffmpeg.exe found in bin\
+) else (
+    echo   [!!] ERROR: ffmpeg.exe not found in bin\ after sync.
+    pause
+    exit /b 1
+)
+echo.
+
+REM ── PHASE 5: Main venv ─────────────────────────────────────────────────────
+echo [5/8] Setting up main venv...
+if exist "%ROOT%\venv\Scripts\python.exe" (
+    "%ROOT%\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
+    if not errorlevel 1 (
+        echo   [OK] Main venv already healthy - skipping.
+        goto venv_ok
+    )
+    echo   Broken venv detected - rebuilding...
+    rmdir /s /q "%ROOT%\venv" >nul 2>&1
+)
+
+echo   Creating main venv...
+%PYTHON_CMD% -m venv "%ROOT%\venv"
+if errorlevel 1 (
+    echo   [!!] ERROR: Failed to create main venv.
+    pause
+    exit /b 1
+)
+
+echo   Installing main requirements...
+call "%ROOT%\venv\Scripts\activate.bat"
+python -m pip install --upgrade pip --quiet
+pip install -r "%ROOT%\requirements.txt" --quiet
+if errorlevel 1 (
+    echo   [!!] ERROR: pip install for main app failed.
+    call "%ROOT%\venv\Scripts\deactivate.bat"
+    pause
+    exit /b 1
+)
+call "%ROOT%\venv\Scripts\deactivate.bat"
+echo   [OK] Main app venv ready.
 
 :venv_ok
-echo       Installing main application dependencies...
-call venv\Scripts\activate.bat
-call venv\Scripts\python -m pip install -r requirements.txt --quiet
-if errorlevel 1 goto main_pip_fail
-call venv\Scripts\deactivate.bat
-echo       Main app packages installed.
-goto main_app_ok
-
-:main_pip_fail
-echo ERROR: pip install failed. Check connection and requirements.txt.
-pause
-exit /b 1
-
-:main_app_ok
-
-REM ── Text-to-Speech Virtual Environment ───────────────
-if /i "!INSTALL_TTS!"=="N" goto skip_tts
-
 echo.
-echo [3/5] Setting up Text-to-Speech ^(text_to_speech_server\venv^)...
-if exist "text_to_speech_server\venv" (
-    text_to_speech_server\venv\Scripts\python -c "import socket" >nul 2>&1
-    if errorlevel 1 (
-        echo       Existing TTS venv is broken. Cleaning up and recreating...
-        rmdir /s /q text_to_speech_server\venv >nul 2>&1
-    ) else (
-        goto tts_venv_exists
+
+REM ── PHASE 6: TTS venv ──────────────────────────────────────────────────────
+echo [6/8] Setting up TTS environment...
+if exist "%ROOT%\text_to_speech_server\venv\Scripts\python.exe" (
+    "%ROOT%\text_to_speech_server\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
+    if not errorlevel 1 (
+        echo   [OK] TTS venv already healthy - skipping.
+        goto tts_ok
     )
+    echo   Broken TTS venv - rebuilding...
+    rmdir /s /q "%ROOT%\text_to_speech_server\venv" >nul 2>&1
 )
-if "%USE_FALLBACK_VENV%"=="Y" (
-    echo       Using portable fallback wrapper for TTS environment...
-    call :create_fallback_venv text_to_speech_server\venv "..\..\.."
-    if errorlevel 1 goto tts_venv_fail
-) else (
-    %PYTHON_CMD% -m venv text_to_speech_server\venv
-    if errorlevel 1 (
-        echo       TTS venv creation failed. Retrying with portable fallback...
-        call :create_fallback_venv text_to_speech_server\venv "..\..\.."
-        if errorlevel 1 goto tts_venv_fail
+
+echo   Creating TTS venv...
+%PYTHON_CMD% -m venv "%ROOT%\text_to_speech_server\venv"
+if errorlevel 1 (
+    echo   [!!] ERROR: Failed to create TTS venv.
+    pause
+    exit /b 1
+)
+
+call "%ROOT%\text_to_speech_server\venv\Scripts\activate.bat"
+python -m pip install --upgrade pip --quiet
+pip install --extra-index-url https://download.pytorch.org/whl/cpu -r "%ROOT%\text_to_speech_server\requirements.txt" --quiet
+pip install "piper-tts>=0.1.0" --quiet
+call "%ROOT%\text_to_speech_server\venv\Scripts\deactivate.bat"
+echo   [OK] TTS venv ready.
+
+:tts_ok
+echo.
+
+REM ── PHASE 7: SFX venv ──────────────────────────────────────────────────────
+echo [7/8] Setting up Sound and Music environment...
+if exist "%ROOT%\sfx_and_music_server\venv\Scripts\python.exe" (
+    "%ROOT%\sfx_and_music_server\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
+    if not errorlevel 1 (
+        echo   [OK] SFX venv already healthy - skipping.
+        goto sfx_ok
     )
+    echo   Broken SFX venv - rebuilding...
+    rmdir /s /q "%ROOT%\sfx_and_music_server\venv" >nul 2>&1
 )
-goto tts_venv_ok
 
-:tts_venv_exists
-echo       text_to_speech_server\venv already exists.
-goto tts_venv_ok
-
-:tts_venv_fail
-echo ERROR: Failed to create text_to_speech_server\venv virtual environment.
-pause
-exit /b 1
-
-:tts_venv_ok
-echo       Installing Text-to-Speech dependencies...
-call text_to_speech_server\venv\Scripts\activate.bat
-call text_to_speech_server\venv\Scripts\python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu -r text_to_speech_server\requirements.txt --quiet
-if errorlevel 1 goto tts_pip_fail
-echo       Installing core engine...
-call text_to_speech_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('cG9ja2V0LXR0cz49MC4xLjA=').decode()])" --quiet
-if errorlevel 1 goto tts_core_fail
-call text_to_speech_server\venv\Scripts\deactivate.bat
-echo       TTS packages installed.
-goto tts_done
-
-:tts_pip_fail
-echo ERROR: TTS pip install failed.
-pause
-exit /b 1
-
-:tts_core_fail
-echo ERROR: TTS core install failed.
-pause
-exit /b 1
-
-:skip_tts
-echo.
-echo [3/5] Skipping TTS setup.
-
-:tts_done
-
-REM ── Sound & Music Virtual Environment ───────────────
-if /i "!INSTALL_SFX!"=="N" goto skip_sfx
-
-echo.
-echo [4/5] Setting up Sound ^& Music Server ^(sfx_and_music_server\venv^)...
-if exist "sfx_and_music_server\venv" (
-    sfx_and_music_server\venv\Scripts\python -c "import socket" >nul 2>&1
-    if errorlevel 1 (
-        echo       Existing Sound & Music venv is broken. Cleaning up and recreating...
-        rmdir /s /q sfx_and_music_server\venv >nul 2>&1
-    ) else (
-        goto sfx_venv_exists
-    )
+echo   Creating SFX venv...
+%PYTHON_CMD% -m venv "%ROOT%\sfx_and_music_server\venv"
+if errorlevel 1 (
+    echo   [!!] ERROR: Failed to create SFX venv.
+    pause
+    exit /b 1
 )
-if "%USE_FALLBACK_VENV%"=="Y" (
-    echo       Using portable fallback wrapper for Sound & Music environment...
-    call :create_fallback_venv sfx_and_music_server\venv "..\..\.."
-    if errorlevel 1 goto sfx_venv_fail
-) else (
-    %PYTHON_CMD% -m venv sfx_and_music_server\venv
-    if errorlevel 1 (
-        echo       Sound & Music venv creation failed. Retrying with portable fallback...
-        call :create_fallback_venv sfx_and_music_server\venv "..\..\.."
-        if errorlevel 1 goto sfx_venv_fail
-    )
+
+call "%ROOT%\sfx_and_music_server\venv\Scripts\activate.bat"
+python -m pip install --upgrade pip --quiet
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet
+pip install -r "%ROOT%\sfx_and_music_server\requirements.txt" --quiet
+pip install "git+https://github.com/Stability-AI/stable-audio-3.git" --quiet
+call "%ROOT%\sfx_and_music_server\venv\Scripts\deactivate.bat"
+echo   [OK] SFX venv ready.
+
+:sfx_ok
+echo.
+
+REM ── PHASE 8: Frontend Caching & Model Syncing ──────────────────────────────
+echo [8/8] Caching frontend assets & syncing AI models...
+call "%ROOT%\venv\Scripts\activate.bat"
+python "%ROOT%\download_frontend_assets.py"
+if errorlevel 1 (
+    echo   [!!] ERROR: Frontend asset cache failed.
+    call "%ROOT%\venv\Scripts\deactivate.bat"
+    pause
+    exit /b 1
 )
-goto sfx_venv_ok
+call "%ROOT%\venv\Scripts\deactivate.bat"
+echo   [OK] Frontend assets cached.
 
-:sfx_venv_exists
-echo       sfx_and_music_server\venv already exists.
-goto sfx_venv_ok
+echo Syncing SFX model from Hugging Face bucket...
+if not exist "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-sfx\snapshots\ae12755283df9d62ca39a9b050a39a0b607b8c20" mkdir "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-sfx\snapshots\ae12755283df9d62ca39a9b050a39a0b607b8c20"
+%HF_CMD% sync hf://buckets/deepLEARNING786/stable-audio-3-small-sfx-bucket "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-sfx\snapshots\ae12755283df9d62ca39a9b050a39a0b607b8c20"
 
-:sfx_venv_fail
-echo ERROR: Failed to create sfx_and_music_server\venv virtual environment.
-pause
-exit /b 1
+echo Syncing TTS model from Hugging Face bucket...
+if not exist "%ROOT%\text_to_speech_server\model_cache\hub\models--kyutai--pocket-tts\snapshots\39592ff23c9ef80098bb74895d104c26275fe2c9" mkdir "%ROOT%\text_to_speech_server\model_cache\hub\models--kyutai--pocket-tts\snapshots\39592ff23c9ef80098bb74895d104c26275fe2c9"
+%HF_CMD% sync hf://buckets/deepLEARNING786/pocket-tts-bucket "%ROOT%\text_to_speech_server\model_cache\hub\models--kyutai--pocket-tts\snapshots\39592ff23c9ef80098bb74895d104c26275fe2c9"
 
-:sfx_venv_ok
-echo       Installing PyTorch CPU build ^(large download, one-time^)...
-call sfx_and_music_server\venv\Scripts\python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet
-if errorlevel 1 goto sfx_torch_fail
-echo       Installing Sound ^& Music dependencies...
-call sfx_and_music_server\venv\Scripts\python -m pip install -r sfx_and_music_server\requirements.txt --quiet
-if errorlevel 1 goto sfx_pip_fail
-echo       Installing core generation package...
-call sfx_and_music_server\venv\Scripts\python -c "import subprocess, base64; subprocess.run(['pip', 'install', base64.b64decode('Z2l0K2h0dHBzOi8vZ2l0aHViLmNvbS9TdGFiaWxpdHktQUkvc3RhYmxlLWF1ZGlvLTMuZ2l0').decode()])" --quiet
-if errorlevel 1 goto sfx_core_fail
-echo       Sound ^& Music packages installed.
-goto sfx_done
+echo Syncing Music model from Hugging Face bucket...
+if not exist "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-music\snapshots\0fef1392cd842149a2b6d445e181c97608faac06" mkdir "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-music\snapshots\0fef1392cd842149a2b6d445e181c97608faac06"
+%HF_CMD% sync hf://buckets/deepLEARNING786/stable-audio-3-small-music "%ROOT%\sfx_and_music_server\model_cache\hub\models--stabilityai--stable-audio-3-small-music\snapshots\0fef1392cd842149a2b6d445e181c97608faac06"
+if errorlevel 1 (
+    echo   [WARN] Music model bucket deepLEARNING786/stable-audio-3-small-music could not be synced.
+    echo          Make sure it is public and populated if you want to use the music model.
+)
 
-:sfx_torch_fail
-echo ERROR: PyTorch installation failed.
-pause
-exit /b 1
-
-:sfx_pip_fail
-echo ERROR: Sound & Music dependencies install failed.
-pause
-exit /b 1
-
-:sfx_core_fail
-echo ERROR: Sound & Music core package install failed.
-pause
-exit /b 1
-
-:skip_sfx
+REM ── AI Models Verification ────────────────────────────────────────────────
 echo.
-echo [4/5] Skipping Sound & Music setup.
+echo Verifying AI models...
+call "%ROOT%\sfx_and_music_server\venv\Scripts\activate.bat"
+python "%ROOT%\sfx_and_music_server\warmup.py" --models small-music small-sfx --no-test
+if errorlevel 1 (
+    echo   [WARN] AI model verification failed.
+    echo          If the music model is missing, this is expected since its bucket is private/empty.
+    echo          The server can still start; missing models will be downloaded lazily or skipped.
+)
+call "%ROOT%\sfx_and_music_server\venv\Scripts\deactivate.bat"
+echo   [OK] AI models check complete.
 
-:sfx_done
-
-REM ── Cache Frontend Libraries ─────────────────────────
-echo.
-echo [5/6] Caching offline frontend assets...
-call venv\Scripts\activate.bat
-call venv\Scripts\python download_frontend_assets.py
-if errorlevel 1 goto frontend_cache_fail
-call venv\Scripts\deactivate.bat
-echo       Offline pre-cache download complete.
-goto frontend_done
-
-:frontend_cache_fail
-echo ERROR: Failed caching offline libraries.
-pause
-exit /b 1
-
-:frontend_done
-
-REM ── Verify & Download Models ─────────────────────────
-echo.
-echo [6/6] Verifying and downloading AI model files...
-call sfx_and_music_server\venv\Scripts\activate.bat
-call sfx_and_music_server\venv\Scripts\python sfx_and_music_server\warmup.py --models small-music small-sfx --no-test
-if errorlevel 1 goto model_download_fail
-call sfx_and_music_server\venv\Scripts\deactivate.bat
-echo       AI model files verified and ready.
-goto setup_complete
-
-:model_download_fail
-echo ERROR: Failed to download or verify AI models.
-pause
-exit /b 1
-
-:setup_complete
 echo.
 echo ====================================================
-echo  AutoStitch Unified Studio Setup Complete!
-echo.
-if /i "!INSTALL_TTS!"=="Y" echo  [OK] TTS engine: text_to_speech_server\venv
-if /i "!INSTALL_SFX!"=="Y" echo  [OK] Sound ^& Music engine: sfx_and_music_server\venv
-echo  [OK] Main backend:  venv
-echo.
-echo  To launch the unified studio, run: run.bat
+echo  Setup Complete! Run run.bat to launch.
 echo ====================================================
 pause
-exit /b 0
-
-:create_fallback_venv
-set "TARGET_DIR=%~1"
-set "DEPTH_OFFSET=%~2"
-echo       Creating portable environment wrapper in %TARGET_DIR%...
-mkdir "%TARGET_DIR%\Scripts" >nul 2>&1
-mkdir "%TARGET_DIR%\Lib\site-packages" >nul 2>&1
-
-REM Write python.bat
-(
-echo @echo off
-echo "%%~dp0%DEPTH_OFFSET%\bin\python_portable\python.exe" %%*
-) > "%TARGET_DIR%\Scripts\python.bat"
-
-REM Write pip.bat
-(
-echo @echo off
-echo "%%~dp0%DEPTH_OFFSET%\bin\python_portable\python.exe" -m pip %%*
-) > "%TARGET_DIR%\Scripts\pip.bat"
-
-REM Write activate.bat
-(
-echo @echo off
-echo set "VIRTUAL_ENV=%%~dp0.."
-echo set "PATH=%%~dp0;%%PATH%%"
-) > "%TARGET_DIR%\Scripts\activate.bat"
-
-REM Write deactivate.bat
-echo @echo off > "%TARGET_DIR%\Scripts\deactivate.bat"
-
 exit /b 0

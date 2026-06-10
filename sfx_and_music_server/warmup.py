@@ -1,8 +1,10 @@
 import os
 import base64
+from pathlib import Path
 os.environ["HF_HOME"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "model_cache"))
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["HF_TOKEN"] = base64.b64decode("aGZf").decode() + base64.b64decode("bmRiaGJVS255bVZlR1lKRmlOdGljekNVYmdrSkdwalFNaw==").decode()
+
+# Gated HuggingFace check bypassed. Models synced directly via setup.bat.
 
 import sys
 import time
@@ -126,21 +128,7 @@ def check_dependencies() -> bool:
         dim("  pip install -r requirements.txt")
     return all_ok
 
-# ─── HuggingFace Login Check ──────────────────────────────────────────────────
-def check_hf_login() -> bool:
-    step("Checking HuggingFace authentication")
-    try:
-        from huggingface_hub import whoami, HfApi
-        user = whoami()
-        ok(f"Logged in as: {C.CYAN}{user['name']}{C.RESET}")
-        return True
-    except Exception:
-        warn("Not logged in to HuggingFace")
-        info("Run:  huggingface-cli login")
-        info("Then paste your token from: https://huggingface.co/settings/tokens")
-        info("Also accept licenses at:")
-        info("Also accept required model licenses on HuggingFace Hub.")
-        return False
+# Hugging Face login check removed.
 
 # --- Model Download -----------------------------------------------------------
 def download_model(short_name: str, hf_repo_id: str) -> bool:
@@ -272,10 +260,7 @@ def main():
     # 2. Check disk
     check_disk_space()
 
-    # 3. Check HF login
-    logged_in = check_hf_login()
-    if not logged_in:
-        print(f"\n{C.YELLOW}You can still continue if models are already cached.{C.RESET}")
+    # 3. Check HF login (skipped for bucket sync)
 
     # 4. Ensure models downloaded
     results = ensure_models(selected)

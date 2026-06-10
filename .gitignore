@@ -81,6 +81,12 @@ desktop.ini
 .vscode/
 .idea/
 
-# Large binaries exceeding GitHub 100MB limit
-bin/ffmpeg.exe
-bin/ffprobe.exe
+# Binaries
+bin/*.exe
+bin/*.zip
+
+# Model cache folders
+model_cache/
+sfx_and_music_server/model_cache/
+text_to_speech_server/model_cache/
+

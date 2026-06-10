@@ -4,7 +4,6 @@ from pathlib import Path
 # Force HuggingFace Hub to cache all downloaded weights locally within the server's directory
 os.environ["HF_HOME"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "model_cache"))
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["HF_TOKEN"] = base64.b64decode("aGZf").decode() + base64.b64decode("bmRiaGJVS255bVZlR1lKRmlOdGljekNVYmdrSkdwalFNaw==").decode()
 
 import sys
 
