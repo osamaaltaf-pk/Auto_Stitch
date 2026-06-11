@@ -9,7 +9,7 @@ echo.
 
 REM ── Check Virtual Environment ─────────────────────────
 if not exist "venv" (
-    echo ERROR: Virtual environment not found. Please run setupfinal.bat first.
+    echo ERROR: Virtual environment not found. Please run setup.bat first.
     pause
     exit /b 1
 )
@@ -17,7 +17,7 @@ if not exist "venv" (
 REM ── Check FFmpeg ──────────────────────────────────────
 if not exist "bin\ffmpeg.exe" (
     echo WARNING: FFmpeg not found in bin\ffmpeg.exe
-    echo          Please run setupfinal.bat first to copy/download FFmpeg automatically.
+    echo          Please run setup.bat first to copy/download FFmpeg automatically.
     echo          Or manually place ffmpeg.exe and ffprobe.exe inside the 'bin' folder.
     echo.
     pause
