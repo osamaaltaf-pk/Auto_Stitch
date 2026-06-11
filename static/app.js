@@ -5961,10 +5961,22 @@ function App() {
                     >
                       <option value="none">None (Cut)</option>
                       <option value="fade">Cross Dissolve (Fade)</option>
+                      <option value="fadeblack">Fade to Black</option>
+                      <option value="fadewhite">Fade to White</option>
                       <option value="slide_left">Slide Left</option>
                       <option value="slide_right">Slide Right</option>
-                      <option value="zoom_blur">Zoom Blur</option>
-                      <option value="wipe">Wipe</option>
+                      <option value="slide_up">Slide Up</option>
+                      <option value="slide_down">Slide Down</option>
+                      <option value="wipe_left">Wipe Left</option>
+                      <option value="wipe_right">Wipe Right</option>
+                      <option value="wipe_up">Wipe Up</option>
+                      <option value="wipe_down">Wipe Down</option>
+                      <option value="zoomin">Zoom In</option>
+                      <option value="pixelize">Pixelize</option>
+                      <option value="dissolve">Dissolve</option>
+                      <option value="circleopen">Circle Open</option>
+                      <option value="circleclose">Circle Close</option>
+                      <option value="hblur">Horizontal Blur</option>
                     </select>
                   </div>
 
@@ -6380,10 +6392,22 @@ function App() {
                           >
                             <option value="none">None (Cut)</option>
                             <option value="fade">Cross Dissolve (Fade)</option>
+                            <option value="fadeblack">Fade to Black</option>
+                            <option value="fadewhite">Fade to White</option>
                             <option value="slide_left">Slide Left</option>
                             <option value="slide_right">Slide Right</option>
-                            <option value="zoom_blur">Zoom Blur</option>
-                            <option value="wipe">Wipe</option>
+                            <option value="slide_up">Slide Up</option>
+                            <option value="slide_down">Slide Down</option>
+                            <option value="wipe_left">Wipe Left</option>
+                            <option value="wipe_right">Wipe Right</option>
+                            <option value="wipe_up">Wipe Up</option>
+                            <option value="wipe_down">Wipe Down</option>
+                            <option value="zoomin">Zoom In</option>
+                            <option value="pixelize">Pixelize</option>
+                            <option value="dissolve">Dissolve</option>
+                            <option value="circleopen">Circle Open</option>
+                            <option value="circleclose">Circle Close</option>
+                            <option value="hblur">Horizontal Blur</option>
                           </select>
                         </div>
 
