@@ -20,6 +20,9 @@ class Logger(object):
         self.terminal.flush()
         self.log.flush()
 
+    def isatty(self):
+        return hasattr(self.terminal, "isatty") and self.terminal.isatty()
+
 sys.stdout = Logger()
 sys.stderr = Logger()
 
