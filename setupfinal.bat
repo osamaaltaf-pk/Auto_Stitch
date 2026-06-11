@@ -93,7 +93,7 @@ echo.
 REM ── PHASE 2: Install Hugging Face CLI ──────────────────────────────────────
 echo [2/8] Setting up Hugging Face CLI...
 %PYTHON_CMD% -m pip install --upgrade pip --quiet
-%PYTHON_CMD% -m pip install -U huggingface_hub --quiet
+%PYTHON_CMD% -m pip install -U huggingface_hub hf_transfer --quiet
 if errorlevel 1 (
     echo   [!!] WARNING: pip installation of huggingface_hub failed.
     echo        Trying direct PowerShell installer...
@@ -281,6 +281,9 @@ call "%ROOT%\venv\Scripts\deactivate.bat"
 echo   [OK] Frontend assets cached.
 
 echo.
+echo Enabling high-speed downloads (hf_transfer)...
+set HF_HUB_ENABLE_HF_TRANSFER=1
+
 echo Downloading SFX & Music model cache from Hugging Face...
 if not exist "%ROOT%\sfx_and_music_server\model_cache" mkdir "%ROOT%\sfx_and_music_server\model_cache"
 "%HF_CMD%" download deepLEARNING786/sfx-music-auto-stitch --local-dir "%ROOT%\sfx_and_music_server\model_cache" --local-dir-use-symlinks False
