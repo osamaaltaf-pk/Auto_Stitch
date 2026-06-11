@@ -877,8 +877,9 @@ async def concat_clips(manifest: Manifest, output_dir: Path, rendered_clips: Lis
         xfade_trans = "fade"
         if trans == "slide_left": xfade_trans = "slideleft"
         elif trans == "slide_right": xfade_trans = "slideright"
-        elif trans == "zoom_blur": xfade_trans = "zoomblur"
-        elif trans == "wipe": xfade_trans = "wipe"
+        elif trans == "zoom_blur": xfade_trans = "zoomin"
+        elif trans == "wipe": xfade_trans = "wipeleft"
+        else: xfade_trans = "fade"
         
         dur_val = trans_duration if trans != "none" else 0.04
         offset = max(0.0, current_offset - dur_val)
