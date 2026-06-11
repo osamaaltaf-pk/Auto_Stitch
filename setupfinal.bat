@@ -1,48 +1,97 @@
 @echo off
 setlocal enabledelayedexpansion
-title AutoStitch Setup - Step 2 (Environments & HF Downloads)
+title AutoStitch Unified Setup (Final)
 
-REM ── Root directory ──────────────────────────────────────────────────────────
+REM ── Root directory (always the folder this .bat lives in) ─────────────────
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
 echo ====================================================
-echo  AutoStitch Setup - Step 2: Environments & Assets
+echo  AutoStitch Unified Studio - Final Setup
 echo  Root: %ROOT%
 echo ====================================================
 echo.
 
-REM ── Check Python ────────────────────────────────────────────────────────────
+REM ── PHASE 1: Python Detection & Bootstrapping ──────────────────────────────
+echo [1/8] Detecting Python environment...
 set "PYTHON_CMD="
+
+REM 1. Check if python is already in PATH and works
 python --version >nul 2>&1
 if not errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PY_VER=%%V"
+    echo   [OK] System Python found: !PY_VER!
     set "PYTHON_CMD=python"
+    goto python_ready
+)
+
+REM 2. Check default Windows non-admin local install path
+if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" (
+    echo   [OK] Found Python 3.12 in AppData local directory.
+    set "PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python312;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%PATH%"
+    set "PYTHON_CMD=python"
+    goto python_ready
+)
+
+REM 3. If Python is completely missing, download and install it
+echo   Python not found. Bootstrapping Python 3.12.10...
+if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
+
+if exist "%ROOT%\bin\python-3.12.10-amd64.exe" (
+    echo   [OK] Python installer already present at bin\python-3.12.10-amd64.exe - skipping download.
 ) else (
-    if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" (
-        set "PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python312;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%PATH%"
-        set "PYTHON_CMD=python"
-    ) else (
-        where py >nul 2>&1
-        if not errorlevel 1 (
-            set "PYTHON_CMD=py"
-        )
+    echo   Downloading Python 3.12.10 installer...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile '%ROOT%\bin\python-3.12.10-amd64.exe'"
+
+    if errorlevel 1 (
+        echo   [!!] ERROR: Failed to download Python. Check internet connection.
+        pause
+        exit /b 1
     )
 )
 
-if not defined PYTHON_CMD (
-    echo   [!!] ERROR: Python was not found on your system.
-    echo        Please run setup1.bat first to install Python.
-    echo.
+echo   Installing Python 3.12.10 silently...
+"%ROOT%\bin\python-3.12.10-amd64.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0 Include_launcher=1
+if errorlevel 1 (
+    echo   [!!] ERROR: Python installation failed.
     pause
     exit /b 1
 )
 
-for /f "tokens=2" %%V in ('%PYTHON_CMD% --version 2^>^&1') do set "PY_VER=%%V"
-echo   [OK] Python verified: !PY_VER!
+echo   Waiting for installation to register...
+timeout /t 10 /nobreak >nul
+
+REM Add the expected location of the newly installed Python to session PATH
+set "PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python312;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%PATH%"
+
+python --version >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PY_VER=%%V"
+    echo   [OK] Python installed successfully: !PY_VER!
+    set "PYTHON_CMD=python"
+    goto python_ready
+)
+
+REM Fallback check for python launcher
+where py >nul 2>&1
+if not errorlevel 1 (
+    echo   [OK] Using Python launcher (py).
+    set "PYTHON_CMD=py"
+    goto python_ready
+)
+
+echo   [!!] ERROR: Python was installed but is still not recognized in this session.
+echo        Please restart this setup window or log out and log back in.
+pause
+exit /b 1
+
+:python_ready
+echo   Using Python Command: %PYTHON_CMD%
 echo.
 
-REM ── Install Hugging Face Hub CLI ────────────────────────────────────────────
-echo [1/7] Installing Hugging Face CLI...
+REM ── PHASE 2: Install Hugging Face CLI ──────────────────────────────────────
+echo [2/8] Setting up Hugging Face CLI...
 %PYTHON_CMD% -m pip install --upgrade pip --quiet
 %PYTHON_CMD% -m pip install -U huggingface_hub --quiet
 if errorlevel 1 (
@@ -55,38 +104,50 @@ REM Dynamically locate the python Scripts directory and add it to session PATH
 for /f "delims=" %%I in ('%PYTHON_CMD% -c "import sys, os; print(os.path.dirname(sys.executable))"') do set "PY_DIR=%%I"
 set "PATH=!PY_DIR!;!PY_DIR!\Scripts;%PATH%"
 
+REM Determine the correct HF CLI command
 set "HF_CMD="
+
+REM 1. Check if hf.exe exists in python Scripts folder
 if exist "!PY_DIR!\Scripts\hf.exe" (
     set "HF_CMD=!PY_DIR!\Scripts\hf.exe"
 )
+
+REM 2. Check if hf is in PATH
 if not defined HF_CMD (
     where hf >nul 2>&1
     if not errorlevel 1 (
         set "HF_CMD=hf"
     )
 )
+
+REM 3. Check if huggingface-cli is in PATH (even though deprecated, check as last resort)
 if not defined HF_CMD (
     where huggingface-cli >nul 2>&1
     if not errorlevel 1 (
         set "HF_CMD=huggingface-cli"
     )
 )
+
+REM 4. Check if it's installed in the user cargo bin or other common locations
 if not defined HF_CMD (
     if exist "%USERPROFILE%\.cargo\bin\hf.exe" (
         set "HF_CMD=%USERPROFILE%\.cargo\bin\hf.exe"
     )
 )
 
+REM 5. If still not found, print error and exit
 if not defined HF_CMD (
     echo   [!!] ERROR: Hugging Face CLI (hf) was not found after installation.
+    echo        Please try running this command manually to install it:
+    echo        python -m pip install -U huggingface_hub
     pause
     exit /b 1
 )
 echo   [OK] Hugging Face CLI ready: %HF_CMD%
 echo.
 
-REM ── Sync Required Binaries ──────────────────────────────────────────────────
-echo [2/7] Syncing required binaries from Hugging Face bucket...
+REM ── PHASE 3: Sync Binaries ─────────────────────────────────────────────────
+echo [3/8] Syncing binaries from Hugging Face bucket...
 if not exist "%ROOT%\bin" mkdir "%ROOT%\bin"
 "%HF_CMD%" sync hf://buckets/deepLEARNING786/YTAuto "%ROOT%\bin"
 if errorlevel 1 (
@@ -95,11 +156,11 @@ if errorlevel 1 (
     exit /b 1
 )
 set "PATH=%ROOT%\bin;%PATH%"
-echo   [OK] Binaries synced successfully.
+echo   [OK] Binaries synced and added to PATH.
 echo.
 
-REM ── Verify FFmpeg ───────────────────────────────────────────────────────────
-echo [3/7] Verifying FFmpeg...
+REM ── PHASE 4: Check FFmpeg ──────────────────────────────────────────────────
+echo [4/8] Verifying FFmpeg...
 if exist "%ROOT%\bin\ffmpeg.exe" (
     echo   [OK] ffmpeg.exe found in bin\
 ) else (
@@ -109,15 +170,15 @@ if exist "%ROOT%\bin\ffmpeg.exe" (
 )
 echo.
 
-REM ── Build Main Venv ─────────────────────────────────────────────────────────
-echo [4/7] Setting up main app virtual environment...
+REM ── PHASE 5: Main venv ─────────────────────────────────────────────────────
+echo [5/8] Setting up main venv...
 if exist "%ROOT%\venv\Scripts\python.exe" (
     "%ROOT%\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
     if not errorlevel 1 (
-        echo   [OK] Main venv healthy - skipping rebuild.
+        echo   [OK] Main venv already healthy - skipping.
         goto venv_ok
     )
-    echo   Broken main venv detected - rebuilding...
+    echo   Broken venv detected - rebuilding...
     rmdir /s /q "%ROOT%\venv" >nul 2>&1
 )
 
@@ -129,31 +190,31 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo   Installing requirements for main app...
+echo   Installing main requirements...
 call "%ROOT%\venv\Scripts\activate.bat"
 python -m pip install --upgrade pip --quiet
 pip install -r "%ROOT%\requirements.txt" --quiet
 if errorlevel 1 (
-    echo   [!!] ERROR: Requirements installation failed.
+    echo   [!!] ERROR: pip install for main app failed.
     call "%ROOT%\venv\Scripts\deactivate.bat"
     pause
     exit /b 1
 )
 call "%ROOT%\venv\Scripts\deactivate.bat"
-echo   [OK] Main app environment ready.
+echo   [OK] Main app venv ready.
 
 :venv_ok
 echo.
 
-REM ── Build TTS Venv ──────────────────────────────────────────────────────────
-echo [5/7] Setting up TTS engine virtual environment...
+REM ── PHASE 6: TTS venv ──────────────────────────────────────────────────────
+echo [6/8] Setting up TTS environment...
 if exist "%ROOT%\text_to_speech_server\venv\Scripts\python.exe" (
     "%ROOT%\text_to_speech_server\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
     if not errorlevel 1 (
-        echo   [OK] TTS venv healthy - skipping rebuild.
+        echo   [OK] TTS venv already healthy - skipping.
         goto tts_ok
     )
-    echo   Broken TTS venv detected - rebuilding...
+    echo   Broken TTS venv - rebuilding...
     rmdir /s /q "%ROOT%\text_to_speech_server\venv" >nul 2>&1
 )
 
@@ -165,26 +226,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo   Installing requirements for TTS server...
 call "%ROOT%\text_to_speech_server\venv\Scripts\activate.bat"
 python -m pip install --upgrade pip --quiet
 pip install --extra-index-url https://download.pytorch.org/whl/cpu -r "%ROOT%\text_to_speech_server\requirements.txt" --quiet
 pip install "piper-tts>=0.1.0" --quiet
 call "%ROOT%\text_to_speech_server\venv\Scripts\deactivate.bat"
-echo   [OK] TTS environment ready.
+echo   [OK] TTS venv ready.
 
 :tts_ok
 echo.
 
-REM ── Build SFX Venv ──────────────────────────────────────────────────────────
-echo [6/7] Setting up Sound and Music virtual environment...
+REM ── PHASE 7: SFX venv ──────────────────────────────────────────────────────
+echo [7/8] Setting up Sound and Music environment...
 if exist "%ROOT%\sfx_and_music_server\venv\Scripts\python.exe" (
     "%ROOT%\sfx_and_music_server\venv\Scripts\python.exe" -c "import socket" >nul 2>&1
     if not errorlevel 1 (
-        echo   [OK] SFX venv healthy - skipping rebuild.
+        echo   [OK] SFX venv already healthy - skipping.
         goto sfx_ok
     )
-    echo   Broken SFX venv detected - rebuilding...
+    echo   Broken SFX venv - rebuilding...
     rmdir /s /q "%ROOT%\sfx_and_music_server\venv" >nul 2>&1
 )
 
@@ -196,24 +256,23 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo   Installing requirements for Sound and Music server...
 call "%ROOT%\sfx_and_music_server\venv\Scripts\activate.bat"
 python -m pip install --upgrade pip --quiet
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet
 pip install -r "%ROOT%\sfx_and_music_server\requirements.txt" --quiet
 pip install "git+https://github.com/Stability-AI/stable-audio-3.git" --quiet
 call "%ROOT%\sfx_and_music_server\venv\Scripts\deactivate.bat"
-echo   [OK] Sound and Music environment ready.
+echo   [OK] SFX venv ready.
 
 :sfx_ok
 echo.
 
-REM ── Pre-cache Assets & Download Models ──────────────────────────────────────
-echo [7/7] Pre-caching frontend assets & downloading model caches...
+REM ── PHASE 8: Frontend Caching & Model Syncing ──────────────────────────────
+echo [8/8] Caching frontend assets & syncing AI models...
 call "%ROOT%\venv\Scripts\activate.bat"
 python "%ROOT%\download_frontend_assets.py"
 if errorlevel 1 (
-    echo   [!!] ERROR: Frontend asset pre-caching failed.
+    echo   [!!] ERROR: Frontend asset cache failed.
     call "%ROOT%\venv\Scripts\deactivate.bat"
     pause
     exit /b 1
@@ -237,7 +296,7 @@ if errorlevel 1 (
     echo   [WARN] Failed to download TTS model cache from Hugging Face.
 )
 
-REM ── Verify AI Models ────────────────────────────────────────────────────────
+REM ── AI Models Verification ────────────────────────────────────────────────
 echo.
 echo Verifying AI models cache health...
 call "%ROOT%\sfx_and_music_server\venv\Scripts\activate.bat"
@@ -251,7 +310,7 @@ echo   [OK] Cache checks completed.
 
 echo.
 echo ====================================================
-echo  Setup Complete! Run run.bat to launch AutoStitch.
+echo  Setup Complete! Run run.bat to launch.
 echo ====================================================
 pause
 exit /b 0

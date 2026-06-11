@@ -89,4 +89,5 @@ bin/*.zip
 model_cache/
 sfx_and_music_server/model_cache/
 text_to_speech_server/model_cache/
+*.zip
 
